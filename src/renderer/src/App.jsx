@@ -54,6 +54,7 @@ function Toast({ message, onClose }) {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
+  const [loginSuccess, setLoginSuccess] = useState(false)
   const [toast, setToast] = useState(null)
   const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
@@ -84,10 +85,14 @@ export default function App() {
   async function handleLogin() {
     setAuthLoading(true)
     const result = await window.api.login()
-    setIsAuthenticated(result.isAuthenticated)
     setAuthLoading(false)
     if (result.isAuthenticated) {
-      refresh()
+      setLoginSuccess(true)
+      setTimeout(() => {
+        setLoginSuccess(false)
+        setIsAuthenticated(true)
+        refresh()
+      }, 2000)
     }
   }
 
@@ -108,6 +113,40 @@ export default function App() {
         }}
       >
         読み込み中...
+      </div>
+    )
+  }
+
+  if (loginSuccess) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          gap: '16px',
+          fontFamily: 'sans-serif'
+        }}
+      >
+        <div
+          style={{
+            width: '64px',
+            height: '64px',
+            background: '#FF0000',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '32px',
+            color: 'white'
+          }}
+        >
+          ✓
+        </div>
+        <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#111' }}>ログイン完了</p>
+        <p style={{ fontSize: '13px', color: '#888' }}>配信スケジュールを読み込んでいます...</p>
       </div>
     )
   }
