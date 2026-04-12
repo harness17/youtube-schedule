@@ -45,7 +45,8 @@ export async function startAuthFlow() {
       const error = url.searchParams.get('error')
       const code = url.searchParams.get('code')
 
-      res.end('<html><body><h2>認証完了。このウィンドウを閉じてください。</h2></body></html>')
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end('<html><head><meta charset="utf-8"></head><body><h2>認証完了。このウィンドウを閉じてください。</h2></body></html>')
       server.close()
 
       if (error || !code) {
