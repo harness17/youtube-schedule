@@ -20,8 +20,8 @@ const makeItem = (id, status, scheduledStartTime) => ({
 
 const liveItems = [makeItem('lv1', 'live', '2026-04-12T08:00:00Z')]
 const upcomingItems = [
-  makeItem('v1', 'upcoming', '2026-04-13T09:00:00Z'),
-  makeItem('v2', 'upcoming', '2026-04-15T18:00:00Z'),
+  makeItem('v1', 'upcoming', '2026-04-13T00:00:00+09:00'), // JST 4月13日
+  makeItem('v2', 'upcoming', '2026-04-15T18:00:00+09:00'), // JST 4月15日
 ]
 
 describe('ScheduleList', () => {

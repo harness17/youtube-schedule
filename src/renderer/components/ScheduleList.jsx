@@ -1,20 +1,39 @@
 import ScheduleCard from './ScheduleCard.jsx'
 
+const TZ = 'Asia/Tokyo'
+
+function getDateKey(isoString) {
+  const d = new Date(isoString)
+  return d.toLocaleDateString('ja-JP', {
+    timeZone: TZ,
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  })
+}
+
 function groupByDate(items) {
   const groups = {}
   for (const item of items) {
-    const date = new Date(item.scheduledStartTime)
-    const key = date.toLocaleDateString('ja-JP', {
-      month: 'long', day: 'numeric', weekday: 'short',
-      timeZone: 'UTC',
-    })
+    const key = getDateKey(item.scheduledStartTime)
     if (!groups[key]) groups[key] = []
     groups[key].push(item)
   }
   return groups
 }
 
-export default function ScheduleList({ live, upcoming }) {
+function getSortedGroupEntries(groups, items) {
+  // items は scheduledStartTime 昇順でソート済みなので、
+  // 最初に出現した順でグループキーを並べる
+  const seen = []
+  for (const item of items) {
+    const key = getDateKey(item.scheduledStartTime)
+    if (!seen.includes(key)) seen.push(key)
+  }
+  return seen.map((key) => [key, groups[key]])
+}
+
+export default function ScheduleList({ live = [], upcoming = [] }) {
   const isEmpty = live.length === 0 && upcoming.length === 0
 
   if (isEmpty) {
@@ -26,6 +45,7 @@ export default function ScheduleList({ live, upcoming }) {
   }
 
   const groups = groupByDate(upcoming)
+  const sortedEntries = getSortedGroupEntries(groups, upcoming)
 
   return (
     <div>
@@ -44,7 +64,7 @@ export default function ScheduleList({ live, upcoming }) {
         </div>
       )}
 
-      {Object.entries(groups).map(([dateLabel, groupItems]) => (
+      {sortedEntries.map(([dateLabel, groupItems]) => (
         <div key={dateLabel} style={{ marginBottom: '24px' }}>
           <h2 style={{
             fontSize: '14px', fontWeight: 'bold', color: '#333',
