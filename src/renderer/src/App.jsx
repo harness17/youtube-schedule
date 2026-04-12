@@ -4,8 +4,13 @@ import ScheduleList from '../components/ScheduleList.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
 
 export class ErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { error: null } }
-  static getDerivedStateFromError(error) { return { error } }
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
   render() {
     if (this.state.error) {
       return (
@@ -26,11 +31,20 @@ function Toast({ message, onClose }) {
     return () => clearTimeout(timer)
   }, [onClose])
   return (
-    <div style={{
-      position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-      background: '#333', color: 'white', padding: '10px 24px',
-      borderRadius: '8px', fontSize: '14px', zIndex: 1000,
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#333',
+        color: 'white',
+        padding: '10px 24px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        zIndex: 1000
+      }}
+    >
       {message}
     </div>
   )
@@ -45,7 +59,8 @@ export default function App() {
 
   useEffect(() => {
     try {
-      window.api.checkAuth()
+      window.api
+        .checkAuth()
         .then(({ isAuthenticated }) => {
           setIsAuthenticated(isAuthenticated)
           if (isAuthenticated) refresh()
@@ -82,7 +97,15 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          fontFamily: 'sans-serif'
+        }}
+      >
         読み込み中...
       </div>
     )
@@ -94,7 +117,14 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}
+      >
         <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>YouTube 配信予定</h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
@@ -102,10 +132,13 @@ export default function App() {
             onClick={refresh}
             disabled={loading}
             style={{
-              padding: '6px 16px', background: '#FF0000', color: 'white',
-              border: 'none', borderRadius: '6px',
+              padding: '6px 16px',
+              background: '#FF0000',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
               cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
+              opacity: loading ? 0.6 : 1
             }}
           >
             {loading ? '更新中...' : '更新'}
@@ -113,8 +146,13 @@ export default function App() {
           <button
             onClick={handleLogout}
             style={{
-              padding: '6px 12px', background: '#f0f0f0', color: '#333',
-              border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+              padding: '6px 12px',
+              background: '#f0f0f0',
+              color: '#333',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
             }}
           >
             ログアウト
@@ -122,10 +160,17 @@ export default function App() {
         </div>
       </div>
       {error && error !== 'QUOTA_EXCEEDED' && (
-        <div style={{
-          background: '#fff3f3', border: '1px solid #ffcccc', borderRadius: '6px',
-          padding: '8px 12px', marginBottom: '12px', fontSize: '13px', color: '#cc0000',
-        }}>
+        <div
+          style={{
+            background: '#fff3f3',
+            border: '1px solid #ffcccc',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            marginBottom: '12px',
+            fontSize: '13px',
+            color: '#cc0000'
+          }}
+        >
           {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
         </div>
       )}

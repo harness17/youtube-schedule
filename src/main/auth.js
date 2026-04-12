@@ -27,12 +27,15 @@ async function saveCredentials(client) {
   const content = await fs.readFile(CREDENTIALS_PATH, 'utf-8')
   const keys = JSON.parse(content)
   const key = keys.installed || keys.web
-  await fs.writeFile(TOKEN_PATH, JSON.stringify({
-    type: 'authorized_user',
-    client_id: key.client_id,
-    client_secret: key.client_secret,
-    refresh_token: client.credentials.refresh_token,
-  }))
+  await fs.writeFile(
+    TOKEN_PATH,
+    JSON.stringify({
+      type: 'authorized_user',
+      client_id: key.client_id,
+      client_secret: key.client_secret,
+      refresh_token: client.credentials.refresh_token
+    })
+  )
 }
 
 export async function getAuthenticatedClient() {
@@ -46,5 +49,9 @@ export async function startAuthFlow() {
 }
 
 export async function logout() {
-  try { await fs.unlink(TOKEN_PATH) } catch { /* already removed */ }
+  try {
+    await fs.unlink(TOKEN_PATH)
+  } catch {
+    /* already removed */
+  }
 }

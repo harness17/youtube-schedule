@@ -8,7 +8,7 @@ function getDateKey(isoString) {
     timeZone: TZ,
     month: 'long',
     day: 'numeric',
-    weekday: 'short',
+    weekday: 'short'
   })
 }
 
@@ -51,11 +51,16 @@ export default function ScheduleList({ live = [], upcoming = [] }) {
     <div>
       {live.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
-          <h2 style={{
-            fontSize: '14px', fontWeight: 'bold', color: '#FF0000',
-            padding: '4px 0', marginBottom: '8px',
-            borderBottom: '2px solid #FF0000',
-          }}>
+          <h2
+            style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#FF0000',
+              padding: '4px 0',
+              marginBottom: '8px',
+              borderBottom: '2px solid #FF0000'
+            }}
+          >
             ライブ配信中
           </h2>
           {live.map((item) => (
@@ -66,11 +71,16 @@ export default function ScheduleList({ live = [], upcoming = [] }) {
 
       {sortedEntries.map(([dateLabel, groupItems]) => (
         <div key={dateLabel} style={{ marginBottom: '24px' }}>
-          <h2 style={{
-            fontSize: '14px', fontWeight: 'bold', color: '#333',
-            padding: '4px 0', marginBottom: '8px',
-            borderBottom: '2px solid #ccc',
-          }}>
+          <h2
+            style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#333',
+              padding: '4px 0',
+              marginBottom: '8px',
+              borderBottom: '2px solid #ccc'
+            }}
+          >
             {dateLabel}
           </h2>
           {groupItems.map((item) => (

@@ -45,7 +45,9 @@ export function useSchedule() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   return { live, upcoming, loading, error, fromCache, refresh }
 }

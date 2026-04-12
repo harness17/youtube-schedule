@@ -5,23 +5,29 @@ import ScheduleList from '../../src/renderer/components/ScheduleList.jsx'
 beforeEach(() => {
   window.api = {
     openExternal: vi.fn().mockResolvedValue({ success: true }),
-    addToWatchLater: vi.fn().mockResolvedValue({ success: true }),
+    addToWatchLater: vi.fn().mockResolvedValue({ success: true })
   }
 })
 
 const makeItem = (id, status, scheduledStartTime) => ({
-  id, status, title: `配信${id}`, channelTitle: 'ch1',
-  channelId: 'UC1', description: '', thumbnail: '',
-  scheduledStartTime, actualStartTime: null,
+  id,
+  status,
+  title: `配信${id}`,
+  channelTitle: 'ch1',
+  channelId: 'UC1',
+  description: '',
+  thumbnail: '',
+  scheduledStartTime,
+  actualStartTime: null,
   concurrentViewers: null,
   url: `https://youtube.com/watch?v=${id}`,
-  channelUrl: 'https://youtube.com/channel/UC1',
+  channelUrl: 'https://youtube.com/channel/UC1'
 })
 
 const liveItems = [makeItem('lv1', 'live', '2026-04-12T08:00:00Z')]
 const upcomingItems = [
   makeItem('v1', 'upcoming', '2026-04-13T00:00:00+09:00'), // JST 4月13日
-  makeItem('v2', 'upcoming', '2026-04-15T18:00:00+09:00'), // JST 4月15日
+  makeItem('v2', 'upcoming', '2026-04-15T18:00:00+09:00') // JST 4月15日
 ]
 
 describe('ScheduleList', () => {

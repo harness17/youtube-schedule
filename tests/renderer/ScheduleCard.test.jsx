@@ -14,15 +14,20 @@ const mockItem = {
   actualStartTime: null,
   concurrentViewers: '12000',
   url: 'https://www.youtube.com/watch?v=vid1',
-  channelUrl: 'https://www.youtube.com/channel/UC_test1',
+  channelUrl: 'https://www.youtube.com/channel/UC_test1'
 }
 
-const liveItem = { ...mockItem, id: 'live1', status: 'live', actualStartTime: '2026-04-12T08:05:00Z' }
+const liveItem = {
+  ...mockItem,
+  id: 'live1',
+  status: 'live',
+  actualStartTime: '2026-04-12T08:05:00Z'
+}
 
 beforeEach(() => {
   window.api = {
     openExternal: vi.fn().mockResolvedValue({ success: true }),
-    addToWatchLater: vi.fn().mockResolvedValue({ success: true }),
+    addToWatchLater: vi.fn().mockResolvedValue({ success: true })
   }
 })
 

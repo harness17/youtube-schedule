@@ -7,5 +7,5 @@ contextBridge.exposeInMainWorld('api', {
   getSchedule: () => ipcRenderer.invoke('schedule:get'),
   refreshSchedule: () => ipcRenderer.invoke('schedule:refresh'),
   addToWatchLater: (videoId) => ipcRenderer.invoke('schedule:addToWatchLater', videoId),
-  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
 })
