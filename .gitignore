@@ -8,3 +8,4 @@ out
 credentials.json
 token.json
 CLAUDE.local.md
+coverage/
