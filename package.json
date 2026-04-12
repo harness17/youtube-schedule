@@ -1,10 +1,10 @@
 {
   "name": "youtube-schedule",
   "version": "1.0.0",
-  "description": "An Electron application with React",
+  "description": "YouTube登録チャンネルの配信予定・ライブ中の動画を一覧表示するElectronデスクトップアプリ",
   "main": "./out/main/index.js",
-  "author": "YouTube Schedule Viewer",
-  "homepage": "",
+  "author": "harness17",
+  "homepage": "https://github.com/harness17/youtube-schedule",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
