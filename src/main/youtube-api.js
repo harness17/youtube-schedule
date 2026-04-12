@@ -16,7 +16,7 @@ async function getSubscribedChannelIds(yt) {
       part: ['snippet'],
       mine: true,
       maxResults: 50,
-      pageToken,
+      pageToken
     })
     for (const item of res.data.items || []) {
       channelIds.push(item.snippet.resourceId.channelId)
@@ -30,11 +30,15 @@ async function getSubscribedChannelIds(yt) {
 function fetchRssFeed(channelId) {
   return new Promise((resolve) => {
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
-    https.get(url, (res) => {
-      let data = ''
-      res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => resolve(data))
-    }).on('error', () => resolve(''))
+    https
+      .get(url, (res) => {
+        let data = ''
+        res.on('data', (chunk) => {
+          data += chunk
+        })
+        res.on('end', () => resolve(data))
+      })
+      .on('error', () => resolve(''))
   })
 }
 
@@ -46,9 +50,7 @@ function parseVideoIdsFromRss(xml) {
     const entries = result?.feed?.entry
     if (!entries) return []
     const arr = Array.isArray(entries) ? entries : [entries]
-    return arr
-      .map((e) => e['yt:videoId'])
-      .filter(Boolean)
+    return arr.map((e) => e['yt:videoId']).filter(Boolean)
   } catch {
     return []
   }
@@ -62,7 +64,7 @@ async function getVideoDetailsBatch(yt, videoIds) {
     const batch = videoIds.slice(i, i + 50)
     const res = await yt.videos.list({
       part: ['snippet', 'liveStreamingDetails'],
-      id: batch.join(','),
+      id: batch.join(',')
     })
     results.push(...(res.data.items || []))
   }
@@ -86,7 +88,7 @@ function toScheduleItem(v, status) {
     actualStartTime: v.liveStreamingDetails?.actualStartTime ?? null,
     concurrentViewers: v.liveStreamingDetails?.concurrentViewers ?? null,
     url: `https://www.youtube.com/watch?v=${v.id}`,
-    channelUrl: `https://www.youtube.com/channel/${v.snippet.channelId}`,
+    channelUrl: `https://www.youtube.com/channel/${v.snippet.channelId}`
   }
 }
 
@@ -98,9 +100,7 @@ export async function fetchSchedule(authClient) {
 
   // Step2: 各チャンネルの RSS を並列取得（0ユニット）
   const rssResults = await Promise.all(channelIds.map(fetchRssFeed))
-  const allVideoIds = [...new Set(
-    rssResults.flatMap((xml) => parseVideoIdsFromRss(xml))
-  )]
+  const allVideoIds = [...new Set(rssResults.flatMap((xml) => parseVideoIdsFromRss(xml)))]
 
   // Step3: 動画詳細を取得（1ユニット/50件）
   const details = await getVideoDetailsBatch(yt, allVideoIds)
@@ -129,27 +129,8 @@ export async function fetchSchedule(authClient) {
   }
 
   upcoming.sort(
-    (a, b) =>
-      new Date(a.scheduledStartTime).getTime() -
-      new Date(b.scheduledStartTime).getTime()
+    (a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
   )
 
   return { live, upcoming }
-}
-
-export async function addToWatchLater(authClient, videoId) {
-  const yt = google.youtube({ version: 'v3', auth: authClient })
-  await yt.playlistItems.insert({
-    part: ['snippet'],
-    requestBody: {
-      snippet: {
-        playlistId: 'WL',
-        resourceId: {
-          kind: 'youtube#video',
-          videoId,
-        },
-      },
-    },
-  })
-  return true
 }

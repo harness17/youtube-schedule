@@ -7,3 +7,5 @@ out
 .env
 credentials.json
 token.json
+CLAUDE.local.md
+coverage/

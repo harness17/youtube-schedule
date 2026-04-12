@@ -14,15 +14,19 @@ const mockItem = {
   actualStartTime: null,
   concurrentViewers: '12000',
   url: 'https://www.youtube.com/watch?v=vid1',
-  channelUrl: 'https://www.youtube.com/channel/UC_test1',
+  channelUrl: 'https://www.youtube.com/channel/UC_test1'
 }
 
-const liveItem = { ...mockItem, id: 'live1', status: 'live', actualStartTime: '2026-04-12T08:05:00Z' }
+const liveItem = {
+  ...mockItem,
+  id: 'live1',
+  status: 'live',
+  actualStartTime: '2026-04-12T08:05:00Z'
+}
 
 beforeEach(() => {
   window.api = {
-    openExternal: vi.fn().mockResolvedValue({ success: true }),
-    addToWatchLater: vi.fn().mockResolvedValue({ success: true }),
+    openExternal: vi.fn().mockResolvedValue({ success: true })
   }
 })
 
@@ -47,12 +51,6 @@ describe('ScheduleCard', () => {
     render(<ScheduleCard item={mockItem} />)
     fireEvent.click(screen.getByText('YouTube で開く'))
     expect(window.api.openExternal).toHaveBeenCalledWith(mockItem.url)
-  })
-
-  it('後で見るボタンで addToWatchLater が呼ばれる', () => {
-    render(<ScheduleCard item={mockItem} />)
-    fireEvent.click(screen.getByText('後で見る'))
-    expect(window.api.addToWatchLater).toHaveBeenCalledWith(mockItem.id)
   })
 
   it('通知ボタンでチャンネルページが開く', () => {

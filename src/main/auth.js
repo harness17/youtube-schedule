@@ -4,7 +4,7 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 
-const SCOPES = ['https://www.googleapis.com/auth/youtube']
+const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
 // credentials.json: プロジェクトルート（dev）または exe 隣（prod）
 const CREDENTIALS_PATH = app.isPackaged
@@ -16,23 +16,22 @@ const TOKEN_PATH = path.join(app.getPath('userData'), 'token.json')
 
 async function loadSavedCredentials() {
   try {
-    const content = await fs.readFile(TOKEN_PATH, 'utf-8')
-    return google.auth.fromJSON(JSON.parse(content))
+    const { refresh_token } = JSON.parse(await fs.readFile(TOKEN_PATH, 'utf-8'))
+    if (!refresh_token) return null
+
+    const keys = JSON.parse(await fs.readFile(CREDENTIALS_PATH, 'utf-8'))
+    const key = keys.installed || keys.web
+
+    const client = new google.auth.OAuth2(key.client_id, key.client_secret)
+    client.setCredentials({ refresh_token })
+    return client
   } catch {
     return null
   }
 }
 
 async function saveCredentials(client) {
-  const content = await fs.readFile(CREDENTIALS_PATH, 'utf-8')
-  const keys = JSON.parse(content)
-  const key = keys.installed || keys.web
-  await fs.writeFile(TOKEN_PATH, JSON.stringify({
-    type: 'authorized_user',
-    client_id: key.client_id,
-    client_secret: key.client_secret,
-    refresh_token: client.credentials.refresh_token,
-  }))
+  await fs.writeFile(TOKEN_PATH, JSON.stringify({ refresh_token: client.credentials.refresh_token }))
 }
 
 export async function getAuthenticatedClient() {
@@ -46,5 +45,9 @@ export async function startAuthFlow() {
 }
 
 export async function logout() {
-  try { await fs.unlink(TOKEN_PATH) } catch { /* already removed */ }
+  try {
+    await fs.unlink(TOKEN_PATH)
+  } catch {
+    /* already removed */
+  }
 }

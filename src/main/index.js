@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getAuthenticatedClient, startAuthFlow, logout } from './auth.js'
-import { fetchSchedule, addToWatchLater } from './youtube-api.js'
+import { fetchSchedule } from './youtube-api.js'
 import { getCache, setCache } from './store.js'
 
 function createWindow() {
@@ -18,8 +18,8 @@ function createWindow() {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-    },
+      sandbox: true
+    }
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -111,17 +111,6 @@ ipcMain.handle('schedule:refresh', async () => {
   }
 })
 
-// 後で見るに追加
-ipcMain.handle('schedule:addToWatchLater', async (_, videoId) => {
-  const client = await getAuthenticatedClient()
-  if (!client) return { error: 'NOT_AUTHENTICATED' }
-  try {
-    await addToWatchLater(client, videoId)
-    return { success: true }
-  } catch (err) {
-    return { success: false, error: err.message }
-  }
-})
 
 // 外部ブラウザで URL を開く
 ipcMain.handle('shell:openExternal', async (_, url) => {
