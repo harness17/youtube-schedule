@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AuthScreen from './components/AuthScreen.jsx'
 import ScheduleList from './components/ScheduleList.jsx'
 import { useSchedule } from './hooks/useSchedule.js'
@@ -24,12 +24,19 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
+  const handleToastClose = useCallback(() => setToast(null), [])
 
   useEffect(() => {
-    window.api.checkAuth().then(({ isAuthenticated }) => {
-      setIsAuthenticated(isAuthenticated)
-      setAuthLoading(false)
-    })
+    window.api.checkAuth()
+      .then(({ isAuthenticated }) => {
+        setIsAuthenticated(isAuthenticated)
+      })
+      .catch(() => {
+        // 認証確認失敗時は未認証扱いにする
+      })
+      .finally(() => {
+        setAuthLoading(false)
+      })
   }, [])
 
   useEffect(() => {
@@ -100,7 +107,7 @@ export default function App() {
         </div>
       )}
       <ScheduleList live={live} upcoming={upcoming} />
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast message={toast} onClose={handleToastClose} />}
     </div>
   )
 }
