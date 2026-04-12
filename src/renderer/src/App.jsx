@@ -157,15 +157,10 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}
-      >
-        <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>YouTube 配信予定</h1>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px' }}>
+          YouTube 配信予定
+        </h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
           <button
