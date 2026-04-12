@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types'
 import ScheduleCard from './ScheduleCard.jsx'
 
 const TZ = 'Asia/Tokyo'
@@ -90,4 +91,9 @@ export default function ScheduleList({ live = [], upcoming = [] }) {
       ))}
     </div>
   )
+}
+
+ScheduleList.propTypes = {
+  live: PropTypes.array,
+  upcoming: PropTypes.array
 }

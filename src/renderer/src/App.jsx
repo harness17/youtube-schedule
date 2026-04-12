@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, Component } from 'react'
+import PropTypes from 'prop-types'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
@@ -26,6 +27,10 @@ export class ErrorBoundary extends Component {
   }
 }
 
+ErrorBoundary.propTypes = {
+  children: PropTypes.node.isRequired
+}
+
 function Toast({ message, onClose }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000)
@@ -51,6 +56,11 @@ function Toast({ message, onClose }) {
   )
 }
 
+Toast.propTypes = {
+  message: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
@@ -60,25 +70,23 @@ export default function App() {
   const handleToastClose = useCallback(() => setToast(null), [])
 
   useEffect(() => {
-    try {
-      window.api
-        .checkAuth()
-        .then(({ isAuthenticated }) => {
-          setIsAuthenticated(isAuthenticated)
-          if (isAuthenticated) refresh()
-        })
-        .catch(() => {})
-        .finally(() => {
-          setAuthLoading(false)
-        })
-    } catch {
-      setAuthLoading(false)
-    }
+    ;(async () => {
+      try {
+        const { isAuthenticated } = await window.api.checkAuth()
+        setIsAuthenticated(isAuthenticated)
+        if (isAuthenticated) refresh()
+      } catch {
+        // silent
+      } finally {
+        setAuthLoading(false)
+      }
+    })()
   }, [])
 
   useEffect(() => {
     if (error === 'QUOTA_EXCEEDED') {
-      setToast('本日の API 上限に達しました')
+      const id = setTimeout(() => setToast('本日の API 上限に達しました'), 0)
+      return () => clearTimeout(id)
     }
   }, [error])
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PropTypes from 'prop-types'
 
 function formatViewers(count) {
   const n = parseInt(count, 10)
@@ -124,4 +125,19 @@ export default function ScheduleCard({ item }) {
       </div>
     </div>
   )
+}
+
+ScheduleCard.propTypes = {
+  item: PropTypes.shape({
+    concurrentViewers: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    status: PropTypes.string,
+    thumbnail: PropTypes.string,
+    title: PropTypes.string,
+    channelTitle: PropTypes.string,
+    actualStartTime: PropTypes.string,
+    scheduledStartTime: PropTypes.string,
+    description: PropTypes.string,
+    url: PropTypes.string,
+    channelUrl: PropTypes.string
+  }).isRequired
 }
