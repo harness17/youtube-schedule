@@ -31,13 +31,13 @@ export default function App() {
       window.api.checkAuth()
         .then(({ isAuthenticated }) => {
           setIsAuthenticated(isAuthenticated)
+          if (isAuthenticated) refresh()
         })
         .catch(() => {})
         .finally(() => {
           setAuthLoading(false)
         })
     } catch {
-      // window.api が未定義など同期エラー
       setAuthLoading(false)
     }
   }, [])
@@ -53,6 +53,9 @@ export default function App() {
     const result = await window.api.login()
     setIsAuthenticated(result.isAuthenticated)
     setAuthLoading(false)
+    if (result.isAuthenticated) {
+      refresh()
+    }
   }
 
   async function handleLogout() {
