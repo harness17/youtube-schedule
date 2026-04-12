@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import AuthScreen from './components/AuthScreen.jsx'
-import ScheduleList from './components/ScheduleList.jsx'
-import { useSchedule } from './hooks/useSchedule.js'
+import AuthScreen from '../components/AuthScreen.jsx'
+import ScheduleList from '../components/ScheduleList.jsx'
+import { useSchedule } from '../hooks/useSchedule.js'
 
 function Toast({ message, onClose }) {
   useEffect(() => {
