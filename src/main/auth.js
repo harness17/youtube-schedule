@@ -8,7 +8,7 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 const REDIRECT_URI = 'http://localhost:3456/callback'
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/youtube',
 ]
 
 function createOAuthClient() {
@@ -40,17 +40,31 @@ export async function startAuthFlow() {
 
     const server = http.createServer(async (req, res) => {
       if (!req.url.startsWith('/callback')) return
+
       const url = new URL(req.url, 'http://localhost:3456')
+      const error = url.searchParams.get('error')
       const code = url.searchParams.get('code')
+
       res.end('<html><body><h2>認証完了。このウィンドウを閉じてください。</h2></body></html>')
       server.close()
+
+      if (error || !code) {
+        reject(new Error(`OAuth error: ${error || 'no code returned'}`))
+        return
+      }
+
       try {
         const { tokens } = await oauth2Client.getToken(code)
         setTokens(tokens)
+        oauth2Client.setCredentials(tokens)
         resolve(oauth2Client)
       } catch (err) {
         reject(err)
       }
+    })
+
+    server.on('error', (err) => {
+      reject(new Error(`Local server error: ${err.message}`))
     })
 
     server.listen(3456, () => {
