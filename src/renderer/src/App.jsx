@@ -1,7 +1,24 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
+
+export class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, color: '#cc0000', fontFamily: 'monospace' }}>
+          <h2>エラーが発生しました</h2>
+          <pre>{this.state.error.message}</pre>
+          <pre>{this.state.error.stack}</pre>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function Toast({ message, onClose }) {
   useEffect(() => {
