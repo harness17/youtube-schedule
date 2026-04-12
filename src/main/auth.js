@@ -1,79 +1,50 @@
+import { authenticate } from '@google-cloud/local-auth'
 import { google } from 'googleapis'
-import http from 'http'
-import { shell } from 'electron'
-import { getTokens, setTokens, clearTokens } from './store.js'
+import { app } from 'electron'
+import fs from 'fs/promises'
+import path from 'path'
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
-const REDIRECT_URI = 'http://localhost:3456/callback'
+const SCOPES = ['https://www.googleapis.com/auth/youtube']
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/youtube',
-]
+// credentials.json: プロジェクトルート（dev）または exe 隣（prod）
+const CREDENTIALS_PATH = app.isPackaged
+  ? path.join(path.dirname(app.getPath('exe')), 'credentials.json')
+  : path.join(process.cwd(), 'credentials.json')
 
-function createOAuthClient() {
-  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI)
+// token.json: ユーザーデータディレクトリに自動保存
+const TOKEN_PATH = path.join(app.getPath('userData'), 'token.json')
+
+async function loadSavedCredentials() {
+  try {
+    const content = await fs.readFile(TOKEN_PATH, 'utf-8')
+    return google.auth.fromJSON(JSON.parse(content))
+  } catch {
+    return null
+  }
 }
 
-export function getAuthenticatedClient() {
-  const tokens = getTokens()
-  if (!tokens) return null
-  const oauth2Client = createOAuthClient()
-  oauth2Client.setCredentials(tokens)
-  oauth2Client.on('tokens', (newTokens) => {
-    if (newTokens.refresh_token) {
-      setTokens({ ...tokens, ...newTokens })
-    } else {
-      setTokens({ ...tokens, access_token: newTokens.access_token })
-    }
-  })
-  return oauth2Client
+async function saveCredentials(client) {
+  const content = await fs.readFile(CREDENTIALS_PATH, 'utf-8')
+  const keys = JSON.parse(content)
+  const key = keys.installed || keys.web
+  await fs.writeFile(TOKEN_PATH, JSON.stringify({
+    type: 'authorized_user',
+    client_id: key.client_id,
+    client_secret: key.client_secret,
+    refresh_token: client.credentials.refresh_token,
+  }))
+}
+
+export async function getAuthenticatedClient() {
+  return await loadSavedCredentials()
 }
 
 export async function startAuthFlow() {
-  return new Promise((resolve, reject) => {
-    const oauth2Client = createOAuthClient()
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: SCOPES,
-    })
-
-    const server = http.createServer(async (req, res) => {
-      if (!req.url.startsWith('/callback')) return
-
-      const url = new URL(req.url, 'http://localhost:3456')
-      const error = url.searchParams.get('error')
-      const code = url.searchParams.get('code')
-
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end('<html><head><meta charset="utf-8"></head><body><h2>認証完了。このウィンドウを閉じてください。</h2></body></html>')
-      server.close()
-
-      if (error || !code) {
-        reject(new Error(`OAuth error: ${error || 'no code returned'}`))
-        return
-      }
-
-      try {
-        const { tokens } = await oauth2Client.getToken(code)
-        setTokens(tokens)
-        oauth2Client.setCredentials(tokens)
-        resolve(oauth2Client)
-      } catch (err) {
-        reject(err)
-      }
-    })
-
-    server.on('error', (err) => {
-      reject(new Error(`Local server error: ${err.message}`))
-    })
-
-    server.listen(3456, () => {
-      shell.openExternal(authUrl)
-    })
-  })
+  const client = await authenticate({ keyfilePath: CREDENTIALS_PATH, scopes: SCOPES })
+  await saveCredentials(client)
+  return client
 }
 
-export function logout() {
-  clearTokens()
+export async function logout() {
+  try { await fs.unlink(TOKEN_PATH) } catch { /* already removed */ }
 }

@@ -5,3 +5,5 @@ out
 .eslintcache
 *.log*
 .env
+credentials.json
+token.json

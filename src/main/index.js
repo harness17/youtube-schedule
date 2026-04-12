@@ -61,7 +61,7 @@ app.on('window-all-closed', () => {
 
 // 認証状態確認
 ipcMain.handle('auth:check', async () => {
-  const client = getAuthenticatedClient()
+  const client = await getAuthenticatedClient()
   return { isAuthenticated: !!client }
 })
 
@@ -77,7 +77,7 @@ ipcMain.handle('auth:login', async () => {
 
 // ログアウト
 ipcMain.handle('auth:logout', async () => {
-  logout()
+  await logout()
   return { isAuthenticated: false }
 })
 
@@ -85,7 +85,7 @@ ipcMain.handle('auth:logout', async () => {
 ipcMain.handle('schedule:get', async () => {
   const cached = getCache()
   if (cached) return { data: cached, fromCache: true }
-  const client = getAuthenticatedClient()
+  const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
     const data = await fetchSchedule(client)
@@ -99,7 +99,7 @@ ipcMain.handle('schedule:get', async () => {
 
 // 配信予定強制更新
 ipcMain.handle('schedule:refresh', async () => {
-  const client = getAuthenticatedClient()
+  const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
     const data = await fetchSchedule(client)
@@ -113,7 +113,7 @@ ipcMain.handle('schedule:refresh', async () => {
 
 // 後で見るに追加
 ipcMain.handle('schedule:addToWatchLater', async (_, videoId) => {
-  const client = getAuthenticatedClient()
+  const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
     await addToWatchLater(client, videoId)
