@@ -123,5 +123,14 @@ ipcMain.handle('schedule:addToWatchLater', async (_, videoId) => {
 
 // 外部ブラウザで URL を開く
 ipcMain.handle('shell:openExternal', async (_, url) => {
-  await shell.openExternal(url)
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { success: false, error: 'Invalid URL scheme' }
+    }
+    await shell.openExternal(url)
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Invalid URL' }
+  }
 })
