@@ -27,16 +27,19 @@ export default function App() {
   const handleToastClose = useCallback(() => setToast(null), [])
 
   useEffect(() => {
-    window.api.checkAuth()
-      .then(({ isAuthenticated }) => {
-        setIsAuthenticated(isAuthenticated)
-      })
-      .catch(() => {
-        // 認証確認失敗時は未認証扱いにする
-      })
-      .finally(() => {
-        setAuthLoading(false)
-      })
+    try {
+      window.api.checkAuth()
+        .then(({ isAuthenticated }) => {
+          setIsAuthenticated(isAuthenticated)
+        })
+        .catch(() => {})
+        .finally(() => {
+          setAuthLoading(false)
+        })
+    } catch {
+      // window.api が未定義など同期エラー
+      setAuthLoading(false)
+    }
   }, [])
 
   useEffect(() => {
