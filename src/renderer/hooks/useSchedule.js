@@ -10,28 +10,38 @@ export function useSchedule() {
   async function load() {
     setLoading(true)
     setError(null)
-    const result = await window.api.getSchedule()
-    setLoading(false)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      setLive(result.data.live)
-      setUpcoming(result.data.upcoming)
-      setFromCache(result.fromCache)
+    try {
+      const result = await window.api.getSchedule()
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
+        setLive(result.data.live ?? [])
+        setUpcoming(result.data.upcoming ?? [])
+        setFromCache(result.fromCache)
+      }
+    } catch (e) {
+      setError(e.message ?? 'FETCH_FAILED')
+    } finally {
+      setLoading(false)
     }
   }
 
   async function refresh() {
     setLoading(true)
     setError(null)
-    const result = await window.api.refreshSchedule()
-    setLoading(false)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      setLive(result.data.live)
-      setUpcoming(result.data.upcoming)
-      setFromCache(false)
+    try {
+      const result = await window.api.refreshSchedule()
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
+        setLive(result.data.live ?? [])
+        setUpcoming(result.data.upcoming ?? [])
+        setFromCache(false)
+      }
+    } catch (e) {
+      setError(e.message ?? 'FETCH_FAILED')
+    } finally {
+      setLoading(false)
     }
   }
 
