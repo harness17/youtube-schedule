@@ -134,20 +134,3 @@ export async function fetchSchedule(authClient) {
 
   return { live, upcoming }
 }
-
-export async function addToWatchLater(authClient, videoId) {
-  const yt = google.youtube({ version: 'v3', auth: authClient })
-  await yt.playlistItems.insert({
-    part: ['snippet'],
-    requestBody: {
-      snippet: {
-        playlistId: 'WL',
-        resourceId: {
-          kind: 'youtube#video',
-          videoId
-        }
-      }
-    }
-  })
-  return true
-}

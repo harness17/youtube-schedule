@@ -65,8 +65,6 @@ const mockVideos = {
   }
 }
 
-const mockPlaylistInsert = { data: { id: 'plItem1' } }
-
 vi.mock('googleapis', () => ({
   google: {
     youtube: () => ({
@@ -75,15 +73,12 @@ vi.mock('googleapis', () => ({
       },
       videos: {
         list: vi.fn().mockResolvedValue(mockVideos)
-      },
-      playlistItems: {
-        insert: vi.fn().mockResolvedValue(mockPlaylistInsert)
       }
     })
   }
 }))
 
-const { fetchSchedule, addToWatchLater } = await import('../../src/main/youtube-api.js')
+const { fetchSchedule } = await import('../../src/main/youtube-api.js')
 
 describe('fetchSchedule', () => {
   it('配信予定とライブ中を返す', async () => {
@@ -110,9 +105,3 @@ describe('fetchSchedule', () => {
   })
 })
 
-describe('addToWatchLater', () => {
-  it('playlistItems.insert を呼ぶ', async () => {
-    const result = await addToWatchLater({}, 'vid1')
-    expect(result).toBe(true)
-  })
-})

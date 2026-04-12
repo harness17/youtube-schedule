@@ -4,7 +4,7 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 
-const SCOPES = ['https://www.googleapis.com/auth/youtube']
+const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
 // credentials.json: プロジェクトルート（dev）または exe 隣（prod）
 const CREDENTIALS_PATH = app.isPackaged

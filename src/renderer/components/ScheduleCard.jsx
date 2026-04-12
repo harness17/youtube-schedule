@@ -104,20 +104,7 @@ export default function ScheduleCard({ item }) {
           >
             YouTube で開く
           </button>
-          <button
-            onClick={() => window.api.addToWatchLater(item.id)}
-            style={{
-              padding: '4px 12px',
-              fontSize: '12px',
-              background: '#f0f0f0',
-              color: '#333',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            後で見る
-          </button>
+
           <button
             title="通知を設定"
             onClick={() => window.api.openExternal(item.channelUrl)}

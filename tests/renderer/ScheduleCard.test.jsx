@@ -26,8 +26,7 @@ const liveItem = {
 
 beforeEach(() => {
   window.api = {
-    openExternal: vi.fn().mockResolvedValue({ success: true }),
-    addToWatchLater: vi.fn().mockResolvedValue({ success: true })
+    openExternal: vi.fn().mockResolvedValue({ success: true })
   }
 })
 
@@ -52,12 +51,6 @@ describe('ScheduleCard', () => {
     render(<ScheduleCard item={mockItem} />)
     fireEvent.click(screen.getByText('YouTube で開く'))
     expect(window.api.openExternal).toHaveBeenCalledWith(mockItem.url)
-  })
-
-  it('後で見るボタンで addToWatchLater が呼ばれる', () => {
-    render(<ScheduleCard item={mockItem} />)
-    fireEvent.click(screen.getByText('後で見る'))
-    expect(window.api.addToWatchLater).toHaveBeenCalledWith(mockItem.id)
   })
 
   it('通知ボタンでチャンネルページが開く', () => {
