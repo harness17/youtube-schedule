@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-import { getAuthenticatedClient, startAuthFlow, logout } from './auth.js'
+import { getAuthenticatedClient, startAuthFlow, logout, credentialsExist, getCredentialsPath } from './auth.js'
 import { fetchSchedule } from './youtube-api.js'
 import { getCache, setCache } from './store.js'
 
@@ -85,12 +85,20 @@ app.on('window-all-closed', () => {
 
 // 認証状態確認
 ipcMain.handle('auth:check', async () => {
+  const exists = await credentialsExist()
+  if (!exists) {
+    return { isAuthenticated: false, error: 'CREDENTIALS_NOT_FOUND', credentialsPath: getCredentialsPath() }
+  }
   const client = await getAuthenticatedClient()
   return { isAuthenticated: !!client }
 })
 
 // ログイン
 ipcMain.handle('auth:login', async () => {
+  const exists = await credentialsExist()
+  if (!exists) {
+    return { isAuthenticated: false, error: 'CREDENTIALS_NOT_FOUND', credentialsPath: getCredentialsPath() }
+  }
   try {
     await startAuthFlow()
     return { isAuthenticated: true }

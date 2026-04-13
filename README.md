@@ -7,7 +7,23 @@ YouTube の登録チャンネルの配信予定・ライブ中の動画を一覧
 - Node.js 20 以上
 - Google アカウント（YouTube を使用しているもの）
 
-## セットアップ
+## インストーラー版を使う（推奨）
+
+[Releases](https://github.com/harness17/youtube-schedule/releases) から最新の `youtube-schedule-X.X.X-setup.exe` をダウンロードしてインストールできます。
+
+インストール後、**アプリを起動する前に** `credentials.json` の配置が必要です（下記の「OAuth 認証情報を取得する」を参照）。
+
+配置先：
+
+```
+C:\Users\<ユーザー名>\AppData\Local\Programs\youtube-schedule\credentials.json
+```
+
+> ファイルが見つからない場合はアプリ起動時に案内画面が表示されます。
+
+---
+
+## ソースからセットアップ（開発者向け）
 
 ### 1. リポジトリをクローン
 
@@ -17,7 +33,7 @@ cd youtube-schedule
 npm install
 ```
 
-### 2. Google Cloud で OAuth 認証情報を取得
+### 2. OAuth 認証情報を取得する
 
 このアプリは YouTube Data API を使用するため、自分用の OAuth クライアントを作成する必要があります。
 

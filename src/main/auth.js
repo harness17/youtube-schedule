@@ -167,6 +167,19 @@ async function saveCredentials(client) {
   )
 }
 
+export async function credentialsExist() {
+  try {
+    await fs.access(CREDENTIALS_PATH)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function getCredentialsPath() {
+  return CREDENTIALS_PATH
+}
+
 export async function getAuthenticatedClient() {
   return await loadSavedCredentials()
 }
