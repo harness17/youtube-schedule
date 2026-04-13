@@ -61,7 +61,7 @@ function setupAutoUpdater(mainWindow) {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('io.github.harness17.youtube-schedule')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
