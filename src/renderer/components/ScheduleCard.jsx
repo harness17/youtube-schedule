@@ -95,7 +95,9 @@ export default function ScheduleCard({ item, darkMode = false, watched = false, 
         )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: textColor }}>
+        <div
+          style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: textColor }}
+        >
           {item.title}
         </div>
         <div style={{ fontSize: '12px', color: subColor, marginBottom: '4px' }}>
@@ -165,6 +167,7 @@ export default function ScheduleCard({ item, darkMode = false, watched = false, 
 
 ScheduleCard.propTypes = {
   item: PropTypes.shape({
+    id: PropTypes.string,
     concurrentViewers: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     status: PropTypes.string,
     thumbnail: PropTypes.string,

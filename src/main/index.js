@@ -4,7 +4,13 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-import { getAuthenticatedClient, startAuthFlow, logout, credentialsExist, getCredentialsPath } from './auth.js'
+import {
+  getAuthenticatedClient,
+  startAuthFlow,
+  logout,
+  credentialsExist,
+  getCredentialsPath
+} from './auth.js'
 import { fetchSchedule } from './youtube-api.js'
 import { getCache, setCache, getSetting, setSetting } from './store.js'
 
@@ -87,7 +93,11 @@ app.on('window-all-closed', () => {
 ipcMain.handle('auth:check', async () => {
   const exists = await credentialsExist()
   if (!exists) {
-    return { isAuthenticated: false, error: 'CREDENTIALS_NOT_FOUND', credentialsPath: getCredentialsPath() }
+    return {
+      isAuthenticated: false,
+      error: 'CREDENTIALS_NOT_FOUND',
+      credentialsPath: getCredentialsPath()
+    }
   }
   const client = await getAuthenticatedClient()
   return { isAuthenticated: !!client }
@@ -97,7 +107,11 @@ ipcMain.handle('auth:check', async () => {
 ipcMain.handle('auth:login', async () => {
   const exists = await credentialsExist()
   if (!exists) {
-    return { isAuthenticated: false, error: 'CREDENTIALS_NOT_FOUND', credentialsPath: getCredentialsPath() }
+    return {
+      isAuthenticated: false,
+      error: 'CREDENTIALS_NOT_FOUND',
+      credentialsPath: getCredentialsPath()
+    }
   }
   try {
     await startAuthFlow()
@@ -142,7 +156,6 @@ ipcMain.handle('schedule:refresh', async () => {
     return { error: 'FETCH_FAILED' }
   }
 })
-
 
 // デスクトップ通知
 ipcMain.handle('notification:show', (_, { title, body }) => {

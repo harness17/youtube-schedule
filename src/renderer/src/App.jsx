@@ -153,8 +153,8 @@ function CredentialsSetupScreen({ credentialsPath }) {
           credentials.json が見つかりません
         </h1>
         <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: 1.6 }}>
-          このアプリを使うには、Google Cloud Console で取得した
-          OAuth 認証ファイルを以下のパスに配置してください。
+          このアプリを使うには、Google Cloud Console で取得した OAuth
+          認証ファイルを以下のパスに配置してください。
         </p>
 
         <div
@@ -172,11 +172,27 @@ function CredentialsSetupScreen({ credentialsPath }) {
           {credentialsPath || '（パスを取得できませんでした）'}
         </div>
 
-        <ol style={{ fontSize: '13px', color: '#444', lineHeight: 2, paddingLeft: '20px', marginBottom: '24px' }}>
+        <ol
+          style={{
+            fontSize: '13px',
+            color: '#444',
+            lineHeight: 2,
+            paddingLeft: '20px',
+            marginBottom: '24px'
+          }}
+        >
           <li>
             <button
               onClick={() => window.api.openExternal('https://console.cloud.google.com/')}
-              style={{ background: 'none', border: 'none', color: '#1a73e8', cursor: 'pointer', fontSize: '13px', padding: 0, textDecoration: 'underline' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#1a73e8',
+                cursor: 'pointer',
+                fontSize: '13px',
+                padding: 0,
+                textDecoration: 'underline'
+              }}
             >
               Google Cloud Console
             </button>
@@ -184,7 +200,13 @@ function CredentialsSetupScreen({ credentialsPath }) {
           </li>
           <li>YouTube Data API v3 を有効化</li>
           <li>OAuth クライアント ID を作成（種類：デスクトップアプリ）</li>
-          <li>JSON をダウンロードし、ファイル名を <code style={{ background: '#f4f4f4', padding: '1px 4px', borderRadius: '3px' }}>credentials.json</code> に変更</li>
+          <li>
+            JSON をダウンロードし、ファイル名を{' '}
+            <code style={{ background: '#f4f4f4', padding: '1px 4px', borderRadius: '3px' }}>
+              credentials.json
+            </code>{' '}
+            に変更
+          </li>
           <li>上記のパスに配置してアプリを再起動</li>
         </ol>
 
@@ -206,6 +228,10 @@ function CredentialsSetupScreen({ credentialsPath }) {
       </div>
     </div>
   )
+}
+
+CredentialsSetupScreen.propTypes = {
+  credentialsPath: PropTypes.string
 }
 
 function UpdateBanner({ status, onInstall }) {
@@ -312,12 +338,18 @@ export default function App() {
 
   // 通知チェック用 ref（interval クロージャでの stale 防止）
   const upcomingRef = useRef(upcoming)
-  useEffect(() => { upcomingRef.current = upcoming }, [upcoming])
+  useEffect(() => {
+    upcomingRef.current = upcoming
+  }, [upcoming])
   const watchedIdsRef = useRef(watchedIds)
-  useEffect(() => { watchedIdsRef.current = watchedIds }, [watchedIds])
+  useEffect(() => {
+    watchedIdsRef.current = watchedIds
+  }, [watchedIds])
   const notifiedRef = useRef(new Set())
   const refreshRef = useRef(refresh)
-  useEffect(() => { refreshRef.current = refresh }, [refresh])
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
 
   // 自動アップデートイベントの購読
   useEffect(() => {
