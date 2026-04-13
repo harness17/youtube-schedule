@@ -1,6 +1,7 @@
 # YouTube Schedule Viewer
 
 YouTube の登録チャンネルの配信予定・ライブ中の動画を一覧表示する Windows デスクトップアプリです。
+Youtubeが日時順にもならなくて一覧性がカスなのにキレて作りました。
 
 ![スクリーンショット](https://github.com/harness17/youtube-schedule/releases/download/v1.3.0/screenshot.png)
 
