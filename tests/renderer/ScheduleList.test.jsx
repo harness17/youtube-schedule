@@ -43,8 +43,8 @@ describe('ScheduleList', () => {
 
   it('配信予定セクションの日付ヘッダーが表示される', () => {
     render(<ScheduleList live={[]} upcoming={upcomingItems} />)
-    expect(screen.getByText(/4月13日/)).toBeInTheDocument()
-    expect(screen.getByText(/4月15日/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /4月13日/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /4月15日/ })).toBeInTheDocument()
   })
 
   it('各配信タイトルが表示される', () => {
