@@ -1,13 +1,15 @@
 @import './base.css';
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-image: url('./wavy-lines.svg');
-  background-size: cover;
+  overflow: auto;
+  background: #f5f5f5;
+  color: #111;
   user-select: none;
+}
+
+[data-theme='dark'] body {
+  background: #1b1b1f;
+  color: #f0f0f0;
 }
 
 code {
@@ -27,11 +29,7 @@ code {
 }
 
 #root {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  margin-bottom: 80px;
+  min-height: 100vh;
 }
 
 .logo {

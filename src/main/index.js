@@ -1,7 +1,8 @@
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { getAuthenticatedClient, startAuthFlow, logout } from './auth.js'
 import { fetchSchedule } from './youtube-api.js'
@@ -38,6 +39,27 @@ function createWindow() {
   }
 }
 
+function setupAutoUpdater(mainWindow) {
+  if (is.dev) return
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow.webContents.send('updater:update-available', info)
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow.webContents.send('updater:update-downloaded', info)
+  })
+
+  autoUpdater.on('error', (err) => {
+    mainWindow.webContents.send('updater:error', err.message)
+  })
+
+  autoUpdater.checkForUpdates()
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
@@ -46,6 +68,9 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  setupAutoUpdater(mainWindow)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -110,6 +135,13 @@ ipcMain.handle('schedule:refresh', async () => {
   }
 })
 
+
+// デスクトップ通知
+ipcMain.handle('notification:show', (_, { title, body }) => {
+  if (Notification.isSupported()) {
+    new Notification({ title, body }).show()
+  }
+})
 
 // 外部ブラウザで URL を開く
 ipcMain.handle('shell:openExternal', async (_, url) => {

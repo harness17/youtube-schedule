@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 
 function formatViewers(count) {
@@ -14,10 +14,42 @@ function formatTime(isoString) {
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function ScheduleCard({ item }) {
+function formatCountdown(isoString) {
+  if (!isoString) return null
+  const diff = new Date(isoString).getTime() - Date.now()
+  if (diff <= 0) return null
+  const totalMinutes = Math.floor(diff / 60000)
+  if (totalMinutes < 60) return `あと${totalMinutes}分`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours < 24) return minutes > 0 ? `あと${hours}時間${minutes}分` : `あと${hours}時間`
+  const days = Math.floor(hours / 24)
+  const remainHours = hours % 24
+  return remainHours > 0 ? `あと${days}日${remainHours}時間` : `あと${days}日`
+}
+
+export default function ScheduleCard({ item, darkMode = false, watched = false, onToggleWatch }) {
   const [expanded, setExpanded] = useState(false)
+  const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
+
+  useEffect(() => {
+    if (item.status === 'live') return
+    const id = setInterval(() => {
+      setCountdown(formatCountdown(item.scheduledStartTime))
+    }, 30000)
+    return () => clearInterval(id)
+  }, [item.scheduledStartTime, item.status])
+
   const viewers = item.concurrentViewers ? formatViewers(item.concurrentViewers) : null
   const isLive = item.status === 'live'
+
+  const cardBg = darkMode ? '#2a2a2e' : '#fff'
+  const textColor = darkMode ? '#f0f0f0' : '#111'
+  const subColor = darkMode ? '#aaa' : '#666'
+  const timeColor = darkMode ? '#ccc' : '#444'
+  const descColor = darkMode ? '#bbb' : '#555'
+  const btnBg = darkMode ? '#444' : '#f0f0f0'
+  const btnColor = darkMode ? '#ccc' : '#333'
 
   return (
     <div
@@ -25,7 +57,7 @@ export default function ScheduleCard({ item }) {
         display: 'flex',
         gap: '12px',
         padding: '12px',
-        background: '#fff',
+        background: cardBg,
         borderRadius: '8px',
         boxShadow: isLive ? '0 0 0 2px #FF0000' : '0 1px 4px rgba(0,0,0,0.1)',
         marginBottom: '8px',
@@ -63,23 +95,28 @@ export default function ScheduleCard({ item }) {
         )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: textColor }}>
           {item.title}
         </div>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+        <div style={{ fontSize: '12px', color: subColor, marginBottom: '4px' }}>
           {item.channelTitle}
         </div>
-        <div style={{ fontSize: '12px', color: '#444', marginBottom: '4px' }}>
+        <div style={{ fontSize: '12px', color: timeColor, marginBottom: '4px' }}>
           {isLive
             ? `配信中（${formatTime(item.actualStartTime)}〜）`
             : `${formatTime(item.scheduledStartTime)}〜`}
+          {!isLive && countdown && (
+            <span style={{ marginLeft: '8px', color: '#FF6600', fontWeight: 'bold' }}>
+              {countdown}
+            </span>
+          )}
           {viewers && <span style={{ marginLeft: '8px' }}>👥 {viewers}</span>}
         </div>
         <div
           onClick={() => setExpanded(!expanded)}
           style={{
             fontSize: '12px',
-            color: '#555',
+            color: descColor,
             cursor: 'pointer',
             overflow: 'hidden',
             display: '-webkit-box',
@@ -105,15 +142,14 @@ export default function ScheduleCard({ item }) {
           >
             YouTube で開く
           </button>
-
           <button
-            title="通知を設定"
-            onClick={() => window.api.openExternal(item.channelUrl)}
+            title={watched ? '通知オン（クリックで解除）' : '通知をオンにする'}
+            onClick={() => onToggleWatch?.(item.id)}
             style={{
               padding: '4px 10px',
               fontSize: '14px',
-              background: '#f0f0f0',
-              color: '#333',
+              background: watched ? '#FF6600' : btnBg,
+              color: watched ? '#fff' : btnColor,
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer'
@@ -139,5 +175,8 @@ ScheduleCard.propTypes = {
     description: PropTypes.string,
     url: PropTypes.string,
     channelUrl: PropTypes.string
-  }).isRequired
+  }).isRequired,
+  darkMode: PropTypes.bool,
+  watched: PropTypes.bool,
+  onToggleWatch: PropTypes.func
 }

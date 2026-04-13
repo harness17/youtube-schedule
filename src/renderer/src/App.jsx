@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Component } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Component } from 'react'
 import PropTypes from 'prop-types'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
@@ -61,6 +61,55 @@ Toast.propTypes = {
   onClose: PropTypes.func.isRequired
 }
 
+function BackToTop() {
+  const [visible, setVisible] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setVisible(window.scrollY > 200)
+    }
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        width: hovered ? 'auto' : '40px',
+        height: '40px',
+        padding: hovered ? '0 16px' : '0',
+        background: '#333',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        whiteSpace: 'nowrap',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        transition: 'width 0.2s ease, padding 0.2s ease, background 0.15s ease',
+        overflow: 'hidden',
+        zIndex: 999
+      }}
+      title="トップへ戻る"
+    >
+      ↑{hovered && <span>トップへ</span>}
+    </button>
+  )
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
@@ -68,6 +117,45 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
+
+  // ダークモード
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('darkMode', darkMode)
+  }, [darkMode])
+
+  // 検索・フィルター
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedChannel, setSelectedChannel] = useState('all')
+
+  // 通知対象
+  const [watchedIds, setWatchedIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('watchedIds') || '[]'))
+    } catch {
+      return new Set()
+    }
+  })
+
+  function toggleWatch(id) {
+    setWatchedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      localStorage.setItem('watchedIds', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  // 通知チェック用 ref（interval クロージャでの stale 防止）
+  const upcomingRef = useRef(upcoming)
+  useEffect(() => { upcomingRef.current = upcoming }, [upcoming])
+  const watchedIdsRef = useRef(watchedIds)
+  useEffect(() => { watchedIdsRef.current = watchedIds }, [watchedIds])
+  const notifiedRef = useRef(new Set())
+  const refreshRef = useRef(refresh)
+  useEffect(() => { refreshRef.current = refresh }, [refresh])
 
   useEffect(() => {
     ;(async () => {
@@ -83,12 +171,65 @@ export default function App() {
     })()
   }, [])
 
+  // 自動リフレッシュ（10分ごと）
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const id = setInterval(() => refreshRef.current(), 10 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [isAuthenticated])
+
+  // 通知チェック（1分ごと）
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const THRESHOLD = 5 * 60 * 1000
+    const id = setInterval(() => {
+      const now = Date.now()
+      for (const item of upcomingRef.current) {
+        if (!watchedIdsRef.current.has(item.id)) continue
+        if (notifiedRef.current.has(item.id)) continue
+        const start = new Date(item.scheduledStartTime).getTime()
+        const remaining = start - now
+        if (remaining > 0 && remaining <= THRESHOLD) {
+          notifiedRef.current.add(item.id)
+          window.api?.showNotification?.(
+            'もうすぐ配信開始',
+            `${item.channelTitle}「${item.title}」が5分後に始まります`
+          )
+        }
+      }
+    }, 60 * 1000)
+    return () => clearInterval(id)
+  }, [isAuthenticated])
+
   useEffect(() => {
     if (error === 'QUOTA_EXCEEDED') {
       const id = setTimeout(() => setToast('本日の API 上限に達しました'), 0)
       return () => clearTimeout(id)
     }
   }, [error])
+
+  // チャンネル一覧
+  const channels = useMemo(() => {
+    const map = new Map()
+    for (const item of [...live, ...upcoming]) {
+      if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [live, upcoming])
+
+  // フィルタリング
+  const filterItem = useCallback(
+    (item) => {
+      const q = searchQuery.trim().toLowerCase()
+      const matchesSearch =
+        !q || item.title.toLowerCase().includes(q) || item.channelTitle.toLowerCase().includes(q)
+      const matchesChannel = selectedChannel === 'all' || item.channelId === selectedChannel
+      return matchesSearch && matchesChannel
+    },
+    [searchQuery, selectedChannel]
+  )
+  const filteredLive = useMemo(() => live.filter(filterItem), [live, filterItem])
+  const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
 
   async function handleLogin() {
     setAuthLoading(true)
@@ -163,45 +304,137 @@ export default function App() {
     return <AuthScreen onLogin={handleLogin} loading={authLoading} />
   }
 
+  const bg = darkMode ? '#1b1b1f' : '#f5f5f5'
+  const textColor = darkMode ? '#f0f0f0' : '#111'
+  const inputBg = darkMode ? '#2a2a2e' : '#fff'
+  const inputBorder = darkMode ? '#444' : '#ddd'
+  const subBtnBg = darkMode ? '#3a3a3e' : '#f0f0f0'
+  const subBtnColor = darkMode ? '#ccc' : '#333'
+
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px' }}>
+    <div
+      style={{
+        maxWidth: '800px',
+        margin: '0 auto',
+        padding: '16px',
+        fontFamily: 'sans-serif',
+        color: textColor,
+        minHeight: '100vh',
+        background: bg
+      }}
+    >
+      {/* ヘッダー行1 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '8px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <h1 style={{ fontSize: '20px', fontWeight: 'bold', flex: 1, color: textColor }}>
           YouTube 配信予定
         </h1>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
-          <button
-            onClick={refresh}
-            disabled={loading}
+        {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
+        <button
+          onClick={refresh}
+          disabled={loading}
+          style={{
+            padding: '6px 16px',
+            background: '#FF0000',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+            fontSize: '13px'
+          }}
+        >
+          {loading ? '更新中...' : '更新'}
+        </button>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: '6px 12px',
+            background: subBtnBg,
+            color: subBtnColor,
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+        >
+          ログアウト
+        </button>
+        <button
+          onClick={() => setDarkMode((d) => !d)}
+          title={darkMode ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+          style={{
+            padding: '6px 10px',
+            background: subBtnBg,
+            color: subBtnColor,
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          {darkMode ? '☀️' : '🌙'}
+        </button>
+      </div>
+
+      {/* ヘッダー行2: 検索・チャンネルフィルター */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '16px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <input
+          type="text"
+          placeholder="タイトル・チャンネルを検索"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: '160px',
+            padding: '6px 10px',
+            fontSize: '13px',
+            background: inputBg,
+            color: textColor,
+            border: `1px solid ${inputBorder}`,
+            borderRadius: '6px',
+            outline: 'none'
+          }}
+        />
+        {channels.length > 0 && (
+          <select
+            value={selectedChannel}
+            onChange={(e) => setSelectedChannel(e.target.value)}
             style={{
-              padding: '6px 16px',
-              background: '#FF0000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1
-            }}
-          >
-            {loading ? '更新中...' : '更新'}
-          </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '6px 12px',
-              background: '#f0f0f0',
-              color: '#333',
-              border: 'none',
+              padding: '6px 10px',
+              fontSize: '13px',
+              background: inputBg,
+              color: textColor,
+              border: `1px solid ${inputBorder}`,
               borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '12px'
+              maxWidth: '200px'
             }}
           >
-            ログアウト
-          </button>
-        </div>
+            <option value="all">すべてのチャンネル</option>
+            {channels.map(([channelId, channelTitle]) => (
+              <option key={channelId} value={channelId}>
+                {channelTitle}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
+
       {error && error !== 'QUOTA_EXCEEDED' && (
         <div
           style={{
@@ -217,8 +450,16 @@ export default function App() {
           {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
         </div>
       )}
-      <ScheduleList live={live} upcoming={upcoming} />
+
+      <ScheduleList
+        live={filteredLive}
+        upcoming={filteredUpcoming}
+        darkMode={darkMode}
+        watchedIds={watchedIds}
+        onToggleWatch={toggleWatch}
+      />
       {toast && <Toast message={toast} onClose={handleToastClose} />}
+      <BackToTop />
     </div>
   )
 }
