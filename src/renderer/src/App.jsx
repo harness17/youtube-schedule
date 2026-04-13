@@ -166,11 +166,30 @@ function CredentialsSetupScreen({ credentialsPath }) {
             fontFamily: 'monospace',
             color: '#333',
             wordBreak: 'break-all',
-            marginBottom: '24px'
+            marginBottom: '8px'
           }}
         >
           {credentialsPath || '（パスを取得できませんでした）'}
         </div>
+
+        {credentialsPath && (
+          <button
+            onClick={() => window.api.openFolder(credentialsPath)}
+            style={{
+              display: 'block',
+              marginBottom: '24px',
+              padding: '6px 14px',
+              fontSize: '12px',
+              background: '#e8f0fe',
+              color: '#1a73e8',
+              border: '1px solid #c5d8fb',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            フォルダを開く
+          </button>
+        )}
 
         <ol
           style={{
@@ -207,7 +226,7 @@ function CredentialsSetupScreen({ credentialsPath }) {
             </code>{' '}
             に変更
           </li>
-          <li>上記のパスに配置してアプリを再起動</li>
+          <li>上記のフォルダに配置してアプリを再起動</li>
         </ol>
 
         <button
@@ -294,6 +313,11 @@ export default function App() {
   const [credentialsPath, setCredentialsPath] = useState('')
   const [toast, setToast] = useState(null)
   const [updateStatus, setUpdateStatus] = useState(null)
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    window.api.getVersion().then((v) => setAppVersion(v))
+  }, [])
   const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
 
@@ -548,7 +572,12 @@ export default function App() {
         }}
       >
         <h1 style={{ fontSize: '20px', fontWeight: 'bold', flex: 1, color: textColor }}>
-          YouTube 配信予定
+          YouTube 配信予定{' '}
+          {appVersion && (
+            <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#888' }}>
+              v{appVersion}
+            </span>
+          )}
         </h1>
         {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
         <button

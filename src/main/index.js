@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
@@ -171,6 +171,19 @@ ipcMain.handle('settings:set', (_, key, value) => setSetting(key, value))
 // アップデートを適用して再起動
 ipcMain.handle('updater:quitAndInstall', () => {
   autoUpdater.quitAndInstall()
+})
+
+// アプリバージョンを取得
+ipcMain.handle('app:version', () => app.getVersion())
+
+// credentials.json が置かれるフォルダをエクスプローラーで開く
+ipcMain.handle('shell:openFolder', async (_, filePath) => {
+  try {
+    await shell.openPath(dirname(filePath))
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
 })
 
 // 外部ブラウザで URL を開く
