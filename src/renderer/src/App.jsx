@@ -208,6 +208,58 @@ function CredentialsSetupScreen({ credentialsPath }) {
   )
 }
 
+function UpdateBanner({ status, onInstall }) {
+  if (!status) return null
+  const isDownloading = status === 'downloading'
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 2000,
+        background: isDownloading ? '#555' : '#1a73e8',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        padding: '8px 16px',
+        fontSize: '13px'
+      }}
+    >
+      {isDownloading ? (
+        <span>更新をダウンロード中...</span>
+      ) : (
+        <>
+          <span>新しいバージョンの準備ができました</span>
+          <button
+            onClick={onInstall}
+            style={{
+              padding: '4px 14px',
+              background: '#fff',
+              color: '#1a73e8',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '12px'
+            }}
+          >
+            再起動して更新
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+UpdateBanner.propTypes = {
+  status: PropTypes.oneOf(['downloading', 'ready', null]),
+  onInstall: PropTypes.func.isRequired
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
@@ -215,14 +267,24 @@ export default function App() {
   const [credentialsMissing, setCredentialsMissing] = useState(false)
   const [credentialsPath, setCredentialsPath] = useState('')
   const [toast, setToast] = useState(null)
+  const [updateStatus, setUpdateStatus] = useState(null)
   const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
 
-  // ダークモード
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true')
+  // ダークモード（electron-store で永続化）
+  const [darkMode, setDarkMode] = useState(false)
+  const darkModeLoaded = useRef(false)
+  useEffect(() => {
+    window.api.getSetting('darkMode', false).then((val) => {
+      darkModeLoaded.current = true
+      setDarkMode(val)
+    })
+  }, [])
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-    localStorage.setItem('darkMode', darkMode)
+    if (darkModeLoaded.current) {
+      window.api.setSetting('darkMode', darkMode)
+    }
   }, [darkMode])
 
   // 検索・フィルター
@@ -256,6 +318,16 @@ export default function App() {
   const notifiedRef = useRef(new Set())
   const refreshRef = useRef(refresh)
   useEffect(() => { refreshRef.current = refresh }, [refresh])
+
+  // 自動アップデートイベントの購読
+  useEffect(() => {
+    window.api.onUpdateAvailable(() => setUpdateStatus('downloading'))
+    window.api.onUpdateDownloaded(() => setUpdateStatus('ready'))
+    window.api.onUpdaterError((msg) => {
+      setUpdateStatus(null)
+      setToast(`更新エラー: ${msg}`)
+    })
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -425,13 +497,14 @@ export default function App() {
       style={{
         maxWidth: '800px',
         margin: '0 auto',
-        padding: '16px',
+        padding: updateStatus ? '48px 16px 16px' : '16px',
         fontFamily: 'sans-serif',
         color: textColor,
         minHeight: '100vh',
         background: bg
       }}
     >
+      <UpdateBanner status={updateStatus} onInstall={() => window.api.quitAndInstall()} />
       {/* ヘッダー行1 */}
       <div
         style={{

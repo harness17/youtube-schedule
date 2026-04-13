@@ -6,7 +6,7 @@ import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { getAuthenticatedClient, startAuthFlow, logout, credentialsExist, getCredentialsPath } from './auth.js'
 import { fetchSchedule } from './youtube-api.js'
-import { getCache, setCache } from './store.js'
+import { getCache, setCache, getSetting, setSetting } from './store.js'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -149,6 +149,15 @@ ipcMain.handle('notification:show', (_, { title, body }) => {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show()
   }
+})
+
+// 設定の取得・保存
+ipcMain.handle('settings:get', (_, key, defaultValue) => getSetting(key, defaultValue))
+ipcMain.handle('settings:set', (_, key, value) => setSetting(key, value))
+
+// アップデートを適用して再起動
+ipcMain.handle('updater:quitAndInstall', () => {
+  autoUpdater.quitAndInstall()
 })
 
 // 外部ブラウザで URL を開く
