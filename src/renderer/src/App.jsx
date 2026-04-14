@@ -374,12 +374,12 @@ export default function App() {
     isRefreshingRef.current = true
     setRefreshing(true)
     try {
-      const [rssResult, memResult] = await Promise.all([
-        window.api.refreshSchedule(),
-        window.api.membershipRefresh({ includeLive: true })
-      ])
-      const merged = memResult.data ?? rssResult.data
-      if (merged) applyResult(merged)
+      // 逐次実行: RSS を先に更新してキャッシュに書き込み、
+      // その後 membershipRefresh が新しい RSS キャッシュを読んでマージする
+      const rssResult = await window.api.refreshSchedule()
+      const memResult = await window.api.membershipRefresh({ includeLive: true })
+      if (memResult.data) applyResult(memResult.data)
+      else if (rssResult.data) applyResult(rssResult.data)
     } finally {
       isRefreshingRef.current = false
       setRefreshing(false)
