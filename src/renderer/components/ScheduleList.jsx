@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types'
 import ScheduleCard from './ScheduleCard.jsx'
 
 const TZ = 'Asia/Tokyo'
@@ -23,8 +24,6 @@ function groupByDate(items) {
 }
 
 function getSortedGroupEntries(groups, items) {
-  // items は scheduledStartTime 昇順でソート済みなので、
-  // 最初に出現した順でグループキーを並べる
   const seen = []
   for (const item of items) {
     const key = getDateKey(item.scheduledStartTime)
@@ -33,12 +32,27 @@ function getSortedGroupEntries(groups, items) {
   return seen.map((key) => [key, groups[key]])
 }
 
-export default function ScheduleList({ live = [], upcoming = [] }) {
+function toAnchorId(label) {
+  return 'section-' + label.replace(/\s/g, '-')
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+export default function ScheduleList({
+  live = [],
+  upcoming = [],
+  darkMode = false,
+  watchedIds = new Set(),
+  onToggleWatch
+}) {
   const isEmpty = live.length === 0 && upcoming.length === 0
 
   if (isEmpty) {
     return (
-      <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+      <div style={{ textAlign: 'center', color: darkMode ? '#888' : '#888', marginTop: '48px' }}>
         予定された配信はありません
       </div>
     )
@@ -47,10 +61,58 @@ export default function ScheduleList({ live = [], upcoming = [] }) {
   const groups = groupByDate(upcoming)
   const sortedEntries = getSortedGroupEntries(groups, upcoming)
 
+  const navItems = [
+    ...(live.length > 0 ? [{ label: 'ライブ配信中', id: 'section-live', isLive: true }] : []),
+    ...sortedEntries.map(([dateLabel]) => ({
+      label: dateLabel,
+      id: toAnchorId(dateLabel),
+      isLive: false
+    }))
+  ]
+
+  const navBg = darkMode ? '#2a2a2e' : '#fff'
+  const navBtnBg = darkMode ? '#3a3a3e' : '#f0f0f0'
+  const navBtnColor = darkMode ? '#ccc' : '#333'
+  const headingColor = darkMode ? '#f0f0f0' : '#333'
+  const dividerColor = darkMode ? '#444' : '#ccc'
+
   return (
     <div>
+      {navItems.length > 1 && (
+        <nav
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+            marginBottom: '20px',
+            padding: '10px 12px',
+            background: navBg,
+            borderRadius: '8px',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
+          }}
+        >
+          {navItems.map(({ label, id, isLive }) => (
+            <button
+              key={id}
+              onClick={() => scrollToSection(id)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                background: isLive ? '#FF0000' : navBtnBg,
+                color: isLive ? '#fff' : navBtnColor,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {live.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
+        <div id="section-live" style={{ marginBottom: '24px' }}>
           <h2
             style={{
               fontSize: '14px',
@@ -64,30 +126,50 @@ export default function ScheduleList({ live = [], upcoming = [] }) {
             ライブ配信中
           </h2>
           {live.map((item) => (
-            <ScheduleCard key={item.id} item={item} />
+            <ScheduleCard
+              key={item.id}
+              item={item}
+              darkMode={darkMode}
+              watched={watchedIds.has(item.id)}
+              onToggleWatch={onToggleWatch}
+            />
           ))}
         </div>
       )}
 
       {sortedEntries.map(([dateLabel, groupItems]) => (
-        <div key={dateLabel} style={{ marginBottom: '24px' }}>
+        <div key={dateLabel} id={toAnchorId(dateLabel)} style={{ marginBottom: '24px' }}>
           <h2
             style={{
               fontSize: '14px',
               fontWeight: 'bold',
-              color: '#333',
+              color: headingColor,
               padding: '4px 0',
               marginBottom: '8px',
-              borderBottom: '2px solid #ccc'
+              borderBottom: `2px solid ${dividerColor}`
             }}
           >
             {dateLabel}
           </h2>
           {groupItems.map((item) => (
-            <ScheduleCard key={item.id} item={item} />
+            <ScheduleCard
+              key={item.id}
+              item={item}
+              darkMode={darkMode}
+              watched={watchedIds.has(item.id)}
+              onToggleWatch={onToggleWatch}
+            />
           ))}
         </div>
       ))}
     </div>
   )
+}
+
+ScheduleList.propTypes = {
+  live: PropTypes.array,
+  upcoming: PropTypes.array,
+  darkMode: PropTypes.bool,
+  watchedIds: PropTypes.instanceOf(Set),
+  onToggleWatch: PropTypes.func
 }

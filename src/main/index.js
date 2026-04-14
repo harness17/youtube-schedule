@@ -1,11 +1,18 @@
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
+import { join, dirname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-import { getAuthenticatedClient, startAuthFlow, logout } from './auth.js'
+import {
+  getAuthenticatedClient,
+  startAuthFlow,
+  logout,
+  credentialsExist,
+  getCredentialsPath
+} from './auth.js'
 import { fetchSchedule } from './youtube-api.js'
-import { getCache, setCache } from './store.js'
+import { getCache, setCache, getSetting, setSetting } from './store.js'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -13,7 +20,7 @@ function createWindow() {
     height: 700,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -38,14 +45,38 @@ function createWindow() {
   }
 }
 
+function setupAutoUpdater(mainWindow) {
+  if (is.dev) return
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow.webContents.send('updater:update-available', info)
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow.webContents.send('updater:update-downloaded', info)
+  })
+
+  autoUpdater.on('error', (err) => {
+    mainWindow.webContents.send('updater:error', err.message)
+  })
+
+  autoUpdater.checkForUpdates()
+}
+
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('io.github.harness17.youtube-schedule')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
   createWindow()
+
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  setupAutoUpdater(mainWindow)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -60,12 +91,28 @@ app.on('window-all-closed', () => {
 
 // 認証状態確認
 ipcMain.handle('auth:check', async () => {
+  const exists = await credentialsExist()
+  if (!exists) {
+    return {
+      isAuthenticated: false,
+      error: 'CREDENTIALS_NOT_FOUND',
+      credentialsPath: getCredentialsPath()
+    }
+  }
   const client = await getAuthenticatedClient()
   return { isAuthenticated: !!client }
 })
 
 // ログイン
 ipcMain.handle('auth:login', async () => {
+  const exists = await credentialsExist()
+  if (!exists) {
+    return {
+      isAuthenticated: false,
+      error: 'CREDENTIALS_NOT_FOUND',
+      credentialsPath: getCredentialsPath()
+    }
+  }
   try {
     await startAuthFlow()
     return { isAuthenticated: true }
@@ -110,6 +157,34 @@ ipcMain.handle('schedule:refresh', async () => {
   }
 })
 
+// デスクトップ通知
+ipcMain.handle('notification:show', (_, { title, body }) => {
+  if (Notification.isSupported()) {
+    new Notification({ title, body }).show()
+  }
+})
+
+// 設定の取得・保存
+ipcMain.handle('settings:get', (_, key, defaultValue) => getSetting(key, defaultValue))
+ipcMain.handle('settings:set', (_, key, value) => setSetting(key, value))
+
+// アップデートを適用して再起動
+ipcMain.handle('updater:quitAndInstall', () => {
+  autoUpdater.quitAndInstall()
+})
+
+// アプリバージョンを取得
+ipcMain.handle('app:version', () => app.getVersion())
+
+// credentials.json が置かれるフォルダをエクスプローラーで開く
+ipcMain.handle('shell:openFolder', async (_, filePath) => {
+  try {
+    await shell.openPath(dirname(filePath))
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+})
 
 // 外部ブラウザで URL を開く
 ipcMain.handle('shell:openExternal', async (_, url) => {

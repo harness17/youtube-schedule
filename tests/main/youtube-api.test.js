@@ -104,4 +104,3 @@ describe('fetchSchedule', () => {
     expect(result.live[0].status).toBe('live')
   })
 })
-

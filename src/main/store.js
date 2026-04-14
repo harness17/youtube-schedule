@@ -13,3 +13,11 @@ export function setCache(data) {
 export function clearCache() {
   store.delete('scheduleCache')
 }
+
+export function getSetting(key, defaultValue) {
+  return store.get(`settings.${key}`, defaultValue)
+}
+
+export function setSetting(key, value) {
+  store.set(`settings.${key}`, value)
+}

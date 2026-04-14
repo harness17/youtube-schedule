@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types'
+
 export default function AuthScreen({ onLogin, loading }) {
   return (
     <div
@@ -30,4 +32,9 @@ export default function AuthScreen({ onLogin, loading }) {
       </button>
     </div>
   )
+}
+
+AuthScreen.propTypes = {
+  onLogin: PropTypes.func.isRequired,
+  loading: PropTypes.bool.isRequired
 }

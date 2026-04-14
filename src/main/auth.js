@@ -9,9 +9,28 @@ const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 const PORT = 3456
 const REDIRECT_URI = `http://localhost:${PORT}/callback`
 
+// パッケージ版は userData（%APPDATA%\youtube-schedule）に配置
+// → アップデートで削除されない
 const CREDENTIALS_PATH = app.isPackaged
-  ? path.join(path.dirname(app.getPath('exe')), 'credentials.json')
+  ? path.join(app.getPath('userData'), 'credentials.json')
   : path.join(process.cwd(), 'credentials.json')
+
+// v1.2.2 以前は exe と同じフォルダに置いていたため、存在すれば userData へ移行する
+async function migrateCredentialsIfNeeded() {
+  if (!app.isPackaged) return
+  try {
+    await fs.access(CREDENTIALS_PATH)
+    return // すでに新パスに存在する
+  } catch {
+    // 新パスにない → 旧パス（exe 横）を確認
+    const oldPath = path.join(path.dirname(app.getPath('exe')), 'credentials.json')
+    try {
+      await fs.copyFile(oldPath, CREDENTIALS_PATH)
+    } catch {
+      // 旧パスにもない（初回インストール）= 正常
+    }
+  }
+}
 
 const TOKEN_PATH = path.join(app.getPath('userData'), 'token.json')
 
@@ -165,6 +184,20 @@ async function saveCredentials(client) {
     TOKEN_PATH,
     JSON.stringify({ refresh_token: client.credentials.refresh_token })
   )
+}
+
+export async function credentialsExist() {
+  await migrateCredentialsIfNeeded()
+  try {
+    await fs.access(CREDENTIALS_PATH)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function getCredentialsPath() {
+  return CREDENTIALS_PATH
 }
 
 export async function getAuthenticatedClient() {

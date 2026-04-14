@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: youtube-schedule
+appId: io.github.harness17.youtube-schedule
+productName: YouTube Schedule
 directories:
   buildResources: build
 files:
@@ -11,12 +11,13 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: youtube-schedule
+  executableName: YouTubeSchedule
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  include: build/installer.nsh
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
@@ -33,5 +34,6 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: harness17
+  repo: youtube-schedule

@@ -53,10 +53,11 @@ describe('ScheduleCard', () => {
     expect(window.api.openExternal).toHaveBeenCalledWith(mockItem.url)
   })
 
-  it('通知ボタンでチャンネルページが開く', () => {
-    render(<ScheduleCard item={mockItem} />)
-    fireEvent.click(screen.getByTitle('通知を設定'))
-    expect(window.api.openExternal).toHaveBeenCalledWith(mockItem.channelUrl)
+  it('通知ボタンクリックで onToggleWatch が呼ばれる', () => {
+    const onToggleWatch = vi.fn()
+    render(<ScheduleCard item={mockItem} onToggleWatch={onToggleWatch} />)
+    fireEvent.click(screen.getByTitle('通知をオンにする'))
+    expect(onToggleWatch).toHaveBeenCalledWith(mockItem.id)
   })
 
   it('live アイテムに LIVE バッジが表示される', () => {
