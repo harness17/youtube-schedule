@@ -8,6 +8,7 @@ YouTube の登録チャンネルの配信予定・ライブ中の動画を一覧
 
 - 登録チャンネルの配信予定・ライブ中の動画を日付グループで一覧表示
 - ライブ中の配信を最上部に表示（赤枠ハイライト）
+- **メンバーシップ限定配信の取得**（⚙️ ボタンからチャンネルを登録）
 - 配信開始 5 分前のデスクトップ通知
 - タイトル・チャンネル名での検索、チャンネルフィルター
 - ダークモード対応
@@ -104,8 +105,57 @@ npm run build:win      # Windows 向けパッケージング
 - [electron-vite](https://electron-vite.org/)
 - [YouTube Data API v3](https://developers.google.com/youtube/v3)
 
+## メンバーシップ限定配信について
+
+YouTube RSS フィードにはメンバーシップ限定動画が含まれないため、専用の設定が必要です。
+
+### 設定方法
+
+1. アプリのヘッダーにある **⚙️ ボタン** をクリックする
+2. 取得したいチャンネルの URL / チャンネル ID / `@ハンドル` を入力して「追加」する
+3. チャンネル名が自動解決されリストに追加される
+
+**入力例：**
+
+```
+https://www.youtube.com/@patra_ch
+@patra_ch
+UCxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### API クォータについて
+
+メンバーシップ限定配信の取得には YouTube Data API の `search.list`（100 ユニット/チャンネル）を使用します。クォータ超過を防ぐため以下の制限があります。
+
+| 更新タイミング     | 内容                      | 消費                |
+| ------------------ | ------------------------- | ------------------- |
+| 自動（2 時間ごと） | 配信予定のみ取得          | 100 ユニット × 件数 |
+| 手動「更新」ボタン | 配信予定 + ライブ中を取得 | 200 ユニット × 件数 |
+
+- **登録上限: 4 チャンネル**（4 件 × 自動 12 回/日 = 4,800 ユニット/日。手動更新分も含めて 1 日 10,000 ユニットの無料枠に収まる計算）
+- 通常チャンネルは引き続き RSS フィード（クォータ消費ゼロ）で取得します
+
+---
+
 ## 注意事項
 
 - YouTube の閲覧専用スコープ（`youtube.readonly`）のみを使用します
-- API クォータを節約するため、RSS フィードを優先して使用します
+- 通常チャンネルの取得には、YouTube が公式に提供している RSS フィード (`/feeds/videos.xml`) を使用します。YouTube Data API のクォータは消費しません
+- メンバーシップ限定配信の取得のみ YouTube Data API（`search.list`）を使用します
 - `credentials.json` と `token.json` は絶対にリポジトリにコミットしないでください
+
+---
+
+## ライセンス（主要依存ライブラリ）
+
+| ライブラリ                                                                | ライセンス | 用途                          |
+| ------------------------------------------------------------------------- | ---------- | ----------------------------- |
+| [Electron](https://www.electronjs.org/)                                   | MIT        | デスクトップアプリ基盤        |
+| [React](https://react.dev/)                                               | MIT        | UI フレームワーク             |
+| [electron-vite](https://electron-vite.org/)                               | MIT        | ビルドツール                  |
+| [googleapis](https://github.com/googleapis/google-api-nodejs-client)      | Apache-2.0 | YouTube Data API クライアント |
+| [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) | MIT        | RSS XML パーサー              |
+| [electron-store](https://github.com/sindresorhus/electron-store)          | MIT        | 設定・キャッシュ永続化        |
+| [electron-updater](https://www.electron.build/auto-update)                | MIT        | 自動アップデート              |
+
+Apache-2.0 ライセンスの `googleapis` を含みますが、本アプリはオープンソースでの配布を行うため利用条件を満たしています。

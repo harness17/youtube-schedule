@@ -27,18 +27,24 @@ async function getSubscribedChannelIds(yt) {
 }
 
 // RSS フィードからビデオIDを取得（クォータ消費ゼロ）
+// 5秒でタイムアウト → 詰まったチャンネルをスキップして他の取得を続行
+const RSS_TIMEOUT_MS = 5000
+
 function fetchRssFeed(channelId) {
   return new Promise((resolve) => {
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
-    https
-      .get(url, (res) => {
-        let data = ''
-        res.on('data', (chunk) => {
-          data += chunk
-        })
-        res.on('end', () => resolve(data))
+    const req = https.get(url, (res) => {
+      let data = ''
+      res.on('data', (chunk) => {
+        data += chunk
       })
-      .on('error', () => resolve(''))
+      res.on('end', () => resolve(data))
+    })
+    req.setTimeout(RSS_TIMEOUT_MS, () => {
+      req.destroy()
+      resolve('')
+    })
+    req.on('error', () => resolve(''))
   })
 }
 
@@ -89,6 +95,121 @@ function toScheduleItem(v, status) {
     concurrentViewers: v.liveStreamingDetails?.concurrentViewers ?? null,
     url: `https://www.youtube.com/watch?v=${v.id}`,
     channelUrl: `https://www.youtube.com/channel/${v.snippet.channelId}`
+  }
+}
+
+// ────────────────────────────────────────────
+// メンバーシップ限定チャンネルの配信取得
+//   search.list: 100ユニット/チャンネル
+//   includeLive=true（手動更新時）: +100ユニット/チャンネル
+// ────────────────────────────────────────────
+
+export async function fetchMembershipSchedule(
+  authClient,
+  channelIds,
+  { includeLive = false } = {}
+) {
+  if (channelIds.length === 0) return { live: [], upcoming: [] }
+
+  const yt = google.youtube({ version: 'v3', auth: authClient })
+  const allVideoIds = new Set()
+
+  for (const channelId of channelIds) {
+    // 配信予定（自動・手動共通）
+    try {
+      const upcomingRes = await yt.search.list({
+        part: ['id'],
+        channelId,
+        eventType: 'upcoming',
+        type: 'video',
+        maxResults: 10
+      })
+      for (const item of upcomingRes.data.items || []) {
+        if (item.id?.videoId) allVideoIds.add(item.id.videoId)
+      }
+    } catch {
+      // チャンネル単位のエラーはスキップ
+    }
+
+    // ライブ中（手動更新のみ: クォータ節約）
+    if (includeLive) {
+      try {
+        const liveRes = await yt.search.list({
+          part: ['id'],
+          channelId,
+          eventType: 'live',
+          type: 'video',
+          maxResults: 5
+        })
+        for (const item of liveRes.data.items || []) {
+          if (item.id?.videoId) allVideoIds.add(item.id.videoId)
+        }
+      } catch {
+        // スキップ
+      }
+    }
+  }
+
+  const details = await getVideoDetailsBatch(yt, [...allVideoIds])
+  const now = Date.now()
+  const live = []
+  const upcoming = []
+
+  for (const v of details) {
+    const ld = v.liveStreamingDetails
+    if (!ld) continue
+    if (ld.actualStartTime && !ld.actualEndTime) {
+      live.push(toScheduleItem(v, 'live'))
+      continue
+    }
+    if (ld.scheduledStartTime) {
+      const startMs = new Date(ld.scheduledStartTime).getTime()
+      if (startMs > now) {
+        upcoming.push(toScheduleItem(v, 'upcoming'))
+      }
+    }
+  }
+
+  upcoming.sort(
+    (a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
+  )
+  return { live, upcoming }
+}
+
+// ────────────────────────────────────────────
+// URL / チャンネルID / @ハンドル → { channelId, channelTitle }
+// ────────────────────────────────────────────
+
+export async function resolveChannel(authClient, input) {
+  const yt = google.youtube({ version: 'v3', auth: authClient })
+  const trimmed = input.trim()
+
+  let channelId = null
+  let handle = null
+
+  // UC から始まる 24文字のチャンネルID
+  if (/^UC[\w-]{22}$/.test(trimmed)) {
+    channelId = trimmed
+  }
+  // https://www.youtube.com/channel/UCxxx
+  else if (trimmed.includes('/channel/')) {
+    const m = trimmed.match(/\/channel\/(UC[\w-]{22})/)
+    if (m) channelId = m[1]
+  }
+  // @ハンドル または URL に @handle が含まれる
+  else {
+    const m = trimmed.match(/@([\w.-]+)/)
+    handle = m ? m[1] : trimmed
+  }
+
+  try {
+    const params = channelId ? { id: [channelId] } : { forHandle: handle }
+    const res = await yt.channels.list({ part: ['snippet'], ...params })
+    const ch = res.data.items?.[0]
+    if (!ch) return { error: 'NOT_FOUND' }
+    return { channelId: ch.id, channelTitle: ch.snippet.title }
+  } catch {
+    return { error: 'NOT_FOUND' }
   }
 }
 

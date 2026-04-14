@@ -19,7 +19,15 @@ vi.mock('electron-store', () => {
   }
 })
 
-const { getCache, setCache, clearCache } = await import('../../src/main/store.js')
+const {
+  getCache,
+  setCache,
+  clearCache,
+  getMembershipChannels,
+  setMembershipChannels,
+  getMembershipCache,
+  setMembershipCache
+} = await import('../../src/main/store.js')
 
 describe('store', () => {
   it('キャッシュの保存と取得ができる', () => {
@@ -32,5 +40,42 @@ describe('store', () => {
     setCache([{ id: '1' }])
     clearCache()
     expect(getCache()).toBeNull()
+  })
+})
+
+describe('membershipChannels', () => {
+  it('デフォルトは空配列を返す', () => {
+    expect(getMembershipChannels()).toEqual([])
+  })
+
+  it('チャンネルの保存と取得ができる', () => {
+    const channels = [{ channelId: 'UC123456789', channelTitle: 'テストチャンネル' }]
+    setMembershipChannels(channels)
+    expect(getMembershipChannels()).toEqual(channels)
+  })
+
+  it('複数チャンネルを保存できる', () => {
+    const channels = [
+      { channelId: 'UC111', channelTitle: 'チャンネルA' },
+      { channelId: 'UC222', channelTitle: 'チャンネルB' }
+    ]
+    setMembershipChannels(channels)
+    expect(getMembershipChannels()).toHaveLength(2)
+  })
+})
+
+describe('membershipCache', () => {
+  it('保存したデータを取得できる', () => {
+    const data = { live: [], upcoming: [{ id: '1', title: 'test' }] }
+    setMembershipCache(data)
+    const entry = getMembershipCache()
+    expect(entry.data).toEqual(data)
+  })
+
+  it('タイムスタンプが数値で付与される', () => {
+    setMembershipCache({ live: [], upcoming: [] })
+    const entry = getMembershipCache()
+    expect(entry.timestamp).toBeTypeOf('number')
+    expect(entry.timestamp).toBeGreaterThan(0)
   })
 })

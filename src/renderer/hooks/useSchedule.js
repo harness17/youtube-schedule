@@ -49,5 +49,11 @@ export function useSchedule() {
     load()
   }, [])
 
-  return { live, upcoming, loading, error, fromCache, refresh }
+  function applyResult(data) {
+    setLive(data.live ?? [])
+    setUpcoming(data.upcoming ?? [])
+    setFromCache(false)
+  }
+
+  return { live, upcoming, loading, error, fromCache, refresh, applyResult }
 }

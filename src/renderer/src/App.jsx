@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Component } from 're
 import PropTypes from 'prop-types'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
+import MembershipSettings from '../components/MembershipSettings.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
 
 export class ErrorBoundary extends Component {
@@ -59,6 +60,48 @@ function Toast({ message, onClose }) {
 Toast.propTypes = {
   message: PropTypes.string.isRequired,
   onClose: PropTypes.func.isRequired
+}
+
+// YouTube クォータは太平洋時間の深夜0時 (UTC-8) にリセット
+function getQuotaResetTime() {
+  const now = new Date()
+  const reset = new Date()
+  reset.setUTCHours(8, 0, 0, 0) // 00:00 PST = 08:00 UTC
+  if (reset <= now) reset.setUTCDate(reset.getUTCDate() + 1)
+  return reset.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function QuotaBanner({ darkMode }) {
+  const resetTime = getQuotaResetTime()
+  return (
+    <div
+      style={{
+        background: darkMode ? '#3a2a00' : '#fff8e1',
+        border: `1px solid ${darkMode ? '#7a5a00' : '#ffe082'}`,
+        borderRadius: '6px',
+        padding: '10px 14px',
+        marginBottom: '12px',
+        fontSize: '13px',
+        color: darkMode ? '#ffd54f' : '#795548',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}
+    >
+      <span>⚠️</span>
+      <span>本日の YouTube API 上限に達しました。{resetTime} 頃にリセットされます。</span>
+    </div>
+  )
+}
+
+QuotaBanner.propTypes = {
+  darkMode: PropTypes.bool
 }
 
 function BackToTop() {
@@ -314,11 +357,34 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [updateStatus, setUpdateStatus] = useState(null)
   const [appVersion, setAppVersion] = useState('')
+  const [membershipSettingsOpen, setMembershipSettingsOpen] = useState(false)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
   }, [])
-  const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
+  const { live, upcoming, loading, error, fromCache, refresh, applyResult } = useSchedule()
+
+  // 手動更新: RSS + メンバーシップ（ライブ含む）を両方取得
+  // ref ガードで連打による多重実行を防止
+  const isRefreshingRef = useRef(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleFullRefresh = useCallback(async () => {
+    if (isRefreshingRef.current) return
+    isRefreshingRef.current = true
+    setRefreshing(true)
+    try {
+      const [rssResult, memResult] = await Promise.all([
+        window.api.refreshSchedule(),
+        window.api.membershipRefresh({ includeLive: true })
+      ])
+      const merged = memResult.data ?? rssResult.data
+      if (merged) applyResult(merged)
+    } finally {
+      isRefreshingRef.current = false
+      setRefreshing(false)
+    }
+  }, [applyResult])
   const handleToastClose = useCallback(() => setToast(null), [])
 
   // ダークモード（electron-store で永続化）
@@ -404,12 +470,26 @@ export default function App() {
     })()
   }, [])
 
-  // 自動リフレッシュ（10分ごと）
+  // 自動リフレッシュ: RSS は 10分ごと
   useEffect(() => {
     if (!isAuthenticated) return
     const id = setInterval(() => refreshRef.current(), 10 * 60 * 1000)
     return () => clearInterval(id)
   }, [isAuthenticated])
+
+  // 自動リフレッシュ: メンバーシップは 2時間ごと（クォータ節約: upcoming のみ）
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const id = setInterval(
+      () => {
+        window.api.membershipRefresh({ includeLive: false }).then((result) => {
+          if (result.data) applyResult(result.data)
+        })
+      },
+      2 * 60 * 60 * 1000
+    )
+    return () => clearInterval(id)
+  }, [isAuthenticated, applyResult])
 
   // 通知チェック（1分ごと）
   useEffect(() => {
@@ -434,12 +514,7 @@ export default function App() {
     return () => clearInterval(id)
   }, [isAuthenticated])
 
-  useEffect(() => {
-    if (error === 'QUOTA_EXCEEDED') {
-      const id = setTimeout(() => setToast('本日の API 上限に達しました'), 0)
-      return () => clearTimeout(id)
-    }
-  }, [error])
+  // QUOTA_EXCEEDED はトーストではなく永続バナーで表示するため、ここでは何もしない
 
   // チャンネル一覧
   const channels = useMemo(() => {
@@ -581,20 +656,35 @@ export default function App() {
         </h1>
         {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
         <button
-          onClick={refresh}
-          disabled={loading}
+          onClick={handleFullRefresh}
+          disabled={loading || refreshing}
           style={{
             padding: '6px 16px',
             background: '#FF0000',
             color: 'white',
             border: 'none',
             borderRadius: '6px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
+            cursor: loading || refreshing ? 'not-allowed' : 'pointer',
+            opacity: loading || refreshing ? 0.6 : 1,
             fontSize: '13px'
           }}
         >
-          {loading ? '更新中...' : '更新'}
+          {loading || refreshing ? '更新中...' : '更新'}
+        </button>
+        <button
+          onClick={() => setMembershipSettingsOpen(true)}
+          title="メンバーシップチャンネル設定"
+          style={{
+            padding: '6px 10px',
+            background: subBtnBg,
+            color: subBtnColor,
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          ⚙️
         </button>
         <button
           onClick={handleLogout}
@@ -678,19 +768,44 @@ export default function App() {
         )}
       </div>
 
+      {error === 'QUOTA_EXCEEDED' && <QuotaBanner darkMode={darkMode} />}
       {error && error !== 'QUOTA_EXCEEDED' && (
         <div
           style={{
-            background: '#fff3f3',
-            border: '1px solid #ffcccc',
+            background: darkMode ? '#2a1a1a' : '#fff3f3',
+            border: `1px solid ${darkMode ? '#7a3333' : '#ffcccc'}`,
             borderRadius: '6px',
             padding: '8px 12px',
             marginBottom: '12px',
             fontSize: '13px',
-            color: '#cc0000'
+            color: darkMode ? '#ff8a80' : '#cc0000',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
           }}
         >
-          {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
+          {error === 'NOT_AUTHENTICATED' ? (
+            <>
+              <span>認証の有効期限が切れました。</span>
+              <button
+                onClick={handleLogin}
+                style={{
+                  padding: '3px 12px',
+                  background: '#FF0000',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                再ログイン
+              </button>
+            </>
+          ) : (
+            'データの取得に失敗しました'
+          )}
         </div>
       )}
 
@@ -703,6 +818,9 @@ export default function App() {
       />
       {toast && <Toast message={toast} onClose={handleToastClose} />}
       <BackToTop />
+      {membershipSettingsOpen && (
+        <MembershipSettings darkMode={darkMode} onClose={() => setMembershipSettingsOpen(false)} />
+      )}
     </div>
   )
 }

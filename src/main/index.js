@@ -11,8 +11,30 @@ import {
   credentialsExist,
   getCredentialsPath
 } from './auth.js'
-import { fetchSchedule } from './youtube-api.js'
-import { getCache, setCache, getSetting, setSetting } from './store.js'
+import { fetchSchedule, fetchMembershipSchedule, resolveChannel } from './youtube-api.js'
+import {
+  getCache,
+  setCache,
+  getSetting,
+  setSetting,
+  getMembershipChannels,
+  setMembershipChannels,
+  getMembershipCache,
+  setMembershipCache
+} from './store.js'
+
+function mergeSchedules(rssData, memData) {
+  const rss = rssData || { live: [], upcoming: [] }
+  const mem = memData || { live: [], upcoming: [] }
+  const liveMap = new Map()
+  const upcomingMap = new Map()
+  for (const item of [...rss.live, ...mem.live]) liveMap.set(item.id, item)
+  for (const item of [...rss.upcoming, ...mem.upcoming]) upcomingMap.set(item.id, item)
+  const upcoming = [...upcomingMap.values()].sort(
+    (a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
+  )
+  return { live: [...liveMap.values()], upcoming }
+}
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -127,34 +149,71 @@ ipcMain.handle('auth:logout', async () => {
   return { isAuthenticated: false }
 })
 
-// 配信予定取得（キャッシュ優先）
+// 配信予定取得（キャッシュ優先・RSS+メンバーシップ統合）
 ipcMain.handle('schedule:get', async () => {
-  const cached = getCache()
-  if (cached) return { data: cached, fromCache: true }
+  const rssCache = getCache()
+  const memCacheEntry = getMembershipCache()
+  if (rssCache || memCacheEntry) {
+    return { data: mergeSchedules(rssCache, memCacheEntry?.data), fromCache: true }
+  }
   const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
-    const data = await fetchSchedule(client)
-    setCache(data)
-    return { data, fromCache: false }
+    const rssData = await fetchSchedule(client)
+    setCache(rssData)
+    return { data: mergeSchedules(rssData, null), fromCache: false }
   } catch (err) {
     if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
     return { error: 'FETCH_FAILED' }
   }
 })
 
-// 配信予定強制更新
+// RSS のみ強制更新（10分自動リフレッシュ用）
 ipcMain.handle('schedule:refresh', async () => {
   const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
-    const data = await fetchSchedule(client)
-    setCache(data)
-    return { data, fromCache: false }
+    const rssData = await fetchSchedule(client)
+    setCache(rssData)
+    const memCacheEntry = getMembershipCache()
+    return { data: mergeSchedules(rssData, memCacheEntry?.data), fromCache: false }
   } catch (err) {
     if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
     return { error: 'FETCH_FAILED' }
   }
+})
+
+// メンバーシップ強制更新（2時間自動 or 手動更新時）
+ipcMain.handle('membership:refresh', async (_, { includeLive = false } = {}) => {
+  const client = await getAuthenticatedClient()
+  if (!client) return { error: 'NOT_AUTHENTICATED' }
+  const channels = getMembershipChannels()
+  if (channels.length === 0) {
+    const rssCache = getCache()
+    return { data: mergeSchedules(rssCache, null), fromCache: true }
+  }
+  try {
+    const channelIds = channels.map((c) => c.channelId)
+    const memData = await fetchMembershipSchedule(client, channelIds, { includeLive })
+    setMembershipCache(memData)
+    const rssCache = getCache()
+    return { data: mergeSchedules(rssCache, memData), fromCache: false }
+  } catch (err) {
+    if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
+    return { error: 'FETCH_FAILED' }
+  }
+})
+
+// メンバーシップチャンネル管理
+ipcMain.handle('membership:getChannels', () => getMembershipChannels())
+ipcMain.handle('membership:setChannels', (_, channels) => {
+  setMembershipChannels(channels)
+  return { success: true }
+})
+ipcMain.handle('membership:resolveChannel', async (_, input) => {
+  const client = await getAuthenticatedClient()
+  if (!client) return { error: 'NOT_AUTHENTICATED' }
+  return resolveChannel(client, input)
 })
 
 // デスクトップ通知
