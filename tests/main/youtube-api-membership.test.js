@@ -82,6 +82,22 @@ const liveVideo = {
   }
 }
 
+const endedVideo = {
+  id: 'mem_ended',
+  snippet: {
+    title: '終了した配信',
+    channelTitle: 'テストチャンネル',
+    channelId: 'UC_mem',
+    description: '',
+    thumbnails: { high: { url: 'https://example.com/ended.jpg' } }
+  },
+  liveStreamingDetails: {
+    scheduledStartTime: new Date(Date.now() - 7200000).toISOString(),
+    actualStartTime: new Date(Date.now() - 7200000).toISOString(),
+    actualEndTime: new Date(Date.now() - 3600000).toISOString() // 1時間前に終了
+  }
+}
+
 const { fetchMembershipSchedule, resolveChannel } = await import(
   '../../src/main/youtube-api.js'
 )
@@ -95,16 +111,17 @@ describe('fetchMembershipSchedule', () => {
     const result = await fetchMembershipSchedule({}, [])
     expect(result.live).toHaveLength(0)
     expect(result.upcoming).toHaveLength(0)
+    expect(result.updatedPool).toHaveLength(0)
   })
 
-  it('upcoming と live を返す（includeLive: true）', async () => {
+  it('upcoming と live を返す', async () => {
     mockState.searchItems = [
       { id: { videoId: 'mem_upcoming' } },
       { id: { videoId: 'mem_live' } }
     ]
     mockState.videoItems = [upcomingVideo, liveVideo]
 
-    const result = await fetchMembershipSchedule({}, ['UC_mem'], { includeLive: true })
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], [])
     expect(result.upcoming).toHaveLength(1)
     expect(result.live).toHaveLength(1)
     expect(result.upcoming[0].title).toBe('メンバー限定配信予定')
@@ -118,7 +135,7 @@ describe('fetchMembershipSchedule', () => {
     ]
     mockState.videoItems = [upcomingVideo, liveVideo]
 
-    const result = await fetchMembershipSchedule({}, ['UC_mem'], { includeLive: true })
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], [])
     for (const item of result.upcoming) expect(item.status).toBe('upcoming')
     for (const item of result.live) expect(item.status).toBe('live')
   })
@@ -131,11 +148,50 @@ describe('fetchMembershipSchedule', () => {
     // 意図的に逆順で返す
     mockState.videoItems = [upcomingVideoLater, upcomingVideo]
 
-    const result = await fetchMembershipSchedule({}, ['UC_mem'], { includeLive: false })
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], [])
     expect(result.upcoming).toHaveLength(2)
     expect(new Date(result.upcoming[0].scheduledStartTime).getTime()).toBeLessThanOrEqual(
       new Date(result.upcoming[1].scheduledStartTime).getTime()
     )
+  })
+
+  it('updatedPool に live と upcoming の ID が含まれる', async () => {
+    mockState.searchItems = [{ id: { videoId: 'mem_upcoming' } }]
+    mockState.videoItems = [upcomingVideo, liveVideo]
+
+    // liveVideo は watchPool 経由で追跡
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], ['mem_live'])
+    expect(result.updatedPool).toContain('mem_upcoming')
+    expect(result.updatedPool).toContain('mem_live')
+  })
+
+  it('actualEndTime ありの動画は updatedPool から除外される', async () => {
+    mockState.searchItems = []
+    mockState.videoItems = [endedVideo]
+
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], ['mem_ended'])
+    expect(result.updatedPool).not.toContain('mem_ended')
+    expect(result.live).toHaveLength(0)
+    expect(result.upcoming).toHaveLength(0)
+  })
+
+  it('API で見つからない ID は updatedPool から除外される', async () => {
+    mockState.searchItems = []
+    mockState.videoItems = [] // 何も返ってこない
+
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], ['missing_id'])
+    expect(result.updatedPool).not.toContain('missing_id')
+  })
+
+  it('既存プールの ID を追跡して live を検出できる', async () => {
+    // search.list は何も返さないが、プールにある ID が live になっている
+    mockState.searchItems = []
+    mockState.videoItems = [liveVideo]
+
+    const result = await fetchMembershipSchedule({}, ['UC_mem'], ['mem_live'])
+    expect(result.live).toHaveLength(1)
+    expect(result.live[0].id).toBe('mem_live')
+    expect(result.updatedPool).toContain('mem_live')
   })
 })
 

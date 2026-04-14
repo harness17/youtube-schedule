@@ -20,7 +20,9 @@ import {
   getMembershipChannels,
   setMembershipChannels,
   getMembershipCache,
-  setMembershipCache
+  setMembershipCache,
+  getMembershipWatchPool,
+  setMembershipWatchPool
 } from './store.js'
 
 function mergeSchedules(rssData, memData) {
@@ -184,7 +186,7 @@ ipcMain.handle('schedule:refresh', async () => {
 })
 
 // メンバーシップ強制更新（2時間自動 or 手動更新時）
-ipcMain.handle('membership:refresh', async (_, { includeLive = false } = {}) => {
+ipcMain.handle('membership:refresh', async () => {
   const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   const channels = getMembershipChannels()
@@ -194,10 +196,17 @@ ipcMain.handle('membership:refresh', async (_, { includeLive = false } = {}) => 
   }
   try {
     const channelIds = channels.map((c) => c.channelId)
-    const memData = await fetchMembershipSchedule(client, channelIds, { includeLive })
+    const { live, upcoming, updatedPool } = await fetchMembershipSchedule(
+      client,
+      channelIds,
+      getMembershipWatchPool()
+    )
+    setMembershipWatchPool(updatedPool)
+    const memData = { live, upcoming }
     setMembershipCache(memData)
     const rssCache = getCache()
-    return { data: mergeSchedules(rssCache, memData), fromCache: false }
+    const merged = mergeSchedules(rssCache, memData)
+    return { data: merged, fromCache: false }
   } catch (err) {
     if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
     return { error: 'FETCH_FAILED' }

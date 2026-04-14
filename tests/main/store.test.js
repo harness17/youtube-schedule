@@ -26,7 +26,9 @@ const {
   getMembershipChannels,
   setMembershipChannels,
   getMembershipCache,
-  setMembershipCache
+  setMembershipCache,
+  getMembershipWatchPool,
+  setMembershipWatchPool
 } = await import('../../src/main/store.js')
 
 describe('store', () => {
@@ -77,5 +79,22 @@ describe('membershipCache', () => {
     const entry = getMembershipCache()
     expect(entry.timestamp).toBeTypeOf('number')
     expect(entry.timestamp).toBeGreaterThan(0)
+  })
+})
+
+describe('membershipWatchPool', () => {
+  it('デフォルトは空配列を返す', () => {
+    expect(getMembershipWatchPool()).toEqual([])
+  })
+
+  it('IDを保存して取得できる', () => {
+    setMembershipWatchPool(['abc123', 'def456'])
+    expect(getMembershipWatchPool()).toEqual(['abc123', 'def456'])
+  })
+
+  it('空配列で上書きできる', () => {
+    setMembershipWatchPool(['abc123'])
+    setMembershipWatchPool([])
+    expect(getMembershipWatchPool()).toEqual([])
   })
 })

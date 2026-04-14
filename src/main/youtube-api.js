@@ -100,64 +100,62 @@ function toScheduleItem(v, status) {
 
 // ────────────────────────────────────────────
 // メンバーシップ限定チャンネルの配信取得
-//   search.list: 100ユニット/チャンネル
-//   includeLive=true（手動更新時）: +100ユニット/チャンネル
+//   発見フェーズ: search.list upcoming → 新規IDを監視プールに追加
+//   追跡フェーズ: videos.list(プール全ID) → 状態の真実はこちら
+//     actualStartTime あり + actualEndTime なし → live
+//     scheduledStartTime > now               → upcoming
+//     actualEndTime あり / ID なし            → 終了、プールから削除
 // ────────────────────────────────────────────
 
-export async function fetchMembershipSchedule(
-  authClient,
-  channelIds,
-  { includeLive = false } = {}
-) {
-  if (channelIds.length === 0) return { live: [], upcoming: [] }
+export async function fetchMembershipSchedule(authClient, channelIds, watchPool = []) {
+  if (channelIds.length === 0) return { live: [], upcoming: [], updatedPool: [...watchPool] }
 
   const yt = google.youtube({ version: 'v3', auth: authClient })
-  const allVideoIds = new Set()
+  const poolSet = new Set(watchPool)
 
+  // 発見フェーズ: search.list upcoming のみ（live は videos.list 追跡で検出）
   for (const channelId of channelIds) {
-    // 配信予定（自動・手動共通）
     try {
-      const upcomingRes = await yt.search.list({
+      const res = await yt.search.list({
         part: ['id'],
         channelId,
         eventType: 'upcoming',
         type: 'video',
         maxResults: 10
       })
-      for (const item of upcomingRes.data.items || []) {
-        if (item.id?.videoId) allVideoIds.add(item.id.videoId)
+      for (const item of res.data.items || []) {
+        if (item.id?.videoId) poolSet.add(item.id.videoId)
       }
-    } catch {
-      // チャンネル単位のエラーはスキップ
-    }
-
-    // ライブ中（手動更新のみ: クォータ節約）
-    if (includeLive) {
-      try {
-        const liveRes = await yt.search.list({
-          part: ['id'],
-          channelId,
-          eventType: 'live',
-          type: 'video',
-          maxResults: 5
-        })
-        for (const item of liveRes.data.items || []) {
-          if (item.id?.videoId) allVideoIds.add(item.id.videoId)
-        }
-      } catch {
-        // スキップ
-      }
+    } catch (err) {
+      if (err.code === 403) throw err
     }
   }
 
-  const details = await getVideoDetailsBatch(yt, [...allVideoIds])
+  if (poolSet.size === 0) return { live: [], upcoming: [], updatedPool: [] }
+
+  // 追跡フェーズ: プール全IDを videos.list にかけて状態を判定
+  const details = await getVideoDetailsBatch(yt, [...poolSet])
+  const foundIds = new Set(details.map((v) => v.id))
   const now = Date.now()
   const live = []
   const upcoming = []
+  const toRemove = new Set()
+
+  // API で見つからなかったID（削除済み・非公開化）
+  for (const id of poolSet) {
+    if (!foundIds.has(id)) toRemove.add(id)
+  }
 
   for (const v of details) {
     const ld = v.liveStreamingDetails
-    if (!ld) continue
+    if (!ld) {
+      toRemove.add(v.id)
+      continue
+    }
+    if (ld.actualEndTime) {
+      toRemove.add(v.id) // 配信終了
+      continue
+    }
     if (ld.actualStartTime && !ld.actualEndTime) {
       live.push(toScheduleItem(v, 'live'))
       continue
@@ -166,14 +164,23 @@ export async function fetchMembershipSchedule(
       const startMs = new Date(ld.scheduledStartTime).getTime()
       if (startMs > now) {
         upcoming.push(toScheduleItem(v, 'upcoming'))
+      } else if (now - startMs > 6 * 60 * 60 * 1000) {
+        // 予定時刻から6時間以上経過しても開始されていない → 中止扱いで削除
+        toRemove.add(v.id)
       }
+      // 6時間以内の過去予定（遅延・開始待ち）はプールに残す
+    } else {
+      toRemove.add(v.id)
     }
   }
+
+  for (const id of toRemove) poolSet.delete(id)
 
   upcoming.sort(
     (a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
   )
-  return { live, upcoming }
+
+  return { live, upcoming, updatedPool: [...poolSet] }
 }
 
 // ────────────────────────────────────────────

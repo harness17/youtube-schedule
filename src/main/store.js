@@ -74,3 +74,16 @@ export function getMembershipCache() {
 export function setMembershipCache(data) {
   store.set('membershipCache', { data, timestamp: Date.now() })
 }
+
+// ────────────────────────────────────────────
+// メンバーシップ監視プール
+//   search.list upcoming で発見した動画IDを永続保存
+//   videos.list で追跡し、終了・消滅したIDは削除する
+// ────────────────────────────────────────────
+export function getMembershipWatchPool() {
+  return store.get('membershipWatchPool', [])
+}
+
+export function setMembershipWatchPool(ids) {
+  store.set('membershipWatchPool', ids)
+}
