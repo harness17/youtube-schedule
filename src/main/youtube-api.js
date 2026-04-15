@@ -27,18 +27,24 @@ async function getSubscribedChannelIds(yt) {
 }
 
 // RSS フィードからビデオIDを取得（クォータ消費ゼロ）
+// 5秒でタイムアウト → 詰まったチャンネルをスキップして他の取得を続行
+const RSS_TIMEOUT_MS = 5000
+
 function fetchRssFeed(channelId) {
   return new Promise((resolve) => {
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
-    https
-      .get(url, (res) => {
-        let data = ''
-        res.on('data', (chunk) => {
-          data += chunk
-        })
-        res.on('end', () => resolve(data))
+    const req = https.get(url, (res) => {
+      let data = ''
+      res.on('data', (chunk) => {
+        data += chunk
       })
-      .on('error', () => resolve(''))
+      res.on('end', () => resolve(data))
+    })
+    req.setTimeout(RSS_TIMEOUT_MS, () => {
+      req.destroy()
+      resolve('')
+    })
+    req.on('error', () => resolve(''))
   })
 }
 
