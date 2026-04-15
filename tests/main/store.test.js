@@ -1,19 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// electron-store のモック（共有データで旧形式テストも可能にする）
+let mockStoreData = {}
 vi.mock('electron-store', () => {
   return {
     default: class {
-      constructor() {
-        this._data = {}
-      }
       get(key, def) {
-        return this._data[key] ?? def
+        return mockStoreData[key] ?? def
       }
       set(key, val) {
-        this._data[key] = val
+        mockStoreData[key] = val
       }
       delete(key) {
-        delete this._data[key]
+        delete mockStoreData[key]
       }
     }
   }
@@ -31,6 +30,10 @@ const {
   setMembershipWatchPool
 } = await import('../../src/main/store.js')
 
+beforeEach(() => {
+  mockStoreData = {}
+})
+
 describe('store', () => {
   it('キャッシュの保存と取得ができる', () => {
     const data = [{ id: '1', title: 'test' }]
@@ -42,6 +45,35 @@ describe('store', () => {
     setCache([{ id: '1' }])
     clearCache()
     expect(getCache()).toBeNull()
+  })
+
+  describe('TTL', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('2時間以内はキャッシュを返す', () => {
+      const data = [{ id: '1', title: 'test' }]
+      setCache(data)
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000 - 1) // 2時間 - 1ms
+      expect(getCache()).toEqual(data)
+    })
+
+    it('2時間経過後は null を返す', () => {
+      const data = [{ id: '1', title: 'test' }]
+      setCache(data)
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000 + 1) // 2時間 + 1ms
+      expect(getCache()).toBeNull()
+    })
+
+    it('タイムスタンプなし（旧形式）は null を返す', () => {
+      // 旧バージョンのキャッシュ形式（timestamp なし）を直接書き込む
+      mockStoreData['scheduleCache'] = [{ id: 'old', title: '旧形式' }]
+      expect(getCache()).toBeNull()
+    })
   })
 })
 

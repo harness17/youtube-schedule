@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 
 // RSS フィードで vid1（配信予定）と vid_live（ライブ中）を返す
+const rss =
+  '<feed><entry><yt:videoId>vid1</yt:videoId></entry>' +
+  '<entry><yt:videoId>vid_live</yt:videoId></entry></feed>'
+
+// https.get のモック: setTimeout / destroy / on を備えた req オブジェクトを返す
 vi.mock('https', () => {
-  const rss =
-    '<feed><entry><yt:videoId>vid1</yt:videoId></entry>' +
-    '<entry><yt:videoId>vid_live</yt:videoId></entry></feed>'
   return {
     default: {
       get: vi.fn().mockImplementation((_url, callback) => {
@@ -16,7 +18,12 @@ vi.mock('https', () => {
           }
         }
         callback(mockRes)
-        return { on: () => {} }
+        const req = {
+          setTimeout: vi.fn(),
+          destroy: vi.fn(),
+          on: vi.fn()
+        }
+        return req
       })
     }
   }
@@ -102,5 +109,39 @@ describe('fetchSchedule', () => {
     const result = await fetchSchedule({})
     expect(result.upcoming[0].status).toBe('upcoming')
     expect(result.live[0].status).toBe('live')
+  })
+})
+
+describe('fetchRssFeed (タイムアウト)', () => {
+  it('RSS 取得時に req.setTimeout が呼ばれる', async () => {
+    const https = await import('https')
+    https.default.get.mockClear()
+
+    await fetchSchedule({})
+
+    // チャンネルごとに https.get が呼ばれ、req.setTimeout が設定されているか確認
+    expect(https.default.get).toHaveBeenCalled()
+    const req = https.default.get.mock.results[0].value
+    expect(req.setTimeout).toHaveBeenCalledWith(5000, expect.any(Function))
+  })
+
+  it('タイムアウト時は req.destroy を呼んで空文字で解決する', async () => {
+    const https = await import('https')
+    https.default.get.mockClear()
+
+    // タイムアウトを発火させるモック
+    https.default.get.mockImplementationOnce((_url, _callback) => {
+      const req = {
+        setTimeout: vi.fn((_, handler) => handler()), // 即座にタイムアウト発火
+        destroy: vi.fn(),
+        on: vi.fn()
+      }
+      return req
+    })
+
+    await fetchSchedule({})
+
+    const req = https.default.get.mock.results[0].value
+    expect(req.destroy).toHaveBeenCalled()
   })
 })
