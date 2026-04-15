@@ -130,7 +130,7 @@ describe('fetchRssFeed (タイムアウト)', () => {
     https.default.get.mockClear()
 
     // タイムアウトを発火させるモック
-    https.default.get.mockImplementationOnce((_url, _callback) => {
+    https.default.get.mockImplementationOnce(() => {
       const req = {
         setTimeout: vi.fn((_, handler) => handler()), // 即座にタイムアウト発火
         destroy: vi.fn(),

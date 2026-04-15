@@ -19,7 +19,6 @@ import {
   setSetting,
   getMembershipChannels,
   setMembershipChannels,
-  getMembershipCache,
   getMembershipCacheData,
   setMembershipCache,
   getMembershipWatchPool,
