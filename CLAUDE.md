@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> 実装詳細（IPC ハンドラー一覧・キャッシュロジック・データフロー）は [`docs/architecture.md`](docs/architecture.md) を参照。
+> ソースファイルを読む前にまずこちらを確認すること。
+
 ## プロジェクト概要
 
 YouTube 配信予定ビューア — Electron + React のデスクトップアプリ。YouTube Data API v3（OAuth 認証）と RSS フィードを使って配信スケジュールを表示する。
