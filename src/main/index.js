@@ -20,6 +20,7 @@ import {
   getMembershipChannels,
   setMembershipChannels,
   getMembershipCache,
+  getMembershipCacheData,
   setMembershipCache,
   getMembershipWatchPool,
   setMembershipWatchPool
@@ -153,17 +154,20 @@ ipcMain.handle('auth:logout', async () => {
 
 // 配信予定取得（キャッシュ優先・RSS+メンバーシップ統合）
 ipcMain.handle('schedule:get', async () => {
-  const rssCache = getCache()
-  const memCacheEntry = getMembershipCache()
-  if (rssCache || memCacheEntry) {
-    return { data: mergeSchedules(rssCache, memCacheEntry?.data), fromCache: true }
+  const rssCache = getCache()            // TTL チェック済み（期限切れなら null）
+  const memCacheData = getMembershipCacheData() // TTL チェック済み（期限切れなら null）
+
+  // RSS キャッシュが有効な場合のみキャッシュ返却（RSS が切れたら再取得）
+  if (rssCache !== null) {
+    return { data: mergeSchedules(rssCache, memCacheData), fromCache: true }
   }
+
   const client = await getAuthenticatedClient()
   if (!client) return { error: 'NOT_AUTHENTICATED' }
   try {
     const rssData = await fetchSchedule(client)
     setCache(rssData)
-    return { data: mergeSchedules(rssData, null), fromCache: false }
+    return { data: mergeSchedules(rssData, memCacheData), fromCache: false }
   } catch (err) {
     if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
     return { error: 'FETCH_FAILED' }
@@ -177,8 +181,8 @@ ipcMain.handle('schedule:refresh', async () => {
   try {
     const rssData = await fetchSchedule(client)
     setCache(rssData)
-    const memCacheEntry = getMembershipCache()
-    return { data: mergeSchedules(rssData, memCacheEntry?.data), fromCache: false }
+    const memCacheData = getMembershipCacheData() // TTL チェック済み
+    return { data: mergeSchedules(rssData, memCacheData), fromCache: false }
   } catch (err) {
     if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
     return { error: 'FETCH_FAILED' }

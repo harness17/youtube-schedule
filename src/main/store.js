@@ -71,6 +71,14 @@ export function getMembershipCache() {
   return store.get('membershipCache', null)
 }
 
+// TTL チェック済みのメンバーシップキャッシュデータを返す（期限切れなら null）
+export function getMembershipCacheData() {
+  const entry = store.get('membershipCache', null)
+  if (!entry || !entry.timestamp) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null
+  return entry.data
+}
+
 export function setMembershipCache(data) {
   store.set('membershipCache', { data, timestamp: Date.now() })
 }
