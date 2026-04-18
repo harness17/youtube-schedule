@@ -1,0 +1,18 @@
+#!/bin/sh
+# コミット前に lint と test を自動実行する
+
+echo "▶ lint チェック中..."
+npm run lint --silent
+if [ $? -ne 0 ]; then
+  echo "✖ ESLint エラーがあります。修正してから再コミットしてください。"
+  exit 1
+fi
+
+echo "▶ テスト実行中..."
+npm run test --silent
+if [ $? -ne 0 ]; then
+  echo "✖ テストが失敗しています。修正してから再コミットしてください。"
+  exit 1
+fi
+
+echo "✔ lint・test ともにパスしました"
