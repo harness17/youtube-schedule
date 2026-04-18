@@ -69,19 +69,27 @@ describe('store', () => {
   })
 
   describe('キャッシュ返却時のフィルタ', () => {
-    it('予定時刻が過去の upcoming は除外される', () => {
-      const past = new Date(Date.now() - 60 * 1000).toISOString()
+    it('予定時刻が2時間超過した upcoming は除外される', () => {
+      const veryPast = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() // 3h前
       const future = new Date(Date.now() + 60 * 60 * 1000).toISOString()
       setCache({
         live: [],
         upcoming: [
-          { id: 'past', scheduledStartTime: past },
+          { id: 'very-past', scheduledStartTime: veryPast },
           { id: 'future', scheduledStartTime: future }
         ]
       })
       const cached = getCache()
       expect(cached.upcoming).toHaveLength(1)
       expect(cached.upcoming[0].id).toBe('future')
+    })
+
+    it('遅延配信（2時間以内のスケジュール超過）はキャッシュに残る', () => {
+      const delayed = new Date(Date.now() - 30 * 60 * 1000).toISOString() // 30分前（遅延中）
+      setCache({ live: [], upcoming: [{ id: 'delayed', scheduledStartTime: delayed }] })
+      const cached = getCache()
+      expect(cached.upcoming).toHaveLength(1)
+      expect(cached.upcoming[0].id).toBe('delayed')
     })
 
     it('scheduledStartTime が無い upcoming は除外される', () => {

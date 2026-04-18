@@ -6,6 +6,9 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24時間
 // 配信終了判定の閾値：actualStartTime からこの時間が経過した live は終了済みとみなす
 const LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000 // 24時間
 
+// 遅延配信バッファ：スケジュール時刻を過ぎてもこの時間内なら upcoming として保持
+const UPCOMING_DELAY_BUFFER_MS = 2 * 60 * 60 * 1000 // 2時間
+
 const store = new Store()
 
 // キャッシュ返却時に古い配信を除外する
@@ -16,7 +19,9 @@ function filterStale(data) {
   const now = Date.now()
   const upcoming = Array.isArray(data.upcoming)
     ? data.upcoming.filter(
-        (v) => v.scheduledStartTime && new Date(v.scheduledStartTime).getTime() > now
+        (v) =>
+          v.scheduledStartTime &&
+          new Date(v.scheduledStartTime).getTime() > now - UPCOMING_DELAY_BUFFER_MS
       )
     : data.upcoming
   const live = Array.isArray(data.live)

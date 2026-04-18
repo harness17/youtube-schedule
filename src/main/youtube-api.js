@@ -1,11 +1,11 @@
 import { google } from 'googleapis'
-import https from 'https'
-import { XMLParser } from 'fast-xml-parser'
 
 // ────────────────────────────────────────────
 // コスト比較
-//   旧: search.list × チャンネル数 × 2 = 100ユニット/チャンネル
-//   新: subscriptions.list(~4) + RSS(0) + videos.list(~30) ≒ 34ユニット合計
+//   旧: RSS(0) + videos.list(~30) ≒ 34ユニット
+//       ※ YouTubeがRSSをUser-Agentなしで404返すようになり廃止
+//   新: subscriptions.list(~7) + playlistItems.list(326) + videos.list(~98) ≒ 431ユニット
+//       ※ 認証済みAPIで安定動作、日次クォータ10,000に対し余裕あり
 // ────────────────────────────────────────────
 
 async function getSubscribedChannelIds(yt) {
@@ -26,40 +26,37 @@ async function getSubscribedChannelIds(yt) {
   return channelIds
 }
 
-// RSS フィードからビデオIDを取得（クォータ消費ゼロ）
-// 5秒でタイムアウト → 詰まったチャンネルをスキップして他の取得を続行
-const RSS_TIMEOUT_MS = 5000
-
-function fetchRssFeed(channelId) {
-  return new Promise((resolve) => {
-    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
-    const req = https.get(url, (res) => {
-      let data = ''
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-      res.on('end', () => resolve(data))
-    })
-    req.setTimeout(RSS_TIMEOUT_MS, () => {
-      req.destroy()
-      resolve('')
-    })
-    req.on('error', () => resolve(''))
-  })
+// UC→UU変換でアップロードプレイリストIDを導出
+function getUploadsPlaylistId(channelId) {
+  return 'UU' + channelId.slice(2)
 }
 
-function parseVideoIdsFromRss(xml) {
-  if (!xml) return []
+// チャンネルの最新動画IDを playlistItems.list で取得（1ユニット/チャンネル）
+// 非公開・エラーのチャンネルは空配列を返してスキップ
+async function getRecentVideoIds(yt, channelId, maxResults = 15) {
   try {
-    const parser = new XMLParser()
-    const result = parser.parse(xml)
-    const entries = result?.feed?.entry
-    if (!entries) return []
-    const arr = Array.isArray(entries) ? entries : [entries]
-    return arr.map((e) => e['yt:videoId']).filter(Boolean)
+    const res = await yt.playlistItems.list({
+      part: ['contentDetails'],
+      playlistId: getUploadsPlaylistId(channelId),
+      maxResults
+    })
+    return (res.data.items || []).map((item) => item.contentDetails.videoId)
   } catch {
     return []
   }
+}
+
+// 全チャンネルの動画IDを並列取得（同時リクエスト数制限あり）
+const PLAYLIST_CONCURRENCY = 10
+
+async function getAllVideoIds(yt, channelIds) {
+  const allIds = []
+  for (let i = 0; i < channelIds.length; i += PLAYLIST_CONCURRENCY) {
+    const batch = channelIds.slice(i, i + PLAYLIST_CONCURRENCY)
+    const results = await Promise.all(batch.map((id) => getRecentVideoIds(yt, id)))
+    allIds.push(...results.flat())
+  }
+  return [...new Set(allIds)]
 }
 
 // videos.list は50件ずつバッチ処理（1バッチ = 1ユニット）
@@ -101,12 +98,11 @@ function toScheduleItem(v, status) {
 export async function fetchSchedule(authClient) {
   const yt = google.youtube({ version: 'v3', auth: authClient })
 
-  // Step1: 登録チャンネルID取得（~4ユニット）
+  // Step1: 登録チャンネルID取得（~7ユニット）
   const channelIds = await getSubscribedChannelIds(yt)
 
-  // Step2: 各チャンネルの RSS を並列取得（0ユニット）
-  const rssResults = await Promise.all(channelIds.map(fetchRssFeed))
-  const allVideoIds = [...new Set(rssResults.flatMap((xml) => parseVideoIdsFromRss(xml)))]
+  // Step2: 各チャンネルのアップロード一覧から最新動画IDを取得（1ユニット/チャンネル）
+  const allVideoIds = await getAllVideoIds(yt, channelIds)
 
   // Step3: 動画詳細を取得（1ユニット/50件）
   const details = await getVideoDetailsBatch(yt, allVideoIds)
@@ -117,16 +113,31 @@ export async function fetchSchedule(authClient) {
 
   for (const v of details) {
     const ld = v.liveStreamingDetails
-    if (!ld) continue
+    const bc = v.snippet?.liveBroadcastContent
+
+    // 終了済みはスキップ
+    if (ld?.actualEndTime) continue
 
     // ライブ中: actualStartTime あり、actualEndTime なし
-    if (ld.actualStartTime && !ld.actualEndTime) {
+    if (ld?.actualStartTime && !ld?.actualEndTime) {
       live.push(toScheduleItem(v, 'live'))
       continue
     }
 
-    // 配信予定: scheduledStartTime が未来
-    if (ld.scheduledStartTime) {
+    // 配信予定・遅延待機中: liveBroadcastContent が 'upcoming'
+    // scheduledStartTime が 2時間以上前のものはキャンセル済み扱いで除外
+    if (bc === 'upcoming') {
+      const startMs = ld?.scheduledStartTime
+        ? new Date(ld.scheduledStartTime).getTime()
+        : now + 1
+      if (startMs > now - 2 * 60 * 60 * 1000) {
+        upcoming.push(toScheduleItem(v, 'upcoming'))
+      }
+      continue
+    }
+
+    // フォールバック: scheduledStartTime が未来（liveBroadcastContent がない場合）
+    if (ld?.scheduledStartTime) {
       const startMs = new Date(ld.scheduledStartTime).getTime()
       if (startMs > now) {
         upcoming.push(toScheduleItem(v, 'upcoming'))
