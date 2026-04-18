@@ -1,7 +1,30 @@
 import Store from 'electron-store'
 
 // キャッシュの有効期限（RSS・メンバーシップ共通）
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000 // 2時間
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24時間
+
+// 配信終了判定の閾値：actualStartTime からこの時間が経過した live は終了済みとみなす
+const LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000 // 24時間
+
+// キャッシュ返却時に古い配信を除外する
+//   upcoming: scheduledStartTime が now より未来のもののみ
+//   live:     actualStartTime があり、かつ開始から LIVE_MAX_DURATION_MS 以内のもののみ
+function filterStale(data) {
+  if (!data || typeof data !== 'object') return data
+  const now = Date.now()
+  const upcoming = Array.isArray(data.upcoming)
+    ? data.upcoming.filter(
+        (v) => v.scheduledStartTime && new Date(v.scheduledStartTime).getTime() > now
+      )
+    : data.upcoming
+  const live = Array.isArray(data.live)
+    ? data.live.filter((v) => {
+        if (!v.actualStartTime) return false
+        return now - new Date(v.actualStartTime).getTime() < LIVE_MAX_DURATION_MS
+      })
+    : data.live
+  return { ...data, live, upcoming }
+}
 
 // ────────────────────────────────────────────
 // スキーマ定義
@@ -34,7 +57,7 @@ export function getCache() {
   const entry = store.get('scheduleCache', null)
   if (!entry || !entry.timestamp) return null
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null
-  return entry.data
+  return filterStale(entry.data)
 }
 
 export function setCache(data) {
@@ -76,7 +99,7 @@ export function getMembershipCacheData() {
   const entry = store.get('membershipCache', null)
   if (!entry || !entry.timestamp) return null
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null
-  return entry.data
+  return filterStale(entry.data)
 }
 
 export function setMembershipCache(data) {
