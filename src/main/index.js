@@ -11,8 +11,31 @@ import {
   credentialsExist,
   getCredentialsPath
 } from './auth.js'
-import { fetchSchedule } from './youtube-api.js'
-import { getCache, setCache, getSetting, setSetting } from './store.js'
+import { google } from 'googleapis'
+import { openDatabase, closeDatabase } from './db/connection.js'
+import { runMigrations } from './db/migrate.js'
+import { createVideoRepository } from './repositories/videoRepository.js'
+import { createChannelRepository } from './repositories/channelRepository.js'
+import { createRssFetchLogRepository } from './repositories/rssFetchLogRepository.js'
+import { createMetaRepository } from './repositories/metaRepository.js'
+import { createSchedulerService } from './services/schedulerService.js'
+import { createRssFetcher } from './fetchers/rssFetcher.js'
+import { createSubscriptionsFetcher } from './fetchers/subscriptionsFetcher.js'
+import { createPlaylistItemsFetcher } from './fetchers/playlistItemsFetcher.js'
+import { createVideoDetailsFetcher } from './fetchers/videoDetailsFetcher.js'
+import {
+  readLegacyScheduleCache,
+  clearLegacyScheduleCache,
+  getSetting,
+  setSetting
+} from './store.js'
+
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000
+let db
+let videoRepo, channelRepo, rssLogRepo, metaRepo
+let scheduler
+let refreshTimer
+let dbBroken = false
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -66,12 +89,65 @@ function setupAutoUpdater(mainWindow) {
   autoUpdater.checkForUpdates()
 }
 
-app.whenReady().then(() => {
+function initDatabase() {
+  const dbPath = join(app.getPath('userData'), 'schedule.db')
+  db = openDatabase(dbPath)
+  const integrity = db.pragma('integrity_check', { simple: true })
+  if (integrity !== 'ok') {
+    dbBroken = true
+    return
+  }
+  runMigrations(db, {
+    legacyStoreReader: {
+      read: readLegacyScheduleCache,
+      clear: clearLegacyScheduleCache
+    }
+  })
+  videoRepo = createVideoRepository(db)
+  channelRepo = createChannelRepository(db)
+  rssLogRepo = createRssFetchLogRepository(db)
+  metaRepo = createMetaRepository(db)
+}
+
+function initScheduler(authClient) {
+  scheduler = createSchedulerService({
+    videoRepo,
+    channelRepo,
+    rssLogRepo,
+    metaRepo,
+    subsFetcher: createSubscriptionsFetcher(),
+    rssFetcher: createRssFetcher({ timeoutMs: 3000 }),
+    playlistFetcher: createPlaylistItemsFetcher(),
+    videoFetcher: createVideoDetailsFetcher(),
+    authClient,
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth })
+  })
+}
+
+function startPolling(mainWindow) {
+  if (refreshTimer) clearInterval(refreshTimer)
+  const kick = async () => {
+    try {
+      await scheduler.refresh()
+      mainWindow?.webContents.send('schedule:updated')
+    } catch (err) {
+      mainWindow?.webContents.send('schedule:error', {
+        message: err?.message ?? String(err)
+      })
+    }
+  }
+  kick()
+  refreshTimer = setInterval(kick, REFRESH_INTERVAL_MS)
+}
+
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('io.github.harness17.youtube-schedule')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  initDatabase()
 
   createWindow()
 
@@ -81,12 +157,27 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // 起動時に認証済みクライアントがあればスケジューラーを初期化
+  const exists = await credentialsExist()
+  if (exists) {
+    const client = await getAuthenticatedClient()
+    if (client) {
+      initScheduler(client)
+      startPolling(mainWindow)
+    }
+  }
 })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  closeDatabase(db)
 })
 
 // 認証状態確認
@@ -115,6 +206,12 @@ ipcMain.handle('auth:login', async () => {
   }
   try {
     await startAuthFlow()
+    const client = await getAuthenticatedClient()
+    if (client && !scheduler) {
+      initScheduler(client)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      startPolling(mainWindow)
+    }
     return { isAuthenticated: true }
   } catch (err) {
     return { isAuthenticated: false, error: err.message }
@@ -127,34 +224,41 @@ ipcMain.handle('auth:logout', async () => {
   return { isAuthenticated: false }
 })
 
-// 配信予定取得（キャッシュ優先）
-ipcMain.handle('schedule:get', async () => {
-  const cached = getCache()
-  if (cached) return { data: cached, fromCache: true }
-  const client = await getAuthenticatedClient()
-  if (!client) return { error: 'NOT_AUTHENTICATED' }
-  try {
-    const data = await fetchSchedule(client)
-    setCache(data)
-    return { data, fromCache: false }
-  } catch (err) {
-    if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
-    return { error: 'FETCH_FAILED' }
+// 配信予定取得
+ipcMain.handle('schedule:get', () => {
+  if (dbBroken) return { live: [], upcoming: [], dbBroken: true }
+  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
+  const visible = videoRepo.listVisible()
+  return {
+    live: visible.filter((v) => v.status === 'live'),
+    upcoming: visible.filter((v) => v.status === 'upcoming')
   }
 })
 
 // 配信予定強制更新
 ipcMain.handle('schedule:refresh', async () => {
-  const client = await getAuthenticatedClient()
-  if (!client) return { error: 'NOT_AUTHENTICATED' }
-  try {
-    const data = await fetchSchedule(client)
-    setCache(data)
-    return { data, fromCache: false }
-  } catch (err) {
-    if (err.code === 403) return { error: 'QUOTA_EXCEEDED' }
-    return { error: 'FETCH_FAILED' }
-  }
+  if (!scheduler) return { error: 'NOT_INITIALIZED' }
+  await scheduler.refresh({ forceFullRecheck: true })
+})
+
+// RSS 失敗率診断
+ipcMain.handle('diag:rssFailureRate', () => {
+  if (!rssLogRepo) return 0
+  const since = Date.now() - 24 * 60 * 60 * 1000
+  return rssLogRepo.getFailureRateSince(since)
+})
+
+// データベースリセット
+ipcMain.handle('schedule:resetDatabase', async () => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  closeDatabase(db)
+  const fs = await import('node:fs/promises')
+  const dbPath = join(app.getPath('userData'), 'schedule.db')
+  await fs.rm(dbPath, { force: true })
+  await fs.rm(dbPath + '-wal', { force: true })
+  await fs.rm(dbPath + '-shm', { force: true })
+  dbBroken = false
+  initDatabase()
 })
 
 // デスクトップ通知
