@@ -30,6 +30,20 @@ import {
   setSetting
 } from './store.js'
 
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0) {
+      const win = windows[0]
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+}
+
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
 let videoRepo, channelRepo, rssLogRepo, metaRepo
