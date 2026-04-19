@@ -35,9 +35,7 @@ function createMocks() {
   const rssLogRepo = { record: vi.fn() }
   const metaRepo = { get: vi.fn(), set: vi.fn() }
   const subsFetcher = {
-    fetch: vi.fn().mockResolvedValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    fetch: vi.fn().mockResolvedValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
   }
   const rssFetcher = {
     fetch: vi.fn().mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
@@ -85,9 +83,7 @@ describe('SchedulerService.refresh', () => {
   it('skips subscriptions fetch when cache is fresh (< 24h)', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.subsFetcher.fetch).not.toHaveBeenCalled()
@@ -115,9 +111,7 @@ describe('SchedulerService.refresh', () => {
   it('records RSS outcomes to the log repository', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.rssLogRepo.record).toHaveBeenCalledWith(
@@ -145,13 +139,43 @@ describe('SchedulerService.refresh', () => {
   it('upserts fetched videos with derived status', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'V1', status: 'upcoming' })
     )
+  })
+
+  it('runs cleanup when last_cleanup_at is older than 24h', async () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn((key) =>
+      key === 'last_cleanup_at' ? String(Date.now() - 25 * 3600_000) : null
+    )
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
+    expect(mocks.metaRepo.set).toHaveBeenCalledWith(
+      'last_cleanup_at',
+      expect.any(String),
+      expect.any(Number)
+    )
+  })
+
+  it('skips cleanup when last_cleanup_at is within 24h', async () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn((key) =>
+      key === 'last_cleanup_at' ? String(Date.now() - 60_000) : null
+    )
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.videoRepo.deleteExpiredEnded).not.toHaveBeenCalled()
+  })
+
+  it('runs cleanup on first run when no last_cleanup_at exists', async () => {
+    const mocks = createMocks()
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
   })
 })

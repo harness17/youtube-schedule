@@ -6,11 +6,12 @@ export function createVideoRepository(db) {
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at
+      url, first_seen_at, last_checked_at, ended_at
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
-      @url, @firstSeenAt, @lastCheckedAt
+      @url, @firstSeenAt, @lastCheckedAt,
+      CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -23,7 +24,12 @@ export function createVideoRepository(db) {
       actual_start_time = excluded.actual_start_time,
       concurrent_viewers = excluded.concurrent_viewers,
       url = excluded.url,
-      last_checked_at = excluded.last_checked_at
+      last_checked_at = excluded.last_checked_at,
+      ended_at = CASE
+        WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
+        WHEN excluded.status != 'ended' THEN NULL
+        ELSE videos.ended_at
+      END
   `)
 
   const getByIdStmt = db.prepare(`SELECT * FROM videos WHERE id = ?`)
@@ -36,8 +42,44 @@ export function createVideoRepository(db) {
       CASE status WHEN 'live' THEN 0 ELSE 1 END,
       scheduled_start_time ASC
   `)
+  const listMissedStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ended'
+      AND viewed_at IS NULL
+      AND (
+        (actual_start_time IS NOT NULL AND actual_start_time < @now) OR
+        (actual_start_time IS NULL AND scheduled_start_time IS NOT NULL AND scheduled_start_time < @now)
+      )
+    ORDER BY COALESCE(actual_start_time, scheduled_start_time) DESC
+  `)
+  const listArchiveStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'ended'
+    ORDER BY COALESCE(ended_at, last_checked_at) DESC
+    LIMIT @limit OFFSET @offset
+  `)
+  const listFavoritesStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE is_favorite = 1
+    ORDER BY COALESCE(scheduled_start_time, last_checked_at) DESC
+  `)
+  const searchStmt = db.prepare(`
+    SELECT v.* FROM videos v
+    JOIN videos_fts fts ON fts.rowid = v.rowid
+    WHERE videos_fts MATCH @query
+    ORDER BY COALESCE(v.scheduled_start_time, v.last_checked_at) DESC
+    LIMIT @limit
+  `)
+  const markViewedStmt = db.prepare(`UPDATE videos SET viewed_at = @now WHERE id = @id`)
+  const clearViewedStmt = db.prepare(`UPDATE videos SET viewed_at = NULL WHERE id = @id`)
+  const toggleFavStmt = db.prepare(
+    `UPDATE videos SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
+  )
   const deleteExpiredStmt = db.prepare(`
-    DELETE FROM videos WHERE status = 'ended' AND last_checked_at < ?
+    DELETE FROM videos
+    WHERE status = 'ended'
+      AND is_favorite = 0
+      AND COALESCE(ended_at, last_checked_at) < ?
   `)
 
   function rowToVideo(row) {
@@ -55,8 +97,20 @@ export function createVideoRepository(db) {
       concurrentViewers: row.concurrent_viewers,
       url: row.url,
       firstSeenAt: row.first_seen_at,
-      lastCheckedAt: row.last_checked_at
+      lastCheckedAt: row.last_checked_at,
+      endedAt: row.ended_at ?? null,
+      viewedAt: row.viewed_at ?? null,
+      isFavorite: row.is_favorite === 1
     }
+  }
+
+  function escapeFtsQuery(raw) {
+    const trimmed = String(raw ?? '').trim()
+    if (!trimmed) return ''
+    return trimmed
+      .split(/\s+/)
+      .map((tok) => `"${tok.replace(/"/g, '""')}"`)
+      .join(' ')
   }
 
   return {
@@ -84,6 +138,33 @@ export function createVideoRepository(db) {
           upcomingThreshold: now - UPCOMING_GRACE_MS
         })
         .map(rowToVideo)
+    },
+    listMissed(now = Date.now()) {
+      return listMissedStmt.all({ now }).map(rowToVideo)
+    },
+    listArchive({ limit = 50, offset = 0 } = {}) {
+      return listArchiveStmt.all({ limit, offset }).map(rowToVideo)
+    },
+    listFavorites() {
+      return listFavoritesStmt.all().map(rowToVideo)
+    },
+    searchByText(query, { limit = 50 } = {}) {
+      const ftsQuery = escapeFtsQuery(query)
+      if (!ftsQuery) return []
+      return searchStmt.all({ query: ftsQuery, limit }).map(rowToVideo)
+    },
+    markViewed(id, now = Date.now()) {
+      const r = markViewedStmt.run({ id, now })
+      return r.changes > 0
+    },
+    clearViewed(id) {
+      const r = clearViewedStmt.run({ id })
+      return r.changes > 0
+    },
+    toggleFavorite(id) {
+      const r = toggleFavStmt.run({ id })
+      if (r.changes === 0) return null
+      return getByIdStmt.get(id)?.is_favorite === 1
     },
     deleteExpiredEnded(thresholdMs) {
       const result = deleteExpiredStmt.run(thresholdMs)

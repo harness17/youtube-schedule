@@ -2,6 +2,9 @@ import { deriveStatus } from './videoStatus.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000
+const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const CLEANUP_META_KEY = 'last_cleanup_at'
 
 function chunk(arr, size) {
   const out = []
@@ -23,9 +26,7 @@ function toVideoRecord(v, now) {
       v.snippet.thumbnails?.medium?.url ??
       '',
     status: deriveStatus(v, now),
-    scheduledStartTime: ld.scheduledStartTime
-      ? new Date(ld.scheduledStartTime).getTime()
-      : null,
+    scheduledStartTime: ld.scheduledStartTime ? new Date(ld.scheduledStartTime).getTime() : null,
     actualStartTime: ld.actualStartTime ? new Date(ld.actualStartTime).getTime() : null,
     concurrentViewers: ld.concurrentViewers ? Number(ld.concurrentViewers) : null,
     url: `https://www.youtube.com/watch?v=${v.id}`,
@@ -113,6 +114,15 @@ export function createSchedulerService({
     }
 
     metaRepo.set('last_full_refresh_at', String(now), now)
+
+    maybeCleanup(now)
+  }
+
+  function maybeCleanup(now) {
+    const last = Number(metaRepo.get(CLEANUP_META_KEY) ?? 0)
+    if (now - last < CLEANUP_INTERVAL_MS) return
+    videoRepo.deleteExpiredEnded(now - ENDED_RETENTION_MS)
+    metaRepo.set(CLEANUP_META_KEY, String(now), now)
   }
 
   return {
