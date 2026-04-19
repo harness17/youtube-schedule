@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Component } from 're
 import PropTypes from 'prop-types'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
+import StatusBanners from '../components/StatusBanners.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
 
 export class ErrorBoundary extends Component {
@@ -318,8 +319,20 @@ export default function App() {
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
   }, [])
-  const { live, upcoming, loading, error, fromCache, refresh } = useSchedule()
+  const { live, upcoming, loading, error, dbBroken, refresh } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
+
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false)
+    const onOffline = () => setIsOffline(true)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
 
   // ダークモード（electron-store で永続化）
   const [darkMode, setDarkMode] = useState(false)
@@ -561,6 +574,7 @@ export default function App() {
       }}
     >
       <UpdateBanner status={updateStatus} onInstall={() => window.api.quitAndInstall()} />
+      <StatusBanners dbBroken={dbBroken} isOffline={isOffline} />
       {/* ヘッダー行1 */}
       <div
         style={{
@@ -579,7 +593,6 @@ export default function App() {
             </span>
           )}
         </h1>
-        {fromCache && <span style={{ fontSize: '12px', color: '#888' }}>キャッシュ表示中</span>}
         <button
           onClick={refresh}
           disabled={loading}
