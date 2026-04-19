@@ -15,5 +15,12 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateAvailable: (cb) => ipcRenderer.on('updater:update-available', (_, info) => cb(info)),
   onUpdateDownloaded: (cb) => ipcRenderer.on('updater:update-downloaded', (_, info) => cb(info)),
   onUpdaterError: (cb) => ipcRenderer.on('updater:error', (_, msg) => cb(msg)),
-  quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall')
+  quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),
+  getRssFailureRate: () => ipcRenderer.invoke('diag:rssFailureRate'),
+  resetDatabase: () => ipcRenderer.invoke('schedule:resetDatabase'),
+  onScheduleUpdated: (cb) => {
+    const listener = () => cb()
+    ipcRenderer.on('schedule:updated', listener)
+    return () => ipcRenderer.off('schedule:updated', listener)
+  }
 })
