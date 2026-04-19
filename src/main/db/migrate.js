@@ -14,14 +14,14 @@ export function getSchemaVersion(db) {
   return row?.v ?? 0
 }
 
-export function runMigrations(db) {
+export function runMigrations(db, ctx = {}) {
   ensureTracking(db)
   const current = getSchemaVersion(db)
   const stmt = db.prepare(`INSERT INTO schema_version (version) VALUES (?)`)
   for (const migration of migrations) {
     if (migration.version <= current) continue
     const tx = db.transaction(() => {
-      migration.up(db)
+      migration.up(db, ctx)
       stmt.run(migration.version)
     })
     tx()
