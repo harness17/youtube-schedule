@@ -5,19 +5,23 @@ export function useSchedule() {
   const [upcoming, setUpcoming] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [fromCache, setFromCache] = useState(false)
+  const [dbBroken, setDbBroken] = useState(false)
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
       const result = await window.api.getSchedule()
-      if (result.error) {
+      if (result.dbBroken) {
+        setDbBroken(true)
+        setLive([])
+        setUpcoming([])
+      } else if (result.error) {
         setError(result.error)
-      } else if (result.data) {
-        setLive(result.data.live ?? [])
-        setUpcoming(result.data.upcoming ?? [])
-        setFromCache(result.fromCache)
+      } else {
+        setDbBroken(false)
+        setLive(result.live ?? [])
+        setUpcoming(result.upcoming ?? [])
       }
     } catch (e) {
       setError(e.message ?? 'FETCH_FAILED')
@@ -30,24 +34,20 @@ export function useSchedule() {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.api.refreshSchedule()
-      if (result.error) {
-        setError(result.error)
-      } else if (result.data) {
-        setLive(result.data.live ?? [])
-        setUpcoming(result.data.upcoming ?? [])
-        setFromCache(false)
-      }
+      await window.api.refreshSchedule()
+      // schedule:updated イベントで load() が呼ばれる
     } catch (e) {
       setError(e.message ?? 'FETCH_FAILED')
-    } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
     load()
+    // schedule:updated イベントで自動リロード
+    const off = window.api.onScheduleUpdated?.(() => load())
+    return () => off?.()
   }, [])
 
-  return { live, upcoming, loading, error, fromCache, refresh }
+  return { live, upcoming, loading, error, dbBroken, refresh }
 }

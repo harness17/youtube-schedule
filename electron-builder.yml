@@ -10,6 +10,7 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+  - '**/better-sqlite3/build/Release/*.node'
 win:
   executableName: YouTubeSchedule
 nsis:
