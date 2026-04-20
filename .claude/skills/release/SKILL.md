@@ -88,14 +88,36 @@ git tag vX.X.X
 git push origin master develop --tags
 ```
 
-### 7. GitHub Actions の完了を待つ
+### 7. CI と Release ワークフローの完了を確認する
+
+push すると **CI**（lint + test）と **Release**（build + publish）が同時に起動する。
+**両方** がパスしてからリリースノート公開に進む。
+
+まず起動した run ID を取得する：
 
 ```bash
-gh run watch $(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run list --limit 5 --json databaseId,name,status,conclusion
 ```
 
-失敗した場合はログを確認する：
+CI（`CI` という名前）と Release（`Release` という名前）の run ID を確認し、それぞれ待つ：
 
+```bash
+# CI ワークフローを待つ
+gh run watch <CI の run-id>
+
+# Release ワークフローを待つ
+gh run watch <Release の run-id>
+```
+
+**CI が失敗した場合**（lint/test エラー）：
+- ログを確認して原因を修正し、develop に fix コミットを積んで再度 Step 5〜6 からやり直す
+- タグを打ち直す場合: `git tag -d vX.X.X && git push origin :refs/tags/vX.X.X`
+
+```bash
+gh run view <run-id> --log-failed 2>&1 | tail -60
+```
+
+**Release が失敗した場合**（ビルド/publish エラー）：
 ```bash
 gh run view <run-id> --log-failed 2>&1 | tail -60
 ```
@@ -149,6 +171,7 @@ git checkout master
 
 | エラー                            | 原因                                       | 対処                                                                                                                             |
 | --------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| CI が lint/test 失敗              | ローカルでは通ったが CI 環境で差異         | `gh run view <id> --log-failed` でエラー確認 → fix コミット → タグ打ち直し                                                       |
 | `Cannot create symbolic link`     | Windows でシンボリックリンク作成不可       | ローカルビルド不可。GitHub Actions を使う                                                                                         |
 | `403 Forbidden` on release create | `GITHUB_TOKEN` に `contents: write` がない | `.github/workflows/release.yml` の `permissions` を確認                                                                          |
 | ワークフローがトリガーされない    | タグが古いコミットを指している             | `git tag -d vX.X.X && git push origin :refs/tags/vX.X.X && git tag vX.X.X && git push origin vX.X.X`                            |
