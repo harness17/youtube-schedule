@@ -45,8 +45,9 @@ export default function ScheduleList({
   live = [],
   upcoming = [],
   darkMode = false,
-  watchedIds = new Set(),
-  onToggleWatch
+  pinnedChannelIds = new Set(),
+  onToggleWatch,
+  onToggleFavorite
 }) {
   const isEmpty = live.length === 0 && upcoming.length === 0
 
@@ -59,7 +60,15 @@ export default function ScheduleList({
   }
 
   const groups = groupByDate(upcoming)
-  const sortedEntries = getSortedGroupEntries(groups, upcoming)
+  const sortedEntries = getSortedGroupEntries(groups, upcoming).map(([dateLabel, items]) => [
+    dateLabel,
+    [...items].sort((a, b) => {
+      const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
+      const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
+      if (ap !== bp) return ap - bp
+      return (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0)
+    })
+  ])
 
   const navItems = [
     ...(live.length > 0 ? [{ label: 'ライブ配信中', id: 'section-live', isLive: true }] : []),
@@ -130,8 +139,10 @@ export default function ScheduleList({
               key={item.id}
               item={item}
               darkMode={darkMode}
-              watched={watchedIds.has(item.id)}
+              watched={item.isNotify}
+              isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
+              onToggleFavorite={onToggleFavorite}
             />
           ))}
         </div>
@@ -156,8 +167,10 @@ export default function ScheduleList({
               key={item.id}
               item={item}
               darkMode={darkMode}
-              watched={watchedIds.has(item.id)}
+              watched={item.isNotify}
+              isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
+              onToggleFavorite={onToggleFavorite}
             />
           ))}
         </div>
@@ -170,6 +183,7 @@ ScheduleList.propTypes = {
   live: PropTypes.array,
   upcoming: PropTypes.array,
   darkMode: PropTypes.bool,
-  watchedIds: PropTypes.instanceOf(Set),
-  onToggleWatch: PropTypes.func
+  pinnedChannelIds: PropTypes.instanceOf(Set),
+  onToggleWatch: PropTypes.func,
+  onToggleFavorite: PropTypes.func
 }

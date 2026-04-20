@@ -59,4 +59,19 @@ describe('ScheduleList', () => {
     expect(screen.getByText('配信lv1')).toBeInTheDocument()
     expect(screen.queryByText('予定された配信はありません')).not.toBeInTheDocument()
   })
+
+  it('pinnedChannelIds に含まれるチャンネルの配信が同一日付グループ内で先頭に表示される', () => {
+    const sameDay = [
+      makeItem('va', 'upcoming', '2026-04-13T10:00:00+09:00'), // ch: UC1 (非ピン)
+      makeItem('vb', 'upcoming', '2026-04-13T09:00:00+09:00') // ch: UC2 (ピン済み)
+    ]
+    // vb は UC1、va は UC2 のようにチャンネルを振り直す
+    sameDay[0] = { ...sameDay[0], channelId: 'UC1' }
+    sameDay[1] = { ...sameDay[1], channelId: 'UC2' }
+    const pinnedChannelIds = new Set(['UC2'])
+    render(<ScheduleList live={[]} upcoming={sameDay} pinnedChannelIds={pinnedChannelIds} />)
+    const cards = screen.getAllByText(/配信v/)
+    // 「配信vb」がピン済み UC2 なので先頭になるはず
+    expect(cards[0].textContent).toBe('配信vb')
+  })
 })

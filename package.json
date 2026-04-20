@@ -1,6 +1,6 @@
 {
   "name": "youtube-schedule",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "YouTube登録チャンネルの配信予定・ライブ中の動画を一覧表示するElectronデスクトップアプリ",
   "main": "./out/main/index.js",
   "author": "harness17",
@@ -12,7 +12,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "postinstall": "electron-builder install-app-deps",
-    "predev": "electron-rebuild -w better-sqlite3",
+    "predev": "node scripts/rebuild-native.js",
     "pretest": "npm rebuild better-sqlite3",
     "pretest:coverage": "npm rebuild better-sqlite3",
     "build:unpack": "npm run build && electron-builder --dir",
