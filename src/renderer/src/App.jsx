@@ -437,6 +437,10 @@ export default function App() {
     const newVal = await window.api.toggleNotify?.(id)
     if (newVal !== null && newVal !== undefined) {
       updateVideo(id, { isNotify: newVal })
+      const patchFn = (v) => (v.id === id ? { ...v, isNotify: newVal } : v)
+      setMissedVideos((prev) => prev.map(patchFn))
+      setArchiveVideos((prev) => prev.map(patchFn))
+      setFavoriteVideos((prev) => prev.map(patchFn))
     }
   }
 
@@ -864,6 +868,8 @@ export default function App() {
                 key={item.id}
                 item={item}
                 darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
                 onToggleFavorite={handleToggleFavorite}
                 onMarkViewed={handleMarkViewed}
                 showViewedButton={true}
@@ -908,6 +914,8 @@ export default function App() {
                 key={item.id}
                 item={item}
                 darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
                 onToggleFavorite={handleToggleFavorite}
                 onMarkViewed={handleMarkViewed}
                 showViewedButton={true}
@@ -934,6 +942,8 @@ export default function App() {
                 key={item.id}
                 item={item}
                 darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
                 onToggleFavorite={handleToggleFavorite}
                 onMarkViewed={handleMarkViewed}
                 showViewedButton={true}
