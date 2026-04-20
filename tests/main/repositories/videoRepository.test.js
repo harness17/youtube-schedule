@@ -244,6 +244,30 @@ describe('VideoRepository', () => {
     expect(repo.toggleNotify('missing')).toBeNull()
   })
 
+  it('markEnded sets status to ended and records ended_at', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'v1', status: 'live', actualStartTime: now - 60e3 }))
+    expect(repo.markEnded('v1', now)).toBe(true)
+    const v = repo.getById('v1')
+    expect(v.status).toBe('ended')
+    expect(v.endedAt).toBe(now)
+  })
+
+  it('markEnded does not overwrite existing ended_at', () => {
+    const firstEnd = 1_700_000_000_000
+    const later = firstEnd + 3600e3
+    repo.upsert(sampleVideo({ id: 'v1', status: 'live', actualStartTime: firstEnd - 60e3 }))
+    repo.markEnded('v1', firstEnd)
+    repo.markEnded('v1', later)
+    expect(repo.getById('v1').endedAt).toBe(firstEnd)
+  })
+
+  it('markEnded returns false for already-ended videos', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'v1', status: 'ended', lastCheckedAt: now }))
+    expect(repo.markEnded('v1', now + 1000)).toBe(false)
+  })
+
   it('listArchive returns ended videos sorted by ended_at desc with paging', () => {
     const base = 1_700_000_000_000
     for (let i = 0; i < 5; i += 1) {

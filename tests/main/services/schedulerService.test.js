@@ -25,6 +25,7 @@ function createMocks() {
     upsert: vi.fn(),
     getByIds: vi.fn().mockReturnValue([]),
     listVisible: vi.fn().mockReturnValue([]),
+    markEnded: vi.fn(),
     deleteExpiredEnded: vi.fn()
   }
   const channelRepo = {
@@ -177,5 +178,35 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks orphaned live videos as ended when API returns nothing', async () => {
+    // V1 は RSS に出る通常動画、ORPHAN は DB に live で残るがRSSに出ない動画
+    const mocks = createMocks()
+    mocks.rssFetcher.fetch.mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
+    mocks.videoRepo.getByIds.mockReturnValue([])
+    // listVisible で ORPHAN が live のまま残っている
+    mocks.videoRepo.listVisible.mockReturnValue([{ id: 'ORPHAN' }])
+    // videoFetcher の1回目（V1用）と2回目（ORPHAN孤立チェック用）を区別
+    mocks.videoFetcher.fetch
+      .mockResolvedValueOnce([videoDetail('V1')]) // 通常fetch
+      .mockResolvedValueOnce([]) // ORPHAN は API からも消えている
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.videoRepo.markEnded).toHaveBeenCalledWith('ORPHAN', expect.any(Number))
+  })
+
+  it('upserts orphaned live video if API still returns it (e.g. delayed RSS)', async () => {
+    const mocks = createMocks()
+    mocks.rssFetcher.fetch.mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
+    mocks.videoRepo.getByIds.mockReturnValue([])
+    mocks.videoRepo.listVisible.mockReturnValue([{ id: 'ORPHAN' }])
+    mocks.videoFetcher.fetch
+      .mockResolvedValueOnce([videoDetail('V1')])
+      .mockResolvedValueOnce([videoDetail('ORPHAN')]) // API にはまだある
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.videoRepo.markEnded).not.toHaveBeenCalled()
+    expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: 'ORPHAN' }))
   })
 })

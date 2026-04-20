@@ -108,9 +108,31 @@ export function createSchedulerService({
     const target = Array.from(new Set([...newIds, ...recheckIds]))
 
     const details = await videoFetcher.fetch(yt, target)
+    const fetchedIds = new Set(details.map((v) => v.id))
     for (const v of details) {
       if (!channelIds.has(v.snippet?.channelId)) continue
       videoRepo.upsert(toVideoRecord(v, now))
+    }
+
+    // RSS から消えた live/upcoming 動画を救済する
+    // （メンバー限定化・削除されると RSS に返らず status が live のまま固まる）
+    const rssIdSet = new Set(videoIds)
+    const orphanIds = videoRepo
+      .listVisible(now)
+      .map((v) => v.id)
+      .filter((id) => !rssIdSet.has(id) && !fetchedIds.has(id))
+    if (orphanIds.length > 0) {
+      const orphanDetails = await videoFetcher.fetch(yt, orphanIds)
+      const orphanFetchedIds = new Set(orphanDetails.map((v) => v.id))
+      for (const v of orphanDetails) {
+        videoRepo.upsert(toVideoRecord(v, now))
+      }
+      // API からも返ってこない → ended に落とす
+      for (const id of orphanIds) {
+        if (!orphanFetchedIds.has(id)) {
+          videoRepo.markEnded(id, now)
+        }
+      }
     }
 
     metaRepo.set('last_full_refresh_at', String(now), now)

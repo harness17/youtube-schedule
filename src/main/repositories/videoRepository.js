@@ -79,6 +79,13 @@ export function createVideoRepository(db) {
   const toggleNotifyStmt = db.prepare(
     `UPDATE videos SET notify = CASE notify WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
   )
+  const markEndedStmt = db.prepare(`
+    UPDATE videos
+    SET status = 'ended',
+        ended_at = CASE WHEN ended_at IS NULL THEN @now ELSE ended_at END,
+        last_checked_at = @now
+    WHERE id = @id AND status != 'ended'
+  `)
   const deleteExpiredStmt = db.prepare(`
     DELETE FROM videos
     WHERE status = 'ended'
@@ -175,6 +182,10 @@ export function createVideoRepository(db) {
       const r = toggleNotifyStmt.run({ id })
       if (r.changes === 0) return null
       return getByIdStmt.get(id)?.notify === 1
+    },
+    markEnded(id, now = Date.now()) {
+      const r = markEndedStmt.run({ id, now })
+      return r.changes > 0
     },
     deleteExpiredEnded(thresholdMs) {
       const result = deleteExpiredStmt.run(thresholdMs)
