@@ -28,7 +28,16 @@ function formatCountdown(isoString) {
   return remainHours > 0 ? `あと${days}日${remainHours}時間` : `あと${days}日`
 }
 
-export default function ScheduleCard({ item, darkMode = false, watched = false, onToggleWatch }) {
+export default function ScheduleCard({
+  item,
+  darkMode = false,
+  watched = false,
+  onToggleWatch,
+  onToggleFavorite,
+  onMarkViewed,
+  isPinned = false,
+  showViewedButton = false
+}) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
 
@@ -101,6 +110,7 @@ export default function ScheduleCard({ item, darkMode = false, watched = false, 
           {item.title}
         </div>
         <div style={{ fontSize: '12px', color: subColor, marginBottom: '4px' }}>
+          {isPinned && <span style={{ marginRight: '4px' }}>📌</span>}
           {item.channelTitle}
         </div>
         <div style={{ fontSize: '12px', color: timeColor, marginBottom: '4px' }}>
@@ -159,6 +169,38 @@ export default function ScheduleCard({ item, darkMode = false, watched = false, 
           >
             🔔
           </button>
+          <button
+            title={item.isFavorite ? 'お気に入り解除' : 'お気に入りに追加'}
+            onClick={() => onToggleFavorite?.(item.id)}
+            style={{
+              padding: '4px 10px',
+              fontSize: '14px',
+              background: item.isFavorite ? '#FFD700' : btnBg,
+              color: item.isFavorite ? '#333' : btnColor,
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ⭐
+          </button>
+          {showViewedButton && (
+            <button
+              title={item.viewedAt ? '視聴済みを解除' : '見た'}
+              onClick={() => onMarkViewed?.(item.id, !item.viewedAt)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '14px',
+                background: item.viewedAt ? '#4CAF50' : btnBg,
+                color: item.viewedAt ? '#fff' : btnColor,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              ✓
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -173,13 +215,20 @@ ScheduleCard.propTypes = {
     thumbnail: PropTypes.string,
     title: PropTypes.string,
     channelTitle: PropTypes.string,
-    actualStartTime: PropTypes.string,
-    scheduledStartTime: PropTypes.string,
+    actualStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    scheduledStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     description: PropTypes.string,
     url: PropTypes.string,
-    channelUrl: PropTypes.string
+    channelUrl: PropTypes.string,
+    isFavorite: PropTypes.bool,
+    isNotify: PropTypes.bool,
+    viewedAt: PropTypes.number
   }).isRequired,
   darkMode: PropTypes.bool,
   watched: PropTypes.bool,
-  onToggleWatch: PropTypes.func
+  onToggleWatch: PropTypes.func,
+  onToggleFavorite: PropTypes.func,
+  onMarkViewed: PropTypes.func,
+  isPinned: PropTypes.bool,
+  showViewedButton: PropTypes.bool
 }

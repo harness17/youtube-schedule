@@ -22,5 +22,15 @@ contextBridge.exposeInMainWorld('api', {
     const listener = () => cb()
     ipcRenderer.on('schedule:updated', listener)
     return () => ipcRenderer.off('schedule:updated', listener)
-  }
+  },
+  listMissed: () => ipcRenderer.invoke('videos:listMissed'),
+  listArchive: (opts) => ipcRenderer.invoke('videos:listArchive', opts),
+  listFavorites: () => ipcRenderer.invoke('videos:listFavorites'),
+  searchByText: (query) => ipcRenderer.invoke('videos:searchByText', query),
+  markViewed: (id) => ipcRenderer.invoke('videos:markViewed', id),
+  clearViewed: (id) => ipcRenderer.invoke('videos:clearViewed', id),
+  toggleFavorite: (id) => ipcRenderer.invoke('videos:toggleFavorite', id),
+  toggleNotify: (id) => ipcRenderer.invoke('videos:toggleNotify', id),
+  togglePin: (id) => ipcRenderer.invoke('channels:togglePin', id),
+  listAllChannels: () => ipcRenderer.invoke('channels:listAll')
 })

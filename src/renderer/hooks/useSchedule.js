@@ -49,5 +49,10 @@ export function useSchedule() {
     return () => off?.()
   }, [])
 
-  return { live, upcoming, loading, error, dbBroken, refresh }
+  function updateVideo(id, patch) {
+    setLive((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+    setUpcoming((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+  }
+
+  return { live, upcoming, loading, error, dbBroken, refresh, updateVideo }
 }

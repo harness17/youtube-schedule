@@ -304,6 +304,56 @@ ipcMain.handle('shell:openFolder', async (_, filePath) => {
   }
 })
 
+// 動画: アーカイブ系一覧
+ipcMain.handle('videos:listMissed', () => {
+  if (!videoRepo) return []
+  return videoRepo.listMissed()
+})
+ipcMain.handle('videos:listArchive', (_, opts) => {
+  if (!videoRepo) return []
+  return videoRepo.listArchive(opts ?? {})
+})
+ipcMain.handle('videos:listFavorites', () => {
+  if (!videoRepo) return []
+  return videoRepo.listFavorites()
+})
+ipcMain.handle('videos:searchByText', (_, query) => {
+  if (!videoRepo) return []
+  return videoRepo.searchByText(query)
+})
+
+// 動画: 見たマーク / クリア
+ipcMain.handle('videos:markViewed', (_, id) => {
+  if (!videoRepo) return false
+  return videoRepo.markViewed(id)
+})
+ipcMain.handle('videos:clearViewed', (_, id) => {
+  if (!videoRepo) return false
+  return videoRepo.clearViewed(id)
+})
+
+// 動画: お気に入りトグル
+ipcMain.handle('videos:toggleFavorite', (_, id) => {
+  if (!videoRepo) return null
+  return videoRepo.toggleFavorite(id)
+})
+
+// 動画: お知らせトグル
+ipcMain.handle('videos:toggleNotify', (_, id) => {
+  if (!videoRepo) return null
+  return videoRepo.toggleNotify(id)
+})
+
+// チャンネル: ピントグル / 全件取得
+ipcMain.handle('channels:togglePin', (_, id) => {
+  if (!channelRepo) return null
+  return channelRepo.togglePin(id)
+})
+ipcMain.handle('channels:listAll', () => {
+  if (!channelRepo) return []
+  return channelRepo.listAll()
+})
+
 // 外部ブラウザで URL を開く
 ipcMain.handle('shell:openExternal', async (_, url) => {
   try {

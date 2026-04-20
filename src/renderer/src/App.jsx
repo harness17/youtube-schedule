@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from 'react'
 import PropTypes from 'prop-types'
 import AuthScreen from '../components/AuthScreen.jsx'
+import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
@@ -319,7 +320,7 @@ export default function App() {
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
   }, [])
-  const { live, upcoming, loading, error, dbBroken, refresh } = useSchedule()
+  const { live, upcoming, loading, error, dbBroken, refresh, updateVideo } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
@@ -350,27 +351,97 @@ export default function App() {
     }
   }, [darkMode])
 
-  // 検索・フィルター
+  // タブ管理
+  const [activeTab, setActiveTab] = useState('schedule')
+  const [missedVideos, setMissedVideos] = useState([])
+  const [archiveVideos, setArchiveVideos] = useState([])
+  const [archiveQuery, setArchiveQuery] = useState('')
+  const [favoriteVideos, setFavoriteVideos] = useState([])
+  const [tabLoading, setTabLoading] = useState(false)
+
+  async function handleTabChange(tab) {
+    setActiveTab(tab)
+    if (tab === 'missed') {
+      setTabLoading(true)
+      setMissedVideos((await window.api.listMissed?.()) ?? [])
+      setTabLoading(false)
+    } else if (tab === 'archive') {
+      setTabLoading(true)
+      setArchiveVideos((await window.api.listArchive?.()) ?? [])
+      setTabLoading(false)
+    } else if (tab === 'favorites') {
+      setTabLoading(true)
+      setFavoriteVideos((await window.api.listFavorites?.()) ?? [])
+      setTabLoading(false)
+    }
+  }
+
+  async function handleArchiveSearch(query) {
+    setArchiveQuery(query)
+    setTabLoading(true)
+    const data = query.trim()
+      ? ((await window.api.searchByText?.(query)) ?? [])
+      : ((await window.api.listArchive?.()) ?? [])
+    setArchiveVideos(data)
+    setTabLoading(false)
+  }
+
+  async function handleMarkViewed(id, viewed) {
+    if (viewed) {
+      await window.api.markViewed?.(id)
+    } else {
+      await window.api.clearViewed?.(id)
+    }
+    const patch = { viewedAt: viewed ? Date.now() : null }
+    setMissedVideos((prev) => (viewed ? prev.filter((v) => v.id !== id) : prev))
+    setArchiveVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+    setFavoriteVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+  }
+
+  // 検索・フィルター（scheduleタブ用）
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('all')
 
-  // 通知対象
-  const [watchedIds, setWatchedIds] = useState(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem('watchedIds') || '[]'))
-    } catch {
-      return new Set()
-    }
-  })
-
-  function toggleWatch(id) {
-    setWatchedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      localStorage.setItem('watchedIds', JSON.stringify([...next]))
-      return next
+  // ピン済みチャンネル
+  const [pinnedChannelIds, setPinnedChannelIds] = useState(new Set())
+  useEffect(() => {
+    window.api.listAllChannels?.().then((channels) => {
+      setPinnedChannelIds(new Set(channels.filter((c) => c.isPinned).map((c) => c.id)))
     })
+  }, [])
+
+  async function handleToggleFavorite(id) {
+    const newVal = await window.api.toggleFavorite?.(id)
+    if (newVal !== null && newVal !== undefined) {
+      updateVideo(id, { isFavorite: newVal })
+      const patchFn = (v) => (v.id === id ? { ...v, isFavorite: newVal } : v)
+      setMissedVideos((prev) => prev.map(patchFn))
+      setArchiveVideos((prev) => prev.map(patchFn))
+      setFavoriteVideos((prev) => prev.map(patchFn))
+    }
+  }
+
+  async function handleTogglePin(channelId) {
+    const newVal = await window.api.togglePin?.(channelId)
+    if (newVal !== null && newVal !== undefined) {
+      setPinnedChannelIds((prev) => {
+        const next = new Set(prev)
+        if (newVal) next.add(channelId)
+        else next.delete(channelId)
+        return next
+      })
+    }
+  }
+
+  async function handleToggleNotify(id) {
+    const newVal = await window.api.toggleNotify?.(id)
+    if (newVal !== null && newVal !== undefined) {
+      updateVideo(id, { isNotify: newVal })
+      const patchFn = (v) => (v.id === id ? { ...v, isNotify: newVal } : v)
+      setMissedVideos((prev) => prev.map(patchFn))
+      setArchiveVideos((prev) => prev.map(patchFn))
+      setFavoriteVideos((prev) => prev.map(patchFn))
+    }
   }
 
   // 通知チェック用 ref（interval クロージャでの stale 防止）
@@ -378,10 +449,6 @@ export default function App() {
   useEffect(() => {
     upcomingRef.current = upcoming
   }, [upcoming])
-  const watchedIdsRef = useRef(watchedIds)
-  useEffect(() => {
-    watchedIdsRef.current = watchedIds
-  }, [watchedIds])
   const notifiedRef = useRef(new Set())
   const refreshRef = useRef(refresh)
   useEffect(() => {
@@ -389,6 +456,7 @@ export default function App() {
   }, [refresh])
 
   // 自動アップデートイベントの購読
+
   useEffect(() => {
     window.api.onUpdateAvailable(() => setUpdateStatus('downloading'))
     window.api.onUpdateDownloaded(() => setUpdateStatus('ready'))
@@ -431,7 +499,7 @@ export default function App() {
     const id = setInterval(() => {
       const now = Date.now()
       for (const item of upcomingRef.current) {
-        if (!watchedIdsRef.current.has(item.id)) continue
+        if (!item.isNotify) continue
         if (notifiedRef.current.has(item.id)) continue
         const start = new Date(item.scheduledStartTime).getTime()
         const remaining = start - now
@@ -454,14 +522,19 @@ export default function App() {
     }
   }, [error])
 
-  // チャンネル一覧
+  // チャンネル一覧（ピン済みを先頭に）
   const channels = useMemo(() => {
     const map = new Map()
     for (const item of [...live, ...upcoming]) {
       if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
     }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [live, upcoming])
+    return [...map.entries()]
+      .map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
+      .sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+        return a.title.localeCompare(b.title)
+      })
+  }, [live, upcoming, pinnedChannelIds])
 
   // フィルタリング
   const filterItem = useCallback(
@@ -640,80 +713,246 @@ export default function App() {
         </button>
       </div>
 
-      {/* ヘッダー行2: 検索・チャンネルフィルター */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '16px',
-          flexWrap: 'wrap'
-        }}
-      >
-        <input
-          type="text"
-          placeholder="タイトル・チャンネルを検索"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+      {/* ヘッダー行2: 検索・チャンネルフィルター（予定タブのみ） */}
+      {activeTab === 'schedule' && (
+        <div
           style={{
-            flex: 1,
-            minWidth: '160px',
-            padding: '6px 10px',
-            fontSize: '13px',
-            background: inputBg,
-            color: textColor,
-            border: `1px solid ${inputBorder}`,
-            borderRadius: '6px',
-            outline: 'none'
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '12px',
+            flexWrap: 'wrap'
           }}
-        />
-        {channels.length > 0 && (
-          <select
-            value={selectedChannel}
-            onChange={(e) => setSelectedChannel(e.target.value)}
+        >
+          <input
+            type="text"
+            placeholder="タイトル・チャンネルを検索"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{
+              flex: 1,
+              minWidth: '160px',
               padding: '6px 10px',
               fontSize: '13px',
               background: inputBg,
               color: textColor,
               border: `1px solid ${inputBorder}`,
               borderRadius: '6px',
-              cursor: 'pointer',
-              maxWidth: '200px'
+              outline: 'none'
             }}
-          >
-            <option value="all">すべてのチャンネル</option>
-            {channels.map(([channelId, channelTitle]) => (
-              <option key={channelId} value={channelId}>
-                {channelTitle}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {error && error !== 'QUOTA_EXCEEDED' && (
-        <div
-          style={{
-            background: '#fff3f3',
-            border: '1px solid #ffcccc',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            marginBottom: '12px',
-            fontSize: '13px',
-            color: '#cc0000'
-          }}
-        >
-          {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
+          />
+          {channels.length > 0 && (
+            <select
+              value={selectedChannel}
+              onChange={(e) => setSelectedChannel(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '6px',
+                cursor: 'pointer',
+                maxWidth: '200px'
+              }}
+            >
+              <option value="all">すべてのチャンネル</option>
+              {channels.map(({ id, title, isPinned }) => (
+                <option key={id} value={id}>
+                  {isPinned ? '📌 ' : ''}
+                  {title}
+                </option>
+              ))}
+            </select>
+          )}
+          {selectedChannel !== 'all' && (
+            <button
+              title={
+                pinnedChannelIds.has(selectedChannel) ? '推し解除' : 'このチャンネルを推しに設定'
+              }
+              onClick={() => handleTogglePin(selectedChannel)}
+              style={{
+                padding: '6px 10px',
+                fontSize: '16px',
+                background: pinnedChannelIds.has(selectedChannel) ? '#FFD700' : subBtnBg,
+                color: subBtnColor,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              📌
+            </button>
+          )}
         </div>
       )}
 
-      <ScheduleList
-        live={filteredLive}
-        upcoming={filteredUpcoming}
-        darkMode={darkMode}
-        watchedIds={watchedIds}
-        onToggleWatch={toggleWatch}
-      />
+      {/* タブバー */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '16px',
+          borderBottom: `2px solid ${darkMode ? '#444' : '#ddd'}`,
+          paddingBottom: '0'
+        }}
+      >
+        {[
+          { key: 'schedule', label: '予定・ライブ' },
+          { key: 'missed', label: '見逃し' },
+          { key: 'archive', label: 'アーカイブ' },
+          { key: 'favorites', label: '⭐ お気に入り' }
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => handleTabChange(key)}
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              background: 'none',
+              color: activeTab === key ? '#FF0000' : darkMode ? '#aaa' : '#666',
+              border: 'none',
+              borderBottom: activeTab === key ? '2px solid #FF0000' : '2px solid transparent',
+              marginBottom: '-2px',
+              cursor: 'pointer',
+              fontWeight: activeTab === key ? 'bold' : 'normal'
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* 予定・ライブタブ */}
+      {activeTab === 'schedule' && (
+        <>
+          {error && error !== 'QUOTA_EXCEEDED' && (
+            <div
+              style={{
+                background: '#fff3f3',
+                border: '1px solid #ffcccc',
+                borderRadius: '6px',
+                padding: '8px 12px',
+                marginBottom: '12px',
+                fontSize: '13px',
+                color: '#cc0000'
+              }}
+            >
+              {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
+            </div>
+          )}
+          <ScheduleList
+            live={filteredLive}
+            upcoming={filteredUpcoming}
+            darkMode={darkMode}
+            pinnedChannelIds={pinnedChannelIds}
+            onToggleWatch={handleToggleNotify}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        </>
+      )}
+
+      {/* 見逃しタブ */}
+      {activeTab === 'missed' && (
+        <div>
+          {tabLoading ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+              読み込み中...
+            </div>
+          ) : missedVideos.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+              見逃した配信はありません 🎉
+            </div>
+          ) : (
+            missedVideos.map((item) => (
+              <ScheduleCard
+                key={item.id}
+                item={item}
+                darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
+                onToggleFavorite={handleToggleFavorite}
+                onMarkViewed={handleMarkViewed}
+                showViewedButton={true}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* アーカイブタブ */}
+      {activeTab === 'archive' && (
+        <div>
+          <input
+            type="text"
+            placeholder="タイトル・説明文を全文検索"
+            value={archiveQuery}
+            onChange={(e) => handleArchiveSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              fontSize: '13px',
+              background: inputBg,
+              color: textColor,
+              border: `1px solid ${inputBorder}`,
+              borderRadius: '6px',
+              outline: 'none',
+              marginBottom: '12px',
+              boxSizing: 'border-box'
+            }}
+          />
+          {tabLoading ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
+              読み込み中...
+            </div>
+          ) : archiveVideos.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
+              {archiveQuery ? '検索結果がありません' : 'アーカイブがありません'}
+            </div>
+          ) : (
+            archiveVideos.map((item) => (
+              <ScheduleCard
+                key={item.id}
+                item={item}
+                darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
+                onToggleFavorite={handleToggleFavorite}
+                onMarkViewed={handleMarkViewed}
+                showViewedButton={true}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* お気に入りタブ */}
+      {activeTab === 'favorites' && (
+        <div>
+          {tabLoading ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+              読み込み中...
+            </div>
+          ) : favoriteVideos.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+              お気に入りはまだありません
+            </div>
+          ) : (
+            favoriteVideos.map((item) => (
+              <ScheduleCard
+                key={item.id}
+                item={item}
+                darkMode={darkMode}
+                watched={item.isNotify}
+                onToggleWatch={handleToggleNotify}
+                onToggleFavorite={handleToggleFavorite}
+                onMarkViewed={handleMarkViewed}
+                showViewedButton={true}
+              />
+            ))
+          )}
+        </div>
+      )}
+
       {toast && <Toast message={toast} onClose={handleToastClose} />}
       <BackToTop />
     </div>
