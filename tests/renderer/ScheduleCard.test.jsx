@@ -69,4 +69,26 @@ describe('ScheduleCard', () => {
     render(<ScheduleCard item={mockItem} />)
     expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
   })
+
+  it('⭐ ボタンクリックで onToggleFavorite が呼ばれる', () => {
+    const onToggleFavorite = vi.fn()
+    render(<ScheduleCard item={mockItem} onToggleFavorite={onToggleFavorite} />)
+    fireEvent.click(screen.getByTitle('お気に入りに追加'))
+    expect(onToggleFavorite).toHaveBeenCalledWith(mockItem.id)
+  })
+
+  it('isFavorite=true のとき ⭐ ボタンのタイトルが「お気に入り解除」になる', () => {
+    render(<ScheduleCard item={{ ...mockItem, isFavorite: true }} />)
+    expect(screen.getByTitle('お気に入り解除')).toBeInTheDocument()
+  })
+
+  it('isPinned=true のときチャンネル名の横に 📌 が表示される', () => {
+    render(<ScheduleCard item={mockItem} isPinned={true} />)
+    expect(screen.getByText('📌')).toBeInTheDocument()
+  })
+
+  it('isPinned=false のとき 📌 が表示されない', () => {
+    render(<ScheduleCard item={mockItem} isPinned={false} />)
+    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+  })
 })

@@ -319,7 +319,7 @@ export default function App() {
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
   }, [])
-  const { live, upcoming, loading, error, dbBroken, refresh } = useSchedule()
+  const { live, upcoming, loading, error, dbBroken, refresh, updateVideo } = useSchedule()
   const handleToastClose = useCallback(() => setToast(null), [])
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
@@ -353,6 +353,33 @@ export default function App() {
   // 検索・フィルター
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('all')
+
+  // ピン済みチャンネル
+  const [pinnedChannelIds, setPinnedChannelIds] = useState(new Set())
+  useEffect(() => {
+    window.api.listAllChannels?.().then((channels) => {
+      setPinnedChannelIds(new Set(channels.filter((c) => c.isPinned).map((c) => c.id)))
+    })
+  }, [])
+
+  async function handleToggleFavorite(id) {
+    const newVal = await window.api.toggleFavorite?.(id)
+    if (newVal !== null && newVal !== undefined) {
+      updateVideo(id, { isFavorite: newVal })
+    }
+  }
+
+  async function handleTogglePin(channelId) {
+    const newVal = await window.api.togglePin?.(channelId)
+    if (newVal !== null && newVal !== undefined) {
+      setPinnedChannelIds((prev) => {
+        const next = new Set(prev)
+        if (newVal) next.add(channelId)
+        else next.delete(channelId)
+        return next
+      })
+    }
+  }
 
   // 通知対象
   const [watchedIds, setWatchedIds] = useState(() => {
@@ -454,14 +481,19 @@ export default function App() {
     }
   }, [error])
 
-  // チャンネル一覧
+  // チャンネル一覧（ピン済みを先頭に）
   const channels = useMemo(() => {
     const map = new Map()
     for (const item of [...live, ...upcoming]) {
       if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
     }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [live, upcoming])
+    return [...map.entries()]
+      .map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
+      .sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+        return a.title.localeCompare(b.title)
+      })
+  }, [live, upcoming, pinnedChannelIds])
 
   // フィルタリング
   const filterItem = useCallback(
@@ -682,12 +714,32 @@ export default function App() {
             }}
           >
             <option value="all">すべてのチャンネル</option>
-            {channels.map(([channelId, channelTitle]) => (
-              <option key={channelId} value={channelId}>
-                {channelTitle}
+            {channels.map(({ id, title, isPinned }) => (
+              <option key={id} value={id}>
+                {isPinned ? '📌 ' : ''}
+                {title}
               </option>
             ))}
           </select>
+        )}
+        {selectedChannel !== 'all' && (
+          <button
+            title={
+              pinnedChannelIds.has(selectedChannel) ? '推し解除' : 'このチャンネルを推しに設定'
+            }
+            onClick={() => handleTogglePin(selectedChannel)}
+            style={{
+              padding: '6px 10px',
+              fontSize: '16px',
+              background: pinnedChannelIds.has(selectedChannel) ? '#FFD700' : subBtnBg,
+              color: subBtnColor,
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            📌
+          </button>
         )}
       </div>
 
@@ -712,7 +764,9 @@ export default function App() {
         upcoming={filteredUpcoming}
         darkMode={darkMode}
         watchedIds={watchedIds}
+        pinnedChannelIds={pinnedChannelIds}
         onToggleWatch={toggleWatch}
+        onToggleFavorite={handleToggleFavorite}
       />
       {toast && <Toast message={toast} onClose={handleToastClose} />}
       <BackToTop />
