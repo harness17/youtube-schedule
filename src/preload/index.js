@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   markViewed: (id) => ipcRenderer.invoke('videos:markViewed', id),
   clearViewed: (id) => ipcRenderer.invoke('videos:clearViewed', id),
   toggleFavorite: (id) => ipcRenderer.invoke('videos:toggleFavorite', id),
+  toggleNotify: (id) => ipcRenderer.invoke('videos:toggleNotify', id),
   togglePin: (id) => ipcRenderer.invoke('channels:togglePin', id),
   listAllChannels: () => ipcRenderer.invoke('channels:listAll')
 })

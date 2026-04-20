@@ -45,7 +45,6 @@ export default function ScheduleList({
   live = [],
   upcoming = [],
   darkMode = false,
-  watchedIds = new Set(),
   pinnedChannelIds = new Set(),
   onToggleWatch,
   onToggleFavorite
@@ -140,7 +139,7 @@ export default function ScheduleList({
               key={item.id}
               item={item}
               darkMode={darkMode}
-              watched={watchedIds.has(item.id)}
+              watched={item.isNotify}
               isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
@@ -168,7 +167,7 @@ export default function ScheduleList({
               key={item.id}
               item={item}
               darkMode={darkMode}
-              watched={watchedIds.has(item.id)}
+              watched={item.isNotify}
               isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
@@ -184,7 +183,6 @@ ScheduleList.propTypes = {
   live: PropTypes.array,
   upcoming: PropTypes.array,
   darkMode: PropTypes.bool,
-  watchedIds: PropTypes.instanceOf(Set),
   pinnedChannelIds: PropTypes.instanceOf(Set),
   onToggleWatch: PropTypes.func,
   onToggleFavorite: PropTypes.func

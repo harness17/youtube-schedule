@@ -185,8 +185,9 @@ describe('VideoRepository', () => {
     expect(ids).toEqual(['a', 'c'])
   })
 
-  it('listMissed returns ended videos that were never viewed', () => {
+  it('listMissed returns ended+notify videos that were never viewed', () => {
     const now = 1_700_000_000_000
+    // notify=1, not viewed → 見逃し対象
     repo.upsert(
       sampleVideo({
         id: 'missed',
@@ -195,6 +196,8 @@ describe('VideoRepository', () => {
         lastCheckedAt: now
       })
     )
+    repo.toggleNotify('missed')
+    // notify=1, viewed → 見逃し対象外
     repo.upsert(
       sampleVideo({
         id: 'seen',
@@ -203,7 +206,18 @@ describe('VideoRepository', () => {
         lastCheckedAt: now
       })
     )
+    repo.toggleNotify('seen')
     repo.markViewed('seen', now)
+    // notify=0 → 見逃し対象外（フラグなし）
+    repo.upsert(
+      sampleVideo({
+        id: 'no_notify',
+        status: 'ended',
+        actualStartTime: now - 3600e3,
+        lastCheckedAt: now
+      })
+    )
+    // upcoming → 見逃し対象外
     repo.upsert(
       sampleVideo({
         id: 'future',
@@ -214,7 +228,20 @@ describe('VideoRepository', () => {
     const ids = repo.listMissed(now).map((v) => v.id)
     expect(ids).toContain('missed')
     expect(ids).not.toContain('seen')
+    expect(ids).not.toContain('no_notify')
     expect(ids).not.toContain('future')
+  })
+
+  it('toggleNotify flips notify flag', () => {
+    repo.upsert(sampleVideo({ id: 'v1' }))
+    expect(repo.toggleNotify('v1')).toBe(true)
+    expect(repo.getById('v1').isNotify).toBe(true)
+    expect(repo.toggleNotify('v1')).toBe(false)
+    expect(repo.getById('v1').isNotify).toBe(false)
+  })
+
+  it('toggleNotify returns null for unknown id', () => {
+    expect(repo.toggleNotify('missing')).toBeNull()
   })
 
   it('listArchive returns ended videos sorted by ended_at desc with paging', () => {

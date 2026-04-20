@@ -221,6 +221,7 @@ ScheduleCard.propTypes = {
     url: PropTypes.string,
     channelUrl: PropTypes.string,
     isFavorite: PropTypes.bool,
+    isNotify: PropTypes.bool,
     viewedAt: PropTypes.number
   }).isRequired,
   darkMode: PropTypes.bool,

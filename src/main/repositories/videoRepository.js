@@ -45,6 +45,7 @@ export function createVideoRepository(db) {
   const listMissedStmt = db.prepare(`
     SELECT * FROM videos
     WHERE status = 'ended'
+      AND notify = 1
       AND viewed_at IS NULL
       AND (
         (actual_start_time IS NOT NULL AND actual_start_time < @now) OR
@@ -75,6 +76,9 @@ export function createVideoRepository(db) {
   const toggleFavStmt = db.prepare(
     `UPDATE videos SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
   )
+  const toggleNotifyStmt = db.prepare(
+    `UPDATE videos SET notify = CASE notify WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
+  )
   const deleteExpiredStmt = db.prepare(`
     DELETE FROM videos
     WHERE status = 'ended'
@@ -100,7 +104,8 @@ export function createVideoRepository(db) {
       lastCheckedAt: row.last_checked_at,
       endedAt: row.ended_at ?? null,
       viewedAt: row.viewed_at ?? null,
-      isFavorite: row.is_favorite === 1
+      isFavorite: row.is_favorite === 1,
+      isNotify: row.notify === 1
     }
   }
 
@@ -165,6 +170,11 @@ export function createVideoRepository(db) {
       const r = toggleFavStmt.run({ id })
       if (r.changes === 0) return null
       return getByIdStmt.get(id)?.is_favorite === 1
+    },
+    toggleNotify(id) {
+      const r = toggleNotifyStmt.run({ id })
+      if (r.changes === 0) return null
+      return getByIdStmt.get(id)?.notify === 1
     },
     deleteExpiredEnded(thresholdMs) {
       const result = deleteExpiredStmt.run(thresholdMs)

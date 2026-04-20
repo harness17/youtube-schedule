@@ -433,23 +433,11 @@ export default function App() {
     }
   }
 
-  // 通知対象
-  const [watchedIds, setWatchedIds] = useState(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem('watchedIds') || '[]'))
-    } catch {
-      return new Set()
+  async function handleToggleNotify(id) {
+    const newVal = await window.api.toggleNotify?.(id)
+    if (newVal !== null && newVal !== undefined) {
+      updateVideo(id, { isNotify: newVal })
     }
-  })
-
-  function toggleWatch(id) {
-    setWatchedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      localStorage.setItem('watchedIds', JSON.stringify([...next]))
-      return next
-    })
   }
 
   // 通知チェック用 ref（interval クロージャでの stale 防止）
@@ -457,10 +445,6 @@ export default function App() {
   useEffect(() => {
     upcomingRef.current = upcoming
   }, [upcoming])
-  const watchedIdsRef = useRef(watchedIds)
-  useEffect(() => {
-    watchedIdsRef.current = watchedIds
-  }, [watchedIds])
   const notifiedRef = useRef(new Set())
   const refreshRef = useRef(refresh)
   useEffect(() => {
@@ -468,6 +452,7 @@ export default function App() {
   }, [refresh])
 
   // 自動アップデートイベントの購読
+
   useEffect(() => {
     window.api.onUpdateAvailable(() => setUpdateStatus('downloading'))
     window.api.onUpdateDownloaded(() => setUpdateStatus('ready'))
@@ -510,7 +495,7 @@ export default function App() {
     const id = setInterval(() => {
       const now = Date.now()
       for (const item of upcomingRef.current) {
-        if (!watchedIdsRef.current.has(item.id)) continue
+        if (!item.isNotify) continue
         if (notifiedRef.current.has(item.id)) continue
         const start = new Date(item.scheduledStartTime).getTime()
         const remaining = start - now
@@ -855,9 +840,8 @@ export default function App() {
             live={filteredLive}
             upcoming={filteredUpcoming}
             darkMode={darkMode}
-            watchedIds={watchedIds}
             pinnedChannelIds={pinnedChannelIds}
-            onToggleWatch={toggleWatch}
+            onToggleWatch={handleToggleNotify}
             onToggleFavorite={handleToggleFavorite}
           />
         </>

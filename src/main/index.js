@@ -338,6 +338,12 @@ ipcMain.handle('videos:toggleFavorite', (_, id) => {
   return videoRepo.toggleFavorite(id)
 })
 
+// 動画: お知らせトグル
+ipcMain.handle('videos:toggleNotify', (_, id) => {
+  if (!videoRepo) return null
+  return videoRepo.toggleNotify(id)
+})
+
 // チャンネル: ピントグル / 全件取得
 ipcMain.handle('channels:togglePin', (_, id) => {
   if (!channelRepo) return null
