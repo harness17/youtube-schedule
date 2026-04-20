@@ -91,4 +91,26 @@ describe('ScheduleCard', () => {
     render(<ScheduleCard item={mockItem} isPinned={false} />)
     expect(screen.queryByText('📌')).not.toBeInTheDocument()
   })
+
+  it('showViewedButton=true のとき ✓ ボタンが表示される', () => {
+    render(<ScheduleCard item={mockItem} showViewedButton={true} />)
+    expect(screen.getByTitle('見た')).toBeInTheDocument()
+  })
+
+  it('showViewedButton=false のとき ✓ ボタンが表示されない', () => {
+    render(<ScheduleCard item={mockItem} showViewedButton={false} />)
+    expect(screen.queryByTitle('見た')).not.toBeInTheDocument()
+  })
+
+  it('✓ ボタンクリックで onMarkViewed が呼ばれる', () => {
+    const onMarkViewed = vi.fn()
+    render(<ScheduleCard item={mockItem} showViewedButton={true} onMarkViewed={onMarkViewed} />)
+    fireEvent.click(screen.getByTitle('見た'))
+    expect(onMarkViewed).toHaveBeenCalledWith(mockItem.id, true)
+  })
+
+  it('viewedAt が設定済みのとき ✓ ボタンのタイトルが「視聴済みを解除」になる', () => {
+    render(<ScheduleCard item={{ ...mockItem, viewedAt: 1000000 }} showViewedButton={true} />)
+    expect(screen.getByTitle('視聴済みを解除')).toBeInTheDocument()
+  })
 })

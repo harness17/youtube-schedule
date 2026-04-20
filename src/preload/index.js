@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('schedule:updated', listener)
     return () => ipcRenderer.off('schedule:updated', listener)
   },
+  listMissed: () => ipcRenderer.invoke('videos:listMissed'),
+  listArchive: (opts) => ipcRenderer.invoke('videos:listArchive', opts),
+  listFavorites: () => ipcRenderer.invoke('videos:listFavorites'),
+  searchByText: (query) => ipcRenderer.invoke('videos:searchByText', query),
   markViewed: (id) => ipcRenderer.invoke('videos:markViewed', id),
   clearViewed: (id) => ipcRenderer.invoke('videos:clearViewed', id),
   toggleFavorite: (id) => ipcRenderer.invoke('videos:toggleFavorite', id),

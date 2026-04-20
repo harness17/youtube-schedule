@@ -304,6 +304,24 @@ ipcMain.handle('shell:openFolder', async (_, filePath) => {
   }
 })
 
+// 動画: アーカイブ系一覧
+ipcMain.handle('videos:listMissed', () => {
+  if (!videoRepo) return []
+  return videoRepo.listMissed()
+})
+ipcMain.handle('videos:listArchive', (_, opts) => {
+  if (!videoRepo) return []
+  return videoRepo.listArchive(opts ?? {})
+})
+ipcMain.handle('videos:listFavorites', () => {
+  if (!videoRepo) return []
+  return videoRepo.listFavorites()
+})
+ipcMain.handle('videos:searchByText', (_, query) => {
+  if (!videoRepo) return []
+  return videoRepo.searchByText(query)
+})
+
 // 動画: 見たマーク / クリア
 ipcMain.handle('videos:markViewed', (_, id) => {
   if (!videoRepo) return false

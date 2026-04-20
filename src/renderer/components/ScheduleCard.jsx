@@ -34,7 +34,9 @@ export default function ScheduleCard({
   watched = false,
   onToggleWatch,
   onToggleFavorite,
-  isPinned = false
+  onMarkViewed,
+  isPinned = false,
+  showViewedButton = false
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -182,6 +184,23 @@ export default function ScheduleCard({
           >
             ⭐
           </button>
+          {showViewedButton && (
+            <button
+              title={item.viewedAt ? '視聴済みを解除' : '見た'}
+              onClick={() => onMarkViewed?.(item.id, !item.viewedAt)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '14px',
+                background: item.viewedAt ? '#4CAF50' : btnBg,
+                color: item.viewedAt ? '#fff' : btnColor,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              ✓
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -201,11 +220,14 @@ ScheduleCard.propTypes = {
     description: PropTypes.string,
     url: PropTypes.string,
     channelUrl: PropTypes.string,
-    isFavorite: PropTypes.bool
+    isFavorite: PropTypes.bool,
+    viewedAt: PropTypes.number
   }).isRequired,
   darkMode: PropTypes.bool,
   watched: PropTypes.bool,
   onToggleWatch: PropTypes.func,
   onToggleFavorite: PropTypes.func,
-  isPinned: PropTypes.bool
+  onMarkViewed: PropTypes.func,
+  isPinned: PropTypes.bool,
+  showViewedButton: PropTypes.bool
 }
