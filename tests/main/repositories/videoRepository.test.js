@@ -279,30 +279,77 @@ describe('VideoRepository', () => {
     expect(next.map((v) => v.id)).toEqual(['e2', 'e3'])
   })
 
-  it('searchByText finds matching videos via FTS', () => {
-    repo.upsert(sampleVideo({ id: 'v1', title: 'Keynote announcement' }))
+  it('searchByText がチャンネル名で検索できる', () => {
+    repo.upsert(sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' }))
+    repo.upsert(sampleVideo({ id: 'v2', channelTitle: '別のチャンネル', title: 'ホロ雑談', status: 'ended' }))
+    // channel=true, title=false → チャンネル名のみ検索
+    const ids = repo.searchByText('ホロ', { title: false, channel: true, description: false }).map((v) => v.id)
+    expect(ids).toEqual(['v1'])
+  })
+
+  it('searchByText のトグルで対象カラムを絞り込める', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: 'テストタイトル', description: 'キーワードあり', status: 'ended' }))
+    // タイトルのみ → ヒットしない
+    expect(repo.searchByText('キーワード', { title: true, channel: false, description: false })).toEqual([])
+    // 説明文のみ → ヒットする
+    expect(repo.searchByText('キーワード', { title: false, channel: false, description: true }).map((v) => v.id)).toEqual(['v1'])
+  })
+
+  it('searchByText がタイトルの部分一致で ended 動画を返す', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: '地獄の果てまで', status: 'ended' }))
+    repo.upsert(sampleVideo({ id: 'v2', title: 'ホロライブ配信', status: 'ended' }))
+    repo.upsert(sampleVideo({ id: 'v3', title: '全然関係ないタイトル', status: 'ended' }))
+    expect(repo.searchByText('地獄').map((v) => v.id)).toEqual(['v1'])
+    expect(repo.searchByText('ホロ').map((v) => v.id)).toEqual(['v2'])
+  })
+
+  it('searchByText が説明文の部分一致で ended 動画を返す（description:true 指定時）', () => {
     repo.upsert(
-      sampleVideo({ id: 'v2', title: 'Cooking stream', description: 'announcement of menu' })
+      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
     )
-    repo.upsert(sampleVideo({ id: 'v3', title: 'Random talk' }))
-    const ids = repo
-      .searchByText('announcement')
-      .map((v) => v.id)
-      .sort()
+    expect(repo.searchByText('地獄', { description: true }).map((v) => v.id)).toEqual(['v1'])
+  })
+
+  it('searchByText はデフォルトで説明文を検索しない', () => {
+    repo.upsert(
+      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
+    )
+    // デフォルト: title=true, channel=true, description=false
+    expect(repo.searchByText('地獄')).toEqual([])
+  })
+
+  it('searchByText はタイトルとチャンネル名を同時に検索する', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: 'announcement stream', status: 'ended' }))
+    repo.upsert(
+      sampleVideo({ id: 'v2', channelTitle: 'announcement channel', title: 'Cooking stream', status: 'ended' })
+    )
+    repo.upsert(sampleVideo({ id: 'v3', title: 'Random talk', status: 'ended' }))
+    const ids = repo.searchByText('announcement').map((v) => v.id).sort()
     expect(ids).toEqual(['v1', 'v2'])
   })
 
-  it('searchByText returns empty array for empty/whitespace query', () => {
-    repo.upsert(sampleVideo({ id: 'v1', title: 'hello' }))
+  it('searchByText は ended 以外の動画を返さない', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: 'upcoming stream', status: 'upcoming' }))
+    repo.upsert(sampleVideo({ id: 'v2', title: 'live stream', status: 'live' }))
+    repo.upsert(sampleVideo({ id: 'v3', title: 'ended stream', status: 'ended' }))
+    const ids = repo.searchByText('stream').map((v) => v.id)
+    expect(ids).toEqual(['v3'])
+  })
+
+  it('searchByText は空・空白クエリで空配列を返す', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: 'hello', status: 'ended' }))
     expect(repo.searchByText('')).toEqual([])
     expect(repo.searchByText('   ')).toEqual([])
   })
 
-  it('searchByText reflects updates and deletes through triggers', () => {
-    repo.upsert(sampleVideo({ id: 'v1', title: 'original' }))
-    expect(repo.searchByText('original').map((v) => v.id)).toEqual(['v1'])
-    repo.upsert(sampleVideo({ id: 'v1', title: 'changed' }))
-    expect(repo.searchByText('original')).toEqual([])
-    expect(repo.searchByText('changed').map((v) => v.id)).toEqual(['v1'])
+  it('searchByText は LIKE 特殊文字（% _）を含むクエリで安全に動作する', () => {
+    repo.upsert(sampleVideo({ id: 'v1', title: '100% confirmed', status: 'ended' }))
+    repo.upsert(sampleVideo({ id: 'v2', title: 'other video', status: 'ended' }))
+    // '100%' で検索すると v1 だけヒット（% がワイルドカードにならない）
+    expect(repo.searchByText('100%').map((v) => v.id)).toEqual(['v1'])
+    // '%' だけで検索すると % を含む v1 だけヒット（全件ヒットにはならない）
+    expect(repo.searchByText('%').map((v) => v.id)).toEqual(['v1'])
+    // '_' だけで検索しても _ を含まない動画はヒットしない
+    expect(repo.searchByText('_').map((v) => v.id)).toEqual([])
   })
 })

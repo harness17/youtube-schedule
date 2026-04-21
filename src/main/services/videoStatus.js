@@ -11,9 +11,7 @@ export function deriveStatus(v, now) {
     return elapsed < LIVE_MAX_DURATION_MS ? 'live' : 'ended'
   }
   if (bc === 'upcoming') {
-    const startMs = ld?.scheduledStartTime
-      ? new Date(ld.scheduledStartTime).getTime()
-      : now + 1
+    const startMs = ld?.scheduledStartTime ? new Date(ld.scheduledStartTime).getTime() : now + 1
     return startMs > now - UPCOMING_GRACE_MS ? 'upcoming' : 'ended'
   }
   return 'ended'

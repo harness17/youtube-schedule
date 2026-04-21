@@ -82,14 +82,14 @@ describe('ScheduleCard', () => {
     expect(screen.getByTitle('お気に入り解除')).toBeInTheDocument()
   })
 
-  it('isPinned=true のときチャンネル名の横に 📌 が表示される', () => {
+  it('isPinned=true のとき 📌 ボタンが「優先解除」タイトルで表示される', () => {
     render(<ScheduleCard item={mockItem} isPinned={true} />)
-    expect(screen.getByText('📌')).toBeInTheDocument()
+    expect(screen.getByTitle('優先解除')).toBeInTheDocument()
   })
 
-  it('isPinned=false のとき 📌 が表示されない', () => {
+  it('isPinned=false のとき 📌 ボタンが「優先に設定」タイトルで表示される', () => {
     render(<ScheduleCard item={mockItem} isPinned={false} />)
-    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+    expect(screen.getByTitle('優先に設定')).toBeInTheDocument()
   })
 
   it('showViewedButton=true のとき ✓ ボタンが表示される', () => {

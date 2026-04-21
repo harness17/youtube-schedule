@@ -12,9 +12,7 @@ function toRecord(item, now) {
     scheduledStartTime: item.scheduledStartTime
       ? new Date(item.scheduledStartTime).getTime()
       : null,
-    actualStartTime: item.actualStartTime
-      ? new Date(item.actualStartTime).getTime()
-      : null,
+    actualStartTime: item.actualStartTime ? new Date(item.actualStartTime).getTime() : null,
     concurrentViewers: item.concurrentViewers ?? null,
     url: item.url,
     firstSeenAt: now,

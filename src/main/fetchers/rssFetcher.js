@@ -59,11 +59,7 @@ export function createRssFetcher({ timeoutMs = 3000, fetchImpl = nodeFetch } = {
       return { success: false, reason: 'parse', httpStatus: res.status }
     }
 
-    const entries = feed.entry
-      ? Array.isArray(feed.entry)
-        ? feed.entry
-        : [feed.entry]
-      : []
+    const entries = feed.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : []
     const videoIds = entries
       .map((e) => e['yt:videoId'] ?? e.videoId ?? null)
       .filter((id) => typeof id === 'string' && id.length > 0)

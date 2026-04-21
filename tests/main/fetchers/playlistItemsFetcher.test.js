@@ -7,10 +7,7 @@ describe('PlaylistItemsFetcher', () => {
       playlistItems: {
         list: vi.fn().mockResolvedValue({
           data: {
-            items: [
-              { contentDetails: { videoId: 'V1' } },
-              { contentDetails: { videoId: 'V2' } }
-            ]
+            items: [{ contentDetails: { videoId: 'V1' } }, { contentDetails: { videoId: 'V2' } }]
           }
         })
       }

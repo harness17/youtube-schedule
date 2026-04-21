@@ -47,7 +47,8 @@ export default function ScheduleList({
   darkMode = false,
   pinnedChannelIds = new Set(),
   onToggleWatch,
-  onToggleFavorite
+  onToggleFavorite,
+  onTogglePin
 }) {
   const isEmpty = live.length === 0 && upcoming.length === 0
 
@@ -143,6 +144,7 @@ export default function ScheduleList({
               isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
+              onTogglePin={onTogglePin}
             />
           ))}
         </div>
@@ -171,6 +173,7 @@ export default function ScheduleList({
               isPinned={pinnedChannelIds.has(item.channelId)}
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
+              onTogglePin={onTogglePin}
             />
           ))}
         </div>
@@ -185,5 +188,6 @@ ScheduleList.propTypes = {
   darkMode: PropTypes.bool,
   pinnedChannelIds: PropTypes.instanceOf(Set),
   onToggleWatch: PropTypes.func,
-  onToggleFavorite: PropTypes.func
+  onToggleFavorite: PropTypes.func,
+  onTogglePin: PropTypes.func
 }
