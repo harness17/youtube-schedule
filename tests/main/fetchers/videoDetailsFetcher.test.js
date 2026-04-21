@@ -23,10 +23,7 @@ describe('VideoDetailsFetcher', () => {
 
   it('batches ids in chunks of 50', async () => {
     const ids = Array.from({ length: 60 }, (_, i) => `V${i}`)
-    const yt = makeYt([
-      ids.slice(0, 50).map((id) => ({ id })),
-      ids.slice(50).map((id) => ({ id }))
-    ])
+    const yt = makeYt([ids.slice(0, 50).map((id) => ({ id })), ids.slice(50).map((id) => ({ id }))])
     const fetcher = createVideoDetailsFetcher()
     const result = await fetcher.fetch(yt, ids)
     expect(yt.videos.list).toHaveBeenCalledTimes(2)

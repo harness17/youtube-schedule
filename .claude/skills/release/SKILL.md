@@ -76,6 +76,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ```bash
 git checkout master
+git pull origin master   # リモートと乖離していないか確認
 git merge --no-ff develop -m "Release vX.X.X
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -110,8 +111,10 @@ gh run watch <Release の run-id>
 ```
 
 **CI が失敗した場合**（lint/test エラー）：
-- ログを確認して原因を修正し、develop に fix コミットを積んで再度 Step 5〜6 からやり直す
-- タグを打ち直す場合: `git tag -d vX.X.X && git push origin :refs/tags/vX.X.X`
+- ログを確認する → `develop` に戻って fix コミットを積む（**master への直接修正は禁止**）
+- タグを削除してから再作成する：`git tag -d vX.X.X && git push origin :refs/tags/vX.X.X`
+- その後、Step 3〜4（必要なら README 再コミット）→ Step 5（develop → master マージ）→ Step 6（タグ作成 → push）をやり直す
+- タグが古いコミットを指したままだと Release ワークフローは再トリガーされず、GitHub Releases の成果物も古い HEAD で固定されるため、タグ打ち直しは必須
 
 ```bash
 gh run view <run-id> --log-failed 2>&1 | tail -60
@@ -124,11 +127,13 @@ gh run view <run-id> --log-failed 2>&1 | tail -60
 
 ### 8. リリースノートを書いて公開
 
+Release ワークフロー（`.github/workflows/release.yml`）はタグ push 時に **draft 状態の GitHub Release** を自動作成する。このステップはその draft に本文を入れて `--draft=false` で公開する作業。
+
 `release-checklist.md` の「リリースノートの作成」ルールに従い、ユーザー視点で内容を整理する。
-コミット差分は以下で取得する：
+コミット差分は以下で取得する（`A..B` は「B に含まれ A に含まれない」の意）：
 
 ```bash
-git log --oneline vX.X.X ^<前バージョンタグ>
+git log --oneline <前バージョンタグ>..vX.X.X
 ```
 
 ```bash

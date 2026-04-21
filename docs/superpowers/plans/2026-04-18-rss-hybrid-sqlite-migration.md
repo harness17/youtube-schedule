@@ -16,54 +16,54 @@
 
 ### 新規作成
 
-| ファイル | 責務 |
-|---------|------|
-| `src/main/db/connection.js` | SQLite 接続の open/close、WAL 設定 |
-| `src/main/db/schema.js` | CREATE TABLE / INDEX 定義 |
-| `src/main/db/migrate.js` | schema_version に基づくマイグレーション実行 |
-| `src/main/db/migrations/001_initial.js` | 初期スキーマ適用 |
-| `src/main/db/migrations/002_import_from_store.js` | 旧 electron-store キャッシュ取り込み |
-| `src/main/repositories/videoRepository.js` | videos テーブルの CRUD / listVisible / cleanup |
-| `src/main/repositories/channelRepository.js` | channels テーブルの CRUD |
-| `src/main/repositories/rssFetchLogRepository.js` | rss_fetch_log の追加・集計 |
-| `src/main/repositories/metaRepository.js` | meta KV 取得・設定 |
-| `src/main/services/videoStatus.js` | `deriveStatus(video, now)` 関数 |
-| `src/main/services/schedulerService.js` | refresh フロー全体のオーケストレーション |
-| `src/main/fetchers/rssFetcher.js` | RSS HTTPS 取得 + XML パース |
-| `src/main/fetchers/subscriptionsFetcher.js` | subscriptions.list + 1 日キャッシュ |
-| `src/main/fetchers/playlistItemsFetcher.js` | playlistItems.list フォールバック |
-| `src/main/fetchers/videoDetailsFetcher.js` | videos.list バッチ取得 |
-| `tests/main/db/connection.test.js` | DB 接続テスト |
-| `tests/main/db/migrate.test.js` | マイグレーション冪等性テスト |
-| `tests/main/repositories/videoRepository.test.js` | 動画 CRUD テスト |
-| `tests/main/repositories/channelRepository.test.js` | チャンネル CRUD テスト |
-| `tests/main/repositories/rssFetchLogRepository.test.js` | RSS ログテスト |
-| `tests/main/repositories/metaRepository.test.js` | meta KV テスト |
-| `tests/main/services/videoStatus.test.js` | status 判定テスト |
-| `tests/main/services/schedulerService.test.js` | オーケストレーションテスト |
-| `tests/main/fetchers/rssFetcher.test.js` | RSS 取得テスト |
-| `tests/main/fetchers/subscriptionsFetcher.test.js` | 登録チャンネル取得テスト |
-| `tests/main/fetchers/playlistItemsFetcher.test.js` | プレイリスト取得テスト |
-| `tests/main/fetchers/videoDetailsFetcher.test.js` | 動画詳細取得テスト |
-| `src/renderer/components/StatusBanners.jsx` | RSS 失敗 / DB 破損 / オフラインの通知 |
+| ファイル                                                | 責務                                           |
+| ------------------------------------------------------- | ---------------------------------------------- |
+| `src/main/db/connection.js`                             | SQLite 接続の open/close、WAL 設定             |
+| `src/main/db/schema.js`                                 | CREATE TABLE / INDEX 定義                      |
+| `src/main/db/migrate.js`                                | schema_version に基づくマイグレーション実行    |
+| `src/main/db/migrations/001_initial.js`                 | 初期スキーマ適用                               |
+| `src/main/db/migrations/002_import_from_store.js`       | 旧 electron-store キャッシュ取り込み           |
+| `src/main/repositories/videoRepository.js`              | videos テーブルの CRUD / listVisible / cleanup |
+| `src/main/repositories/channelRepository.js`            | channels テーブルの CRUD                       |
+| `src/main/repositories/rssFetchLogRepository.js`        | rss_fetch_log の追加・集計                     |
+| `src/main/repositories/metaRepository.js`               | meta KV 取得・設定                             |
+| `src/main/services/videoStatus.js`                      | `deriveStatus(video, now)` 関数                |
+| `src/main/services/schedulerService.js`                 | refresh フロー全体のオーケストレーション       |
+| `src/main/fetchers/rssFetcher.js`                       | RSS HTTPS 取得 + XML パース                    |
+| `src/main/fetchers/subscriptionsFetcher.js`             | subscriptions.list + 1 日キャッシュ            |
+| `src/main/fetchers/playlistItemsFetcher.js`             | playlistItems.list フォールバック              |
+| `src/main/fetchers/videoDetailsFetcher.js`              | videos.list バッチ取得                         |
+| `tests/main/db/connection.test.js`                      | DB 接続テスト                                  |
+| `tests/main/db/migrate.test.js`                         | マイグレーション冪等性テスト                   |
+| `tests/main/repositories/videoRepository.test.js`       | 動画 CRUD テスト                               |
+| `tests/main/repositories/channelRepository.test.js`     | チャンネル CRUD テスト                         |
+| `tests/main/repositories/rssFetchLogRepository.test.js` | RSS ログテスト                                 |
+| `tests/main/repositories/metaRepository.test.js`        | meta KV テスト                                 |
+| `tests/main/services/videoStatus.test.js`               | status 判定テスト                              |
+| `tests/main/services/schedulerService.test.js`          | オーケストレーションテスト                     |
+| `tests/main/fetchers/rssFetcher.test.js`                | RSS 取得テスト                                 |
+| `tests/main/fetchers/subscriptionsFetcher.test.js`      | 登録チャンネル取得テスト                       |
+| `tests/main/fetchers/playlistItemsFetcher.test.js`      | プレイリスト取得テスト                         |
+| `tests/main/fetchers/videoDetailsFetcher.test.js`       | 動画詳細取得テスト                             |
+| `src/renderer/components/StatusBanners.jsx`             | RSS 失敗 / DB 破損 / オフラインの通知          |
 
 ### 変更
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `package.json` | 依存追加、`asarUnpack` 設定 |
-| `electron-builder.yml` (存在確認の上) | `asarUnpack` 追加 |
-| `src/main/index.js` | IPC ハンドラーを SchedulerService 経由に切替、単一インスタンス化 |
-| `src/main/store.js` | 設定専用に縮退（キャッシュ関連削除、`getSetting` / `setSetting` のみ残す） |
-| `src/renderer/hooks/useSchedule.js` | IPC イベント `schedule:updated` 購読 |
-| `src/renderer/src/App.jsx` | `StatusBanners` 配置 |
+| ファイル                              | 変更内容                                                                   |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `package.json`                        | 依存追加、`asarUnpack` 設定                                                |
+| `electron-builder.yml` (存在確認の上) | `asarUnpack` 追加                                                          |
+| `src/main/index.js`                   | IPC ハンドラーを SchedulerService 経由に切替、単一インスタンス化           |
+| `src/main/store.js`                   | 設定専用に縮退（キャッシュ関連削除、`getSetting` / `setSetting` のみ残す） |
+| `src/renderer/hooks/useSchedule.js`   | IPC イベント `schedule:updated` 購読                                       |
+| `src/renderer/src/App.jsx`            | `StatusBanners` 配置                                                       |
 
 ### 削除
 
-| ファイル | 削除理由 |
-|---------|---------|
-| `src/main/youtube-api.js` | SchedulerService + Fetchers に完全移行 |
-| `tests/main/youtube-api.test.js` | 上記に伴う移植後削除 |
+| ファイル                                    | 削除理由                                     |
+| ------------------------------------------- | -------------------------------------------- |
+| `src/main/youtube-api.js`                   | SchedulerService + Fetchers に完全移行       |
+| `tests/main/youtube-api.test.js`            | 上記に伴う移植後削除                         |
 | `tests/main/store.test.js` のキャッシュ関連 | VideoRepository / migrate テストへ移植後削除 |
 
 ---
@@ -88,11 +88,13 @@ Phase H (仕上げ)   → Task 18 ~ 20
 ## Task 1: 依存関係追加とビルド設定
 
 **Files:**
+
 - Modify: `H:/ClaudeCode/Youtube/youtube-schedule/package.json`
 
 - [ ] **Step 1: 依存関係をインストール**
 
 実行コマンド:
+
 ```bash
 cd H:/ClaudeCode/Youtube/youtube-schedule
 npm install better-sqlite3@^11.3.0 fast-xml-parser@^4.5.0
@@ -104,6 +106,7 @@ npm install -D nock@^13.5.0
 - [ ] **Step 2: `postinstall` の動作確認**
 
 実行コマンド:
+
 ```bash
 npm run postinstall
 ```
@@ -127,6 +130,7 @@ npm run postinstall
 - [ ] **Step 4: dev 起動で native module がロードできるか確認**
 
 実行コマンド:
+
 ```bash
 npm run dev
 ```
@@ -145,6 +149,7 @@ git commit -m "chore: add better-sqlite3, fast-xml-parser, nock and configure as
 ## Task 2: SQLite 接続モジュール
 
 **Files:**
+
 - Create: `src/main/db/connection.js`
 - Create: `tests/main/db/connection.test.js`
 
@@ -193,6 +198,7 @@ describe('db/connection', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/connection.test.js
 ```
@@ -221,6 +227,7 @@ export function closeDatabase(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/connection.test.js
 ```
@@ -239,6 +246,7 @@ git commit -m "feat: add SQLite connection module with WAL mode"
 ## Task 3: スキーマ + マイグレーションフレームワーク
 
 **Files:**
+
 - Create: `src/main/db/schema.js`
 - Create: `src/main/db/migrate.js`
 - Create: `src/main/db/migrations/001_initial.js`
@@ -305,6 +313,7 @@ describe('db/migrate', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/migrate.test.js
 ```
@@ -410,6 +419,7 @@ export function runMigrations(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/migrate.test.js
 ```
@@ -428,6 +438,7 @@ git commit -m "feat: add schema migration framework with 001_initial"
 ## Task 4: VideoRepository
 
 **Files:**
+
 - Create: `src/main/repositories/videoRepository.js`
 - Create: `tests/main/repositories/videoRepository.test.js`
 
@@ -495,9 +506,7 @@ describe('VideoRepository', () => {
       sampleVideo({ id: 'up2', status: 'upcoming', scheduledStartTime: now - 3 * 3600e3 })
     )
     repo.upsert(sampleVideo({ id: 'lv1', status: 'live', actualStartTime: now - 3600e3 }))
-    repo.upsert(
-      sampleVideo({ id: 'lv2', status: 'live', actualStartTime: now - 25 * 3600e3 })
-    )
+    repo.upsert(sampleVideo({ id: 'lv2', status: 'live', actualStartTime: now - 25 * 3600e3 }))
     repo.upsert(sampleVideo({ id: 'en1', status: 'ended' }))
 
     const visible = repo.listVisible(now)
@@ -542,9 +551,7 @@ describe('VideoRepository', () => {
 
   it('deleteExpiredEnded removes ended videos older than threshold', () => {
     const now = 1_700_000_000_000
-    repo.upsert(
-      sampleVideo({ id: 'old', status: 'ended', lastCheckedAt: now - 31 * 24 * 3600e3 })
-    )
+    repo.upsert(sampleVideo({ id: 'old', status: 'ended', lastCheckedAt: now - 31 * 24 * 3600e3 }))
     repo.upsert(
       sampleVideo({ id: 'fresh', status: 'ended', lastCheckedAt: now - 10 * 24 * 3600e3 })
     )
@@ -559,6 +566,7 @@ describe('VideoRepository', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/videoRepository.test.js
 ```
@@ -668,6 +676,7 @@ export function createVideoRepository(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/videoRepository.test.js
 ```
@@ -686,6 +695,7 @@ git commit -m "feat: add VideoRepository with UPSERT, listVisible, cleanup"
 ## Task 5: ChannelRepository
 
 **Files:**
+
 - Create: `src/main/repositories/channelRepository.js`
 - Create: `tests/main/repositories/channelRepository.test.js`
 
@@ -733,10 +743,7 @@ describe('ChannelRepository', () => {
   })
 
   it('getLastSyncTime returns the latest sync timestamp', () => {
-    repo.replaceAll(
-      [{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }],
-      1_700_000_000_000
-    )
+    repo.replaceAll([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1_700_000_000_000)
     expect(repo.getLastSyncTime()).toBe(1_700_000_000_000)
   })
 })
@@ -745,6 +752,7 @@ describe('ChannelRepository', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/channelRepository.test.js
 ```
@@ -763,9 +771,7 @@ export function createChannelRepository(db) {
     VALUES (@id, @title, @uploadsPlaylistId, @syncAt)
   `)
   const listAllStmt = db.prepare(`SELECT * FROM channels ORDER BY id`)
-  const maxSyncStmt = db.prepare(
-    `SELECT MAX(last_subscription_sync_at) AS ts FROM channels`
-  )
+  const maxSyncStmt = db.prepare(`SELECT MAX(last_subscription_sync_at) AS ts FROM channels`)
 
   return {
     replaceAll(channels, syncAt) {
@@ -800,6 +806,7 @@ export function createChannelRepository(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/channelRepository.test.js
 ```
@@ -818,6 +825,7 @@ git commit -m "feat: add ChannelRepository with replaceAll and getLastSyncTime"
 ## Task 6: RssFetchLogRepository
 
 **Files:**
+
 - Create: `src/main/repositories/rssFetchLogRepository.js`
 - Create: `tests/main/repositories/rssFetchLogRepository.test.js`
 
@@ -872,6 +880,7 @@ describe('RssFetchLogRepository', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/rssFetchLogRepository.test.js
 ```
@@ -922,6 +931,7 @@ export function createRssFetchLogRepository(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/rssFetchLogRepository.test.js
 ```
@@ -940,6 +950,7 @@ git commit -m "feat: add RssFetchLogRepository with failure rate aggregation"
 ## Task 7: MetaRepository
 
 **Files:**
+
 - Create: `src/main/repositories/metaRepository.js`
 - Create: `tests/main/repositories/metaRepository.test.js`
 
@@ -983,6 +994,7 @@ describe('MetaRepository', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/metaRepository.test.js
 ```
@@ -1016,6 +1028,7 @@ export function createMetaRepository(db) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/repositories/metaRepository.test.js
 ```
@@ -1034,6 +1047,7 @@ git commit -m "feat: add MetaRepository for KV metadata"
 ## Task 8: videoStatus（deriveStatus 関数）
 
 **Files:**
+
 - Create: `src/main/services/videoStatus.js`
 - Create: `tests/main/services/videoStatus.test.js`
 
@@ -1060,29 +1074,24 @@ function v({ actualEnd, actualStart, scheduled, bc } = {}) {
 
 describe('deriveStatus', () => {
   it('returns "ended" when actualEndTime is set', () => {
-    expect(deriveStatus(v({ actualEnd: new Date(NOW - 1000).toISOString() }), NOW)).toBe(
+    expect(deriveStatus(v({ actualEnd: new Date(NOW - 1000).toISOString() }), NOW)).toBe('ended')
+  })
+
+  it('returns "live" for active stream started less than 24h ago', () => {
+    expect(deriveStatus(v({ actualStart: new Date(NOW - 3600_000).toISOString() }), NOW)).toBe(
+      'live'
+    )
+  })
+
+  it('returns "ended" for stream that started over 24h ago without actualEnd', () => {
+    expect(deriveStatus(v({ actualStart: new Date(NOW - 25 * 3600_000).toISOString() }), NOW)).toBe(
       'ended'
     )
   })
 
-  it('returns "live" for active stream started less than 24h ago', () => {
-    expect(
-      deriveStatus(v({ actualStart: new Date(NOW - 3600_000).toISOString() }), NOW)
-    ).toBe('live')
-  })
-
-  it('returns "ended" for stream that started over 24h ago without actualEnd', () => {
-    expect(
-      deriveStatus(v({ actualStart: new Date(NOW - 25 * 3600_000).toISOString() }), NOW)
-    ).toBe('ended')
-  })
-
   it('returns "upcoming" when liveBroadcastContent=upcoming and scheduled is future', () => {
     expect(
-      deriveStatus(
-        v({ bc: 'upcoming', scheduled: new Date(NOW + 3600_000).toISOString() }),
-        NOW
-      )
+      deriveStatus(v({ bc: 'upcoming', scheduled: new Date(NOW + 3600_000).toISOString() }), NOW)
     ).toBe('upcoming')
   })
 
@@ -1108,6 +1117,7 @@ describe('deriveStatus', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/services/videoStatus.test.js
 ```
@@ -1132,9 +1142,7 @@ export function deriveStatus(v, now) {
     return elapsed < LIVE_MAX_DURATION_MS ? 'live' : 'ended'
   }
   if (bc === 'upcoming') {
-    const startMs = ld?.scheduledStartTime
-      ? new Date(ld.scheduledStartTime).getTime()
-      : now + 1
+    const startMs = ld?.scheduledStartTime ? new Date(ld.scheduledStartTime).getTime() : now + 1
     return startMs > now - UPCOMING_GRACE_MS ? 'upcoming' : 'ended'
   }
   return 'ended'
@@ -1144,6 +1152,7 @@ export function deriveStatus(v, now) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/services/videoStatus.test.js
 ```
@@ -1162,6 +1171,7 @@ git commit -m "feat: add deriveStatus function for video state machine"
 ## Task 9: RssFetcher
 
 **Files:**
+
 - Create: `src/main/fetchers/rssFetcher.js`
 - Create: `tests/main/fetchers/rssFetcher.test.js`
 
@@ -1235,6 +1245,7 @@ describe('RssFetcher', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/rssFetcher.test.js
 ```
@@ -1298,11 +1309,7 @@ export function createRssFetcher({ timeoutMs = 3000, fetchImpl = globalThis.fetc
       return { success: false, reason: 'parse', httpStatus: res.status }
     }
 
-    const entries = feed.entry
-      ? Array.isArray(feed.entry)
-        ? feed.entry
-        : [feed.entry]
-      : []
+    const entries = feed.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : []
     const videoIds = entries
       .map((e) => e['yt:videoId'] ?? e.videoId ?? null)
       .filter((id) => typeof id === 'string' && id.length > 0)
@@ -1317,6 +1324,7 @@ export function createRssFetcher({ timeoutMs = 3000, fetchImpl = globalThis.fetc
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/rssFetcher.test.js
 ```
@@ -1337,6 +1345,7 @@ git commit -m "feat: add RssFetcher with timeout and structured error reasons"
 ## Task 10: SubscriptionsFetcher
 
 **Files:**
+
 - Create: `src/main/fetchers/subscriptionsFetcher.js`
 - Create: `tests/main/fetchers/subscriptionsFetcher.test.js`
 
@@ -1400,6 +1409,7 @@ describe('SubscriptionsFetcher', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/subscriptionsFetcher.test.js
 ```
@@ -1447,6 +1457,7 @@ export function createSubscriptionsFetcher() {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/subscriptionsFetcher.test.js
 ```
@@ -1465,6 +1476,7 @@ git commit -m "feat: add SubscriptionsFetcher with pagination"
 ## Task 11: PlaylistItemsFetcher
 
 **Files:**
+
 - Create: `src/main/fetchers/playlistItemsFetcher.js`
 - Create: `tests/main/fetchers/playlistItemsFetcher.test.js`
 
@@ -1482,10 +1494,7 @@ describe('PlaylistItemsFetcher', () => {
       playlistItems: {
         list: vi.fn().mockResolvedValue({
           data: {
-            items: [
-              { contentDetails: { videoId: 'V1' } },
-              { contentDetails: { videoId: 'V2' } }
-            ]
+            items: [{ contentDetails: { videoId: 'V1' } }, { contentDetails: { videoId: 'V2' } }]
           }
         })
       }
@@ -1509,6 +1518,7 @@ describe('PlaylistItemsFetcher', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/playlistItemsFetcher.test.js
 ```
@@ -1541,6 +1551,7 @@ export function createPlaylistItemsFetcher() {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/playlistItemsFetcher.test.js
 ```
@@ -1559,6 +1570,7 @@ git commit -m "feat: add PlaylistItemsFetcher fallback"
 ## Task 12: VideoDetailsFetcher
 
 **Files:**
+
 - Create: `src/main/fetchers/videoDetailsFetcher.js`
 - Create: `tests/main/fetchers/videoDetailsFetcher.test.js`
 
@@ -1592,10 +1604,7 @@ describe('VideoDetailsFetcher', () => {
 
   it('batches ids in chunks of 50', async () => {
     const ids = Array.from({ length: 60 }, (_, i) => `V${i}`)
-    const yt = makeYt([
-      ids.slice(0, 50).map((id) => ({ id })),
-      ids.slice(50).map((id) => ({ id }))
-    ])
+    const yt = makeYt([ids.slice(0, 50).map((id) => ({ id })), ids.slice(50).map((id) => ({ id }))])
     const fetcher = createVideoDetailsFetcher()
     const result = await fetcher.fetch(yt, ids)
     expect(yt.videos.list).toHaveBeenCalledTimes(2)
@@ -1607,6 +1616,7 @@ describe('VideoDetailsFetcher', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/videoDetailsFetcher.test.js
 ```
@@ -1640,6 +1650,7 @@ export function createVideoDetailsFetcher() {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/fetchers/videoDetailsFetcher.test.js
 ```
@@ -1658,6 +1669,7 @@ git commit -m "feat: add VideoDetailsFetcher with 50-item batching"
 ## Task 13: SchedulerService
 
 **Files:**
+
 - Create: `src/main/services/schedulerService.js`
 - Create: `tests/main/services/schedulerService.test.js`
 
@@ -1703,9 +1715,7 @@ function createMocks() {
   const rssLogRepo = { record: vi.fn() }
   const metaRepo = { get: vi.fn(), set: vi.fn() }
   const subsFetcher = {
-    fetch: vi.fn().mockResolvedValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    fetch: vi.fn().mockResolvedValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
   }
   const rssFetcher = {
     fetch: vi.fn().mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
@@ -1753,9 +1763,7 @@ describe('SchedulerService.refresh', () => {
   it('skips subscriptions fetch when cache is fresh (< 24h)', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.subsFetcher.fetch).not.toHaveBeenCalled()
@@ -1783,9 +1791,7 @@ describe('SchedulerService.refresh', () => {
   it('records RSS outcomes to the log repository', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.rssLogRepo.record).toHaveBeenCalledWith(
@@ -1813,9 +1819,7 @@ describe('SchedulerService.refresh', () => {
   it('upserts fetched videos with derived status', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
-    mocks.channelRepo.listAll.mockReturnValue([
-      { id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }
-    ])
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(
@@ -1828,6 +1832,7 @@ describe('SchedulerService.refresh', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/services/schedulerService.test.js
 ```
@@ -1864,9 +1869,7 @@ function toVideoRecord(v, now) {
       v.snippet.thumbnails?.medium?.url ??
       '',
     status: deriveStatus(v, now),
-    scheduledStartTime: ld.scheduledStartTime
-      ? new Date(ld.scheduledStartTime).getTime()
-      : null,
+    scheduledStartTime: ld.scheduledStartTime ? new Date(ld.scheduledStartTime).getTime() : null,
     actualStartTime: ld.actualStartTime ? new Date(ld.actualStartTime).getTime() : null,
     concurrentViewers: ld.concurrentViewers ? Number(ld.concurrentViewers) : null,
     url: `https://www.youtube.com/watch?v=${v.id}`,
@@ -1975,6 +1978,7 @@ export function createSchedulerService({
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/services/schedulerService.test.js
 ```
@@ -1993,6 +1997,7 @@ git commit -m "feat: add SchedulerService orchestration with lock guard"
 ## Task 14: electron-store からの移行マイグレーション
 
 **Files:**
+
 - Create: `src/main/db/migrations/002_import_from_store.js`
 - Modify: `src/main/db/schema.js`
 - Create: `tests/main/db/migrate.store.test.js`
@@ -2097,6 +2102,7 @@ describe('migration 002: import from electron-store', () => {
 - [ ] **Step 2: テストが失敗することを確認**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/migrate.store.test.js
 ```
@@ -2122,9 +2128,7 @@ function toRecord(item, now) {
     scheduledStartTime: item.scheduledStartTime
       ? new Date(item.scheduledStartTime).getTime()
       : null,
-    actualStartTime: item.actualStartTime
-      ? new Date(item.actualStartTime).getTime()
-      : null,
+    actualStartTime: item.actualStartTime ? new Date(item.actualStartTime).getTime() : null,
     concurrentViewers: item.concurrentViewers ?? null,
     url: item.url,
     firstSeenAt: now,
@@ -2189,6 +2193,7 @@ export function runMigrations(db, ctx = {}) {
 - [ ] **Step 4: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/db/migrate.test.js tests/main/db/migrate.store.test.js
 ```
@@ -2207,6 +2212,7 @@ git commit -m "feat: add migration 002 to import legacy electron-store cache"
 ## Task 15: store.js を設定専用に縮退
 
 **Files:**
+
 - Modify: `src/main/store.js`
 - Modify: `tests/main/store.test.js` (キャッシュ関連テスト削除)
 
@@ -2290,6 +2296,7 @@ describe('store (settings-only)', () => {
 - [ ] **Step 3: テストを通す**
 
 実行:
+
 ```bash
 npx vitest run tests/main/store.test.js
 ```
@@ -2308,11 +2315,13 @@ git commit -m "refactor: reduce store.js to settings and legacy cache accessors"
 ## Task 16: Main エントリ (`src/main/index.js`) の切替
 
 **Files:**
+
 - Modify: `src/main/index.js`
 
 - [ ] **Step 1: 現状の IPC ハンドラーを把握**
 
 実行:
+
 ```bash
 npx grep -n "ipcMain" H:/ClaudeCode/Youtube/youtube-schedule/src/main/index.js
 ```
@@ -2449,12 +2458,14 @@ app.on('before-quit', () => {
 - [ ] **Step 3: 実際の dev 起動で既存機能を確認**
 
 実行:
+
 ```bash
 cd H:/ClaudeCode/Youtube/youtube-schedule
 npm run dev
 ```
 
 確認項目（ブラウザ手動確認の代わりに Electron の UI で）:
+
 - アプリ起動時にコンソールエラーなし
 - ログイン済みユーザーでスケジュール取得が走る
 - 数分で live/upcoming が表示される
@@ -2474,6 +2485,7 @@ git commit -m "feat: wire SchedulerService and SQLite to Main entrypoint"
 ## Task 17: 新規ステータスバナー
 
 **Files:**
+
 - Create: `src/renderer/components/StatusBanners.jsx`
 - Modify: `src/renderer/src/App.jsx`
 - Modify: `src/preload/index.js`
@@ -2617,6 +2629,7 @@ git commit -m "feat: add StatusBanners for DB/RSS/offline notifications"
 ## Task 18: 単一インスタンス化
 
 **Files:**
+
 - Modify: `src/main/index.js`
 
 - [ ] **Step 1: `app.requestSingleInstanceLock()` を追加**
@@ -2643,6 +2656,7 @@ if (!gotTheLock) {
 - [ ] **Step 2: 動作確認**
 
 実行:
+
 ```bash
 npm run dev
 ```
@@ -2661,12 +2675,14 @@ git commit -m "feat: enforce single-instance lock to prevent SQLite write races"
 ## Task 19: 旧コード削除と既存テストの整理
 
 **Files:**
+
 - Delete: `src/main/youtube-api.js`
 - Delete: `tests/main/youtube-api.test.js`
 
 - [ ] **Step 1: 参照が残っていないか確認**
 
 実行:
+
 ```bash
 npx grep -rn "youtube-api" H:/ClaudeCode/Youtube/youtube-schedule/src
 ```
@@ -2676,6 +2692,7 @@ npx grep -rn "youtube-api" H:/ClaudeCode/Youtube/youtube-schedule/src
 - [ ] **Step 2: 削除**
 
 実行:
+
 ```bash
 rm H:/ClaudeCode/Youtube/youtube-schedule/src/main/youtube-api.js
 rm H:/ClaudeCode/Youtube/youtube-schedule/tests/main/youtube-api.test.js
@@ -2684,6 +2701,7 @@ rm H:/ClaudeCode/Youtube/youtube-schedule/tests/main/youtube-api.test.js
 - [ ] **Step 3: 全テスト通し**
 
 実行:
+
 ```bash
 cd H:/ClaudeCode/Youtube/youtube-schedule
 npm run test
@@ -2714,6 +2732,7 @@ git commit -m "refactor: remove legacy youtube-api module replaced by Fetchers"
 - [ ] **Step 1: lint**
 
 実行:
+
 ```bash
 npm run lint
 ```
@@ -2723,6 +2742,7 @@ npm run lint
 - [ ] **Step 2: 全テスト**
 
 実行:
+
 ```bash
 npm run test
 ```
@@ -2732,11 +2752,13 @@ npm run test
 - [ ] **Step 3: dev 起動でエンド to エンド確認**
 
 実行:
+
 ```bash
 npm run dev
 ```
 
 確認項目:
+
 - アプリ起動時のログに `runMigrations` 完了と `schema_version=2` が出力される
 - UI に既存の live/upcoming が表示（キャッシュ移行成功）
 - 手動更新ボタンで再取得、5 秒以内に UI 更新
@@ -2754,6 +2776,7 @@ console.timeEnd('listVisible')
 ```
 
 許容ライン:
+
 - `listVisible` < 50ms
 - 起動から最初の描画まで < 3 秒
 - refresh 全体 < 15 秒（登録 100ch 想定）
@@ -2785,6 +2808,7 @@ git commit -m "docs: update CLAUDE.md to reflect RSS-hybrid + SQLite architectur
 - [ ] **Step 8: develop へマージできる状態か確認**
 
 実行:
+
 ```bash
 git status
 git log --oneline -20

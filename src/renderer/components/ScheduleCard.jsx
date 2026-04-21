@@ -35,6 +35,7 @@ export default function ScheduleCard({
   onToggleWatch,
   onToggleFavorite,
   onMarkViewed,
+  onTogglePin,
   isPinned = false,
   showViewedButton = false
 }) {
@@ -70,7 +71,8 @@ export default function ScheduleCard({
         borderRadius: '8px',
         boxShadow: isLive ? '0 0 0 2px #FF0000' : '0 1px 4px rgba(0,0,0,0.1)',
         marginBottom: '8px',
-        position: 'relative'
+        position: 'relative',
+        borderLeft: isPinned ? '4px solid #FFD700' : undefined
       }}
     >
       <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -109,9 +111,47 @@ export default function ScheduleCard({
         >
           {item.title}
         </div>
-        <div style={{ fontSize: '12px', color: subColor, marginBottom: '4px' }}>
-          {isPinned && <span style={{ marginRight: '4px' }}>📌</span>}
-          {item.channelTitle}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+          <span
+            onClick={(e) => {
+              e.stopPropagation()
+              if (item.channelId) {
+                window.api.openExternal(`https://www.youtube.com/channel/${item.channelId}`)
+              }
+            }}
+            title={item.channelTitle}
+            style={{
+              fontSize: '12px',
+              color: isPinned ? '#D4A017' : subColor,
+              fontWeight: isPinned ? 'bold' : 'normal',
+              flex: 1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              cursor: item.channelId ? 'pointer' : 'default',
+              textDecoration: item.channelId ? 'underline' : 'none',
+              textDecorationColor: isPinned ? '#D4A017' : subColor
+            }}
+          >
+            {item.channelTitle}
+          </span>
+          <button
+            title={isPinned ? '優先解除' : '優先に設定'}
+            onClick={(e) => { e.stopPropagation(); onTogglePin?.(item.channelId) }}
+            style={{
+              flexShrink: 0,
+              padding: '1px 5px',
+              fontSize: '11px',
+              background: isPinned ? '#FFD700' : (darkMode ? '#3a3a3e' : '#e8e8e8'),
+              color: isPinned ? '#333' : (darkMode ? '#aaa' : '#666'),
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              lineHeight: '18px'
+            }}
+          >
+            📌
+          </button>
         </div>
         <div style={{ fontSize: '12px', color: timeColor, marginBottom: '4px' }}>
           {isLive
@@ -215,6 +255,7 @@ ScheduleCard.propTypes = {
     thumbnail: PropTypes.string,
     title: PropTypes.string,
     channelTitle: PropTypes.string,
+    channelId: PropTypes.string,
     actualStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     scheduledStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     description: PropTypes.string,
@@ -229,6 +270,7 @@ ScheduleCard.propTypes = {
   onToggleWatch: PropTypes.func,
   onToggleFavorite: PropTypes.func,
   onMarkViewed: PropTypes.func,
+  onTogglePin: PropTypes.func,
   isPinned: PropTypes.bool,
   showViewedButton: PropTypes.bool
 }

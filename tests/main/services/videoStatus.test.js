@@ -20,23 +20,20 @@ describe('deriveStatus', () => {
   })
 
   it('returns "live" for active stream started less than 24h ago', () => {
-    expect(
-      deriveStatus(v({ actualStart: new Date(NOW - 3600_000).toISOString() }), NOW)
-    ).toBe('live')
+    expect(deriveStatus(v({ actualStart: new Date(NOW - 3600_000).toISOString() }), NOW)).toBe(
+      'live'
+    )
   })
 
   it('returns "ended" for stream that started over 24h ago without actualEnd', () => {
-    expect(
-      deriveStatus(v({ actualStart: new Date(NOW - 25 * 3600_000).toISOString() }), NOW)
-    ).toBe('ended')
+    expect(deriveStatus(v({ actualStart: new Date(NOW - 25 * 3600_000).toISOString() }), NOW)).toBe(
+      'ended'
+    )
   })
 
   it('returns "upcoming" when liveBroadcastContent=upcoming and scheduled is future', () => {
     expect(
-      deriveStatus(
-        v({ bc: 'upcoming', scheduled: new Date(NOW + 3600_000).toISOString() }),
-        NOW
-      )
+      deriveStatus(v({ bc: 'upcoming', scheduled: new Date(NOW + 3600_000).toISOString() }), NOW)
     ).toBe('upcoming')
   })
 

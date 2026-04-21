@@ -355,7 +355,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
   const [missedVideos, setMissedVideos] = useState([])
   const [archiveVideos, setArchiveVideos] = useState([])
-  const [archiveQuery, setArchiveQuery] = useState('')
+  const [searchTargets, setSearchTargets] = useState({ title: true, channel: true, description: false })
   const [favoriteVideos, setFavoriteVideos] = useState([])
   const [tabLoading, setTabLoading] = useState(false)
 
@@ -367,7 +367,11 @@ export default function App() {
       setTabLoading(false)
     } else if (tab === 'archive') {
       setTabLoading(true)
-      setArchiveVideos((await window.api.listArchive?.()) ?? [])
+      const q = searchQuery.trim()
+      const data = q
+        ? ((await window.api.searchByText?.(q, searchTargets)) ?? [])
+        : ((await window.api.listArchive?.()) ?? [])
+      setArchiveVideos(data)
       setTabLoading(false)
     } else if (tab === 'favorites') {
       setTabLoading(true)
@@ -376,14 +380,52 @@ export default function App() {
     }
   }
 
-  async function handleArchiveSearch(query) {
-    setArchiveQuery(query)
-    setTabLoading(true)
-    const data = query.trim()
-      ? ((await window.api.searchByText?.(query)) ?? [])
-      : ((await window.api.listArchive?.()) ?? [])
-    setArchiveVideos(data)
-    setTabLoading(false)
+  const archiveSearchSeqRef = useRef(0)
+  const archiveSearchTimerRef = useRef(null)
+
+  function runArchiveSearch(query, targets) {
+    clearTimeout(archiveSearchTimerRef.current)
+    archiveSearchTimerRef.current = setTimeout(async () => {
+      const seq = ++archiveSearchSeqRef.current
+      setTabLoading(true)
+      const data = query.trim()
+        ? ((await window.api.searchByText?.(query, targets)) ?? [])
+        : ((await window.api.listArchive?.()) ?? [])
+      if (seq !== archiveSearchSeqRef.current) return
+      setArchiveVideos(data)
+      setTabLoading(false)
+    }, 300)
+  }
+
+  function handleToggleSearchTarget(key) {
+    setSearchTargets((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      if (activeTab === 'archive') runArchiveSearch(searchQuery, next)
+      return next
+    })
+  }
+
+  /**
+   * アーカイブ・見逃し・お気に入りタブ共通のカード描画ハーネス。
+   * ScheduleCard に渡す共通 props はここだけで管理する。
+   * 新しい prop を追加するときはこの関数のみ更新すれば全タブに反映される。
+   */
+  function renderTabCard(item, extraProps = {}) {
+    return (
+      <ScheduleCard
+        key={item.id}
+        item={item}
+        darkMode={darkMode}
+        watched={item.isNotify}
+        isPinned={pinnedChannelIds.has(item.channelId)}
+        onToggleWatch={handleToggleNotify}
+        onToggleFavorite={handleToggleFavorite}
+        onMarkViewed={handleMarkViewed}
+        onTogglePin={handleTogglePin}
+        showViewedButton={true}
+        {...extraProps}
+      />
+    )
   }
 
   async function handleMarkViewed(id, viewed) {
@@ -404,6 +446,8 @@ export default function App() {
 
   // ピン済みチャンネル
   const [pinnedChannelIds, setPinnedChannelIds] = useState(new Set())
+  const [showChannelManager, setShowChannelManager] = useState(false)
+  const [channelManagerQuery, setChannelManagerQuery] = useState('')
   useEffect(() => {
     window.api.listAllChannels?.().then((channels) => {
       setPinnedChannelIds(new Set(channels.filter((c) => c.isPinned).map((c) => c.id)))
@@ -537,18 +581,38 @@ export default function App() {
   }, [live, upcoming, pinnedChannelIds])
 
   // フィルタリング
-  const filterItem = useCallback(
+  const matchesQuery = useCallback(
     (item) => {
       const q = searchQuery.trim().toLowerCase()
-      const matchesSearch =
-        !q || item.title.toLowerCase().includes(q) || item.channelTitle.toLowerCase().includes(q)
-      const matchesChannel = selectedChannel === 'all' || item.channelId === selectedChannel
-      return matchesSearch && matchesChannel
+      if (!q) return true
+      const hits = []
+      if (searchTargets.title) hits.push((item.title ?? '').toLowerCase().includes(q))
+      if (searchTargets.channel) hits.push((item.channelTitle ?? '').toLowerCase().includes(q))
+      if (searchTargets.description)
+        hits.push((item.description ?? '').toLowerCase().includes(q))
+      return hits.length === 0 ? true : hits.some(Boolean)
     },
-    [searchQuery, selectedChannel]
+    [searchQuery, searchTargets]
+  )
+  const filterItem = useCallback(
+    (item) => {
+      const matchesChannel = selectedChannel === 'all' || item.channelId === selectedChannel
+      return matchesQuery(item) && matchesChannel
+    },
+    [matchesQuery, selectedChannel]
   )
   const filteredLive = useMemo(() => live.filter(filterItem), [live, filterItem])
   const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
+  const filteredMissed = useMemo(() => missedVideos.filter(matchesQuery), [missedVideos, matchesQuery])
+  const filteredFavorites = useMemo(
+    () => favoriteVideos.filter(matchesQuery),
+    [favoriteVideos, matchesQuery]
+  )
+
+  function handleSearchQueryChange(v) {
+    setSearchQuery(v)
+    if (activeTab === 'archive') runArchiveSearch(v, searchTargets)
+  }
 
   async function handleLogin() {
     setAuthLoading(true)
@@ -713,34 +777,56 @@ export default function App() {
         </button>
       </div>
 
-      {/* ヘッダー行2: 検索・チャンネルフィルター（予定タブのみ） */}
-      {activeTab === 'schedule' && (
-        <div
+      {/* ヘッダー行2: 共通検索・検索対象トグル・チャンネルフィルター */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '12px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <input
+          type="text"
+          placeholder="キーワード検索"
+          value={searchQuery}
+          onChange={(e) => handleSearchQueryChange(e.target.value)}
           style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '12px',
-            flexWrap: 'wrap'
+            flex: 1,
+            minWidth: '160px',
+            padding: '6px 10px',
+            fontSize: '13px',
+            background: inputBg,
+            color: textColor,
+            border: `1px solid ${inputBorder}`,
+            borderRadius: '6px',
+            outline: 'none'
           }}
-        >
-          <input
-            type="text"
-            placeholder="タイトル・チャンネルを検索"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        {[
+          { key: 'title', label: 'タイトル' },
+          { key: 'channel', label: 'チャンネル' },
+          { key: 'description', label: '説明文' }
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => handleToggleSearchTarget(key)}
             style={{
-              flex: 1,
-              minWidth: '160px',
-              padding: '6px 10px',
-              fontSize: '13px',
-              background: inputBg,
-              color: textColor,
-              border: `1px solid ${inputBorder}`,
+              padding: '4px 10px',
+              fontSize: '12px',
+              background: searchTargets[key] ? (darkMode ? '#3a7bd5' : '#0066cc') : subBtnBg,
+              color: searchTargets[key] ? '#fff' : subBtnColor,
+              border: 'none',
               borderRadius: '6px',
-              outline: 'none'
+              cursor: 'pointer',
+              fontWeight: searchTargets[key] ? 'bold' : 'normal'
             }}
-          />
-          {channels.length > 0 && (
+          >
+            {label}
+          </button>
+        ))}
+        {activeTab === 'schedule' && channels.length > 0 && (
+          <>
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
@@ -763,17 +849,13 @@ export default function App() {
                 </option>
               ))}
             </select>
-          )}
-          {selectedChannel !== 'all' && (
             <button
-              title={
-                pinnedChannelIds.has(selectedChannel) ? '推し解除' : 'このチャンネルを推しに設定'
-              }
-              onClick={() => handleTogglePin(selectedChannel)}
+              title="チャンネル管理（優先チャンネルを設定）"
+              onClick={() => setShowChannelManager(true)}
               style={{
                 padding: '6px 10px',
-                fontSize: '16px',
-                background: pinnedChannelIds.has(selectedChannel) ? '#FFD700' : subBtnBg,
+                fontSize: '15px',
+                background: pinnedChannelIds.size > 0 ? '#FFD700' : subBtnBg,
                 color: subBtnColor,
                 border: 'none',
                 borderRadius: '6px',
@@ -782,7 +864,134 @@ export default function App() {
             >
               📌
             </button>
-          )}
+          </>
+        )}
+      </div>
+
+      {/* チャンネル管理モーダル */}
+      {showChannelManager && (
+        <div
+          onClick={() => { setShowChannelManager(false); setChannelManagerQuery('') }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: darkMode ? '#2a2a2e' : '#fff',
+              color: textColor,
+              borderRadius: '12px',
+              padding: '20px',
+              width: '340px',
+              maxHeight: '70vh',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            }}
+          >
+            {/* モーダルヘッダー */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
+                📌 チャンネル管理
+              </h2>
+              <button
+                onClick={() => { setShowChannelManager(false); setChannelManagerQuery('') }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  color: textColor,
+                  lineHeight: 1
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>
+              優先設定したチャンネルが予定・ライブ一覧の上部に表示されます。
+            </p>
+
+            {/* 検索欄 */}
+            <input
+              type="text"
+              placeholder="チャンネル名で絞り込み"
+              value={channelManagerQuery}
+              onChange={(e) => setChannelManagerQuery(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '6px',
+                outline: 'none'
+              }}
+            />
+
+            {/* チャンネル一覧 */}
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[...channels]
+                .sort((a, b) => a.title.localeCompare(b.title, 'ja'))
+                .filter(({ title }) =>
+                  channelManagerQuery === '' ||
+                  title.toLowerCase().includes(channelManagerQuery.toLowerCase())
+                )
+                .map(({ id, title }) => {
+                  const isPinned = pinnedChannelIds.has(id)
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: isPinned
+                          ? darkMode
+                            ? '#3a3200'
+                            : '#fffbe6'
+                          : darkMode
+                            ? '#1b1b1f'
+                            : '#f5f5f5',
+                        border: `1px solid ${isPinned ? '#FFD700' : 'transparent'}`
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {isPinned && <span style={{ marginRight: '4px' }}>📌</span>}
+                        {title}
+                      </span>
+                      <button
+                        onClick={() => handleTogglePin(id)}
+                        title={isPinned ? '優先解除' : '優先に設定'}
+                        style={{
+                          flexShrink: 0,
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          background: isPinned ? '#FFD700' : subBtnBg,
+                          color: isPinned ? '#333' : subBtnColor,
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: isPinned ? 'bold' : 'normal'
+                        }}
+                      >
+                        {isPinned ? '優先中' : '優先'}
+                      </button>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -847,6 +1056,7 @@ export default function App() {
             pinnedChannelIds={pinnedChannelIds}
             onToggleWatch={handleToggleNotify}
             onToggleFavorite={handleToggleFavorite}
+            onTogglePin={handleTogglePin}
           />
         </>
       )}
@@ -858,23 +1068,14 @@ export default function App() {
             <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
               読み込み中...
             </div>
-          ) : missedVideos.length === 0 ? (
+          ) : filteredMissed.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
-              見逃した配信はありません 🎉
+              {searchQuery.trim() && missedVideos.length > 0
+                ? '検索結果がありません'
+                : '見逃した配信はありません 🎉'}
             </div>
           ) : (
-            missedVideos.map((item) => (
-              <ScheduleCard
-                key={item.id}
-                item={item}
-                darkMode={darkMode}
-                watched={item.isNotify}
-                onToggleWatch={handleToggleNotify}
-                onToggleFavorite={handleToggleFavorite}
-                onMarkViewed={handleMarkViewed}
-                showViewedButton={true}
-              />
-            ))
+            filteredMissed.map((item) => renderTabCard(item))
           )}
         </div>
       )}
@@ -882,45 +1083,16 @@ export default function App() {
       {/* アーカイブタブ */}
       {activeTab === 'archive' && (
         <div>
-          <input
-            type="text"
-            placeholder="タイトル・説明文を全文検索"
-            value={archiveQuery}
-            onChange={(e) => handleArchiveSearch(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              fontSize: '13px',
-              background: inputBg,
-              color: textColor,
-              border: `1px solid ${inputBorder}`,
-              borderRadius: '6px',
-              outline: 'none',
-              marginBottom: '12px',
-              boxSizing: 'border-box'
-            }}
-          />
           {tabLoading ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
               読み込み中...
             </div>
           ) : archiveVideos.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
-              {archiveQuery ? '検索結果がありません' : 'アーカイブがありません'}
+              {searchQuery.trim() ? '検索結果がありません' : 'アーカイブがありません'}
             </div>
           ) : (
-            archiveVideos.map((item) => (
-              <ScheduleCard
-                key={item.id}
-                item={item}
-                darkMode={darkMode}
-                watched={item.isNotify}
-                onToggleWatch={handleToggleNotify}
-                onToggleFavorite={handleToggleFavorite}
-                onMarkViewed={handleMarkViewed}
-                showViewedButton={true}
-              />
-            ))
+            archiveVideos.map((item) => renderTabCard(item))
           )}
         </div>
       )}
@@ -932,23 +1104,14 @@ export default function App() {
             <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
               読み込み中...
             </div>
-          ) : favoriteVideos.length === 0 ? (
+          ) : filteredFavorites.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
-              お気に入りはまだありません
+              {searchQuery.trim() && favoriteVideos.length > 0
+                ? '検索結果がありません'
+                : 'お気に入りはまだありません'}
             </div>
           ) : (
-            favoriteVideos.map((item) => (
-              <ScheduleCard
-                key={item.id}
-                item={item}
-                darkMode={darkMode}
-                watched={item.isNotify}
-                onToggleWatch={handleToggleNotify}
-                onToggleFavorite={handleToggleFavorite}
-                onMarkViewed={handleMarkViewed}
-                showViewedButton={true}
-              />
-            ))
+            filteredFavorites.map((item) => renderTabCard(item))
           )}
         </div>
       )}

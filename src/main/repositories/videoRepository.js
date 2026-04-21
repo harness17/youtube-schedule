@@ -65,10 +65,14 @@ export function createVideoRepository(db) {
     ORDER BY COALESCE(scheduled_start_time, last_checked_at) DESC
   `)
   const searchStmt = db.prepare(`
-    SELECT v.* FROM videos v
-    JOIN videos_fts fts ON fts.rowid = v.rowid
-    WHERE videos_fts MATCH @query
-    ORDER BY COALESCE(v.scheduled_start_time, v.last_checked_at) DESC
+    SELECT * FROM videos
+    WHERE status = 'ended'
+      AND (
+        (@searchTitle   AND title        LIKE '%' || @query || '%' ESCAPE '!')
+        OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
+        OR (@searchDesc    AND description  LIKE '%' || @query || '%' ESCAPE '!')
+      )
+    ORDER BY COALESCE(actual_start_time, scheduled_start_time, last_checked_at) DESC
     LIMIT @limit
   `)
   const markViewedStmt = db.prepare(`UPDATE videos SET viewed_at = @now WHERE id = @id`)
@@ -116,13 +120,11 @@ export function createVideoRepository(db) {
     }
   }
 
-  function escapeFtsQuery(raw) {
+  function escapeLikeQuery(raw) {
     const trimmed = String(raw ?? '').trim()
     if (!trimmed) return ''
-    return trimmed
-      .split(/\s+/)
-      .map((tok) => `"${tok.replace(/"/g, '""')}"`)
-      .join(' ')
+    // LIKE のワイルドカード文字（! % _）をエスケープ
+    return trimmed.replace(/[!%_]/g, '!$&')
   }
 
   return {
@@ -160,10 +162,18 @@ export function createVideoRepository(db) {
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
     },
-    searchByText(query, { limit = 50 } = {}) {
-      const ftsQuery = escapeFtsQuery(query)
-      if (!ftsQuery) return []
-      return searchStmt.all({ query: ftsQuery, limit }).map(rowToVideo)
+    searchByText(query, { limit = 50, title = true, channel = true, description = false } = {}) {
+      const likeQuery = escapeLikeQuery(query)
+      if (!likeQuery) return []
+      return searchStmt
+        .all({
+          query: likeQuery,
+          limit,
+          searchTitle: title ? 1 : 0,
+          searchChannel: channel ? 1 : 0,
+          searchDesc: description ? 1 : 0
+        })
+        .map(rowToVideo)
     },
     markViewed(id, now = Date.now()) {
       const r = markViewedStmt.run({ id, now })

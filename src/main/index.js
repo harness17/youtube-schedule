@@ -317,9 +317,9 @@ ipcMain.handle('videos:listFavorites', () => {
   if (!videoRepo) return []
   return videoRepo.listFavorites()
 })
-ipcMain.handle('videos:searchByText', (_, query) => {
+ipcMain.handle('videos:searchByText', (_, query, opts) => {
   if (!videoRepo) return []
-  return videoRepo.searchByText(query)
+  return videoRepo.searchByText(query, opts ?? {})
 })
 
 // 動画: 見たマーク / クリア
