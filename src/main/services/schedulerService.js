@@ -4,6 +4,7 @@ const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000
 const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const CLEANUP_META_KEY = 'last_cleanup_at'
 
 function chunk(arr, size) {
@@ -198,7 +199,10 @@ export function createSchedulerService({
   function maybeCleanup(now) {
     const last = Number(metaRepo.get(CLEANUP_META_KEY) ?? 0)
     if (now - last < CLEANUP_INTERVAL_MS) return
-    videoRepo.deleteExpiredEnded(now - ENDED_RETENTION_MS)
+    videoRepo.deleteExpiredEnded({
+      defaultThreshold: now - ENDED_RETENTION_MS,
+      notifyThreshold: now - NOTIFY_RETENTION_MS
+    })
     metaRepo.set(CLEANUP_META_KEY, String(now), now)
   }
 

@@ -156,6 +156,12 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
+    expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultThreshold: expect.any(Number),
+        notifyThreshold: expect.any(Number)
+      })
+    )
     expect(mocks.metaRepo.set).toHaveBeenCalledWith(
       'last_cleanup_at',
       expect.any(String),
@@ -178,6 +184,14 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls cleanup with 30d default and 90d notify thresholds', async () => {
+    const mocks = createMocks()
+    const svc = createService(mocks)
+    await svc.refresh()
+    const call = mocks.videoRepo.deleteExpiredEnded.mock.calls[0][0]
+    expect(call.defaultThreshold - call.notifyThreshold).toBe(60 * 24 * 3600 * 1000)
   })
 
   it('marks orphaned live videos as ended when API returns nothing', async () => {
