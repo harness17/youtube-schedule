@@ -37,7 +37,8 @@ export default function ScheduleCard({
   onMarkViewed,
   onTogglePin,
   isPinned = false,
-  showViewedButton = false
+  showViewedButton = false,
+  isViewed = false
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -72,7 +73,8 @@ export default function ScheduleCard({
         boxShadow: isLive ? '0 0 0 2px #FF0000' : '0 1px 4px rgba(0,0,0,0.1)',
         marginBottom: '8px',
         position: 'relative',
-        borderLeft: isPinned ? '4px solid #FFD700' : undefined
+        borderLeft: isPinned ? '4px solid #FFD700' : undefined,
+        opacity: isViewed ? 0.6 : 1
       }}
     >
       <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -110,6 +112,21 @@ export default function ScheduleCard({
           style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: textColor }}
         >
           {item.title}
+          {isViewed && (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 6px',
+                marginLeft: '6px',
+                borderRadius: '4px',
+                background: darkMode ? '#555' : '#ddd',
+                color: darkMode ? '#fff' : '#333',
+                verticalAlign: 'middle'
+              }}
+            >
+              見た
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
           <span
@@ -272,5 +289,6 @@ ScheduleCard.propTypes = {
   onMarkViewed: PropTypes.func,
   onTogglePin: PropTypes.func,
   isPinned: PropTypes.bool,
-  showViewedButton: PropTypes.bool
+  showViewedButton: PropTypes.bool,
+  isViewed: PropTypes.bool
 }
