@@ -94,7 +94,11 @@ export function createVideoRepository(db) {
     DELETE FROM videos
     WHERE status = 'ended'
       AND is_favorite = 0
-      AND COALESCE(ended_at, last_checked_at) < ?
+      AND (
+        (notify = 1 AND viewed_at IS NULL AND COALESCE(ended_at, last_checked_at) < @notifyThreshold)
+        OR
+        ((notify = 0 OR viewed_at IS NOT NULL) AND COALESCE(ended_at, last_checked_at) < @defaultThreshold)
+      )
   `)
 
   function rowToVideo(row) {
@@ -197,8 +201,8 @@ export function createVideoRepository(db) {
       const r = markEndedStmt.run({ id, now })
       return r.changes > 0
     },
-    deleteExpiredEnded(thresholdMs) {
-      const result = deleteExpiredStmt.run(thresholdMs)
+    deleteExpiredEnded({ defaultThreshold, notifyThreshold }) {
+      const result = deleteExpiredStmt.run({ defaultThreshold, notifyThreshold })
       return result.changes
     }
   }

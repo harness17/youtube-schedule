@@ -100,13 +100,16 @@ describe('VideoRepository', () => {
     expect(got.map((v) => v.id)).toEqual(['a'])
   })
 
-  it('deleteExpiredEnded removes ended videos older than threshold', () => {
+  it('deleteExpiredEnded removes ended videos older than default threshold', () => {
     const now = 1_700_000_000_000
     repo.upsert(sampleVideo({ id: 'old', status: 'ended', lastCheckedAt: now - 31 * 24 * 3600e3 }))
     repo.upsert(
       sampleVideo({ id: 'fresh', status: 'ended', lastCheckedAt: now - 10 * 24 * 3600e3 })
     )
-    const removed = repo.deleteExpiredEnded(now - 30 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
     expect(removed).toBe(1)
     expect(repo.getById('old')).toBeNull()
     expect(repo.getById('fresh')).not.toBeNull()
@@ -116,9 +119,40 @@ describe('VideoRepository', () => {
     const now = 1_700_000_000_000
     repo.upsert(sampleVideo({ id: 'fav', status: 'ended', lastCheckedAt: now - 90 * 24 * 3600e3 }))
     repo.toggleFavorite('fav')
-    const removed = repo.deleteExpiredEnded(now - 30 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
     expect(removed).toBe(0)
     expect(repo.getById('fav')).not.toBeNull()
+  })
+
+  it('deleteExpiredEnded keeps notify=1 unread videos up to 90 days', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'n45', status: 'ended', lastCheckedAt: now - 45 * 24 * 3600e3 }))
+    repo.toggleNotify('n45')
+    repo.upsert(sampleVideo({ id: 'n95', status: 'ended', lastCheckedAt: now - 95 * 24 * 3600e3 }))
+    repo.toggleNotify('n95')
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
+    expect(removed).toBe(1)
+    expect(repo.getById('n45')).not.toBeNull()
+    expect(repo.getById('n95')).toBeNull()
+  })
+
+  it('deleteExpiredEnded drops notify=1 back to default threshold when viewed', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'v45', status: 'ended', lastCheckedAt: now - 45 * 24 * 3600e3 }))
+    repo.toggleNotify('v45')
+    repo.markViewed('v45', now - 40 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
+    expect(removed).toBe(1)
+    expect(repo.getById('v45')).toBeNull()
   })
 
   it('upsert sets ended_at when status becomes ended and clears it on revival', () => {
