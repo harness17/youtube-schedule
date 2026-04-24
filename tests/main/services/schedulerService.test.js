@@ -210,6 +210,21 @@ describe('SchedulerService.refresh', () => {
     expect(mocks.videoRepo.markEnded).toHaveBeenCalledWith('ORPHAN', expect.any(Number))
   })
 
+  it('does not recheck ended videos older than 24h', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
+    mocks.rssFetcher.fetch.mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
+    mocks.videoRepo.getByIds.mockReturnValue([
+      { id: 'V1', status: 'ended', lastCheckedAt: Date.now() - 25 * 3600_000 }
+    ])
+    mocks.videoFetcher.fetch.mockResolvedValue([])
+    const svc = createService(mocks)
+    await svc.refresh()
+    const [, calledIds] = mocks.videoFetcher.fetch.mock.calls[0]
+    expect(calledIds).toEqual([])
+  })
+
   it('upserts orphaned live video if API still returns it (e.g. delayed RSS)', async () => {
     const mocks = createMocks()
     mocks.rssFetcher.fetch.mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })

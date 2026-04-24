@@ -141,7 +141,7 @@ export function createSchedulerService({
             (v) =>
               v.status === 'live' ||
               v.status === 'upcoming' ||
-              now - v.lastCheckedAt > 24 * 60 * 60 * 1000
+              (v.status !== 'ended' && now - v.lastCheckedAt > 24 * 60 * 60 * 1000)
           )
           .map((v) => v.id)
     const newIds = videoIds.filter((id) => !knownIds.has(id))
