@@ -29,4 +29,14 @@ describe('VideoDetailsFetcher', () => {
     expect(yt.videos.list).toHaveBeenCalledTimes(2)
     expect(result.map((r) => r.id)).toEqual(ids)
   })
+
+  it('throws on timeout', async () => {
+    const yt = {
+      videos: {
+        list: vi.fn().mockImplementation(() => new Promise(() => {}))
+      }
+    }
+    const fetcher = createVideoDetailsFetcher({ timeoutMs: 50 })
+    await expect(fetcher.fetch(yt, ['V1'])).rejects.toThrow('videos.list timeout')
+  })
 })

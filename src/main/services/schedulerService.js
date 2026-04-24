@@ -4,6 +4,7 @@ const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000
 const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const CLEANUP_META_KEY = 'last_cleanup_at'
 
 function chunk(arr, size) {
@@ -63,13 +64,13 @@ export function createSchedulerService({
   async function resolveChannels(yt, now) {
     const lastSync = channelRepo.getLastSyncTime()
     if (lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
-      const cached = channelRepo.listAll()
+      const cached = channelRepo.listAll().filter((c) => c.uploadsPlaylistId)
       logger.info('scheduler.resolveChannels.cached', { count: cached.length })
       return cached
     }
     return logger.withTiming('scheduler.resolveChannels', async () => {
       const fresh = await subsFetcher.fetch(yt)
-      channelRepo.replaceAll(fresh, now)
+      channelRepo.syncSubscriptions(fresh, now)
       return fresh
     })
   }
@@ -140,7 +141,7 @@ export function createSchedulerService({
             (v) =>
               v.status === 'live' ||
               v.status === 'upcoming' ||
-              now - v.lastCheckedAt > 24 * 60 * 60 * 1000
+              (v.status !== 'ended' && now - v.lastCheckedAt > 24 * 60 * 60 * 1000)
           )
           .map((v) => v.id)
     const newIds = videoIds.filter((id) => !knownIds.has(id))
@@ -155,6 +156,7 @@ export function createSchedulerService({
     for (const v of details) {
       if (!channelIds.has(v.snippet?.channelId)) continue
       videoRepo.upsert(toVideoRecord(v, now))
+      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
     }
 
     // RSS から消えた live/upcoming 動画を救済する
@@ -198,7 +200,10 @@ export function createSchedulerService({
   function maybeCleanup(now) {
     const last = Number(metaRepo.get(CLEANUP_META_KEY) ?? 0)
     if (now - last < CLEANUP_INTERVAL_MS) return
-    videoRepo.deleteExpiredEnded(now - ENDED_RETENTION_MS)
+    videoRepo.deleteExpiredEnded({
+      defaultThreshold: now - ENDED_RETENTION_MS,
+      notifyThreshold: now - NOTIFY_RETENTION_MS
+    })
     metaRepo.set(CLEANUP_META_KEY, String(now), now)
   }
 

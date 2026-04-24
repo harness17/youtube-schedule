@@ -14,7 +14,7 @@ describe('ChannelRepository', () => {
   afterEach(() => closeDatabase(db))
 
   it('upserts and lists channels', () => {
-    repo.replaceAll(
+    repo.syncSubscriptions(
       [
         { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' },
         { id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }
@@ -25,24 +25,30 @@ describe('ChannelRepository', () => {
     expect(list.map((c) => c.id).sort()).toEqual(['UC1', 'UC2'])
   })
 
-  it('replaceAll deletes channels not in the new set', () => {
-    repo.replaceAll([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
-    repo.replaceAll([{ id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }], 2)
-    const list = repo.listAll()
-    expect(list.map((c) => c.id)).toEqual(['UC2'])
+  it('syncSubscriptions does not delete channels removed from subscriptions', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
+    repo.syncSubscriptions([{ id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }], 2)
+    const ids = repo.listAll().map((c) => c.id).sort()
+    expect(ids).toEqual(['UC1', 'UC2'])
   })
 
   it('getLastSyncTime returns 0 when empty', () => {
     expect(repo.getLastSyncTime()).toBe(0)
   })
 
-  it('getLastSyncTime returns the latest sync timestamp', () => {
-    repo.replaceAll([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1_700_000_000_000)
+  it('getLastSyncTime returns the latest sync timestamp for subscribed channels', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1_700_000_000_000)
+    expect(repo.getLastSyncTime()).toBe(1_700_000_000_000)
+  })
+
+  it('getLastSyncTime ignores upsertSeen channels (no uploadsPlaylistId)', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1_700_000_000_000)
+    repo.upsertSeen('UC_SEEN', 'Seen Channel')
     expect(repo.getLastSyncTime()).toBe(1_700_000_000_000)
   })
 
   it('togglePin flips is_pinned and listAll sorts pinned first', () => {
-    repo.replaceAll(
+    repo.syncSubscriptions(
       [
         { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' },
         { id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }
@@ -61,8 +67,8 @@ describe('ChannelRepository', () => {
     expect(repo.togglePin('missing')).toBeNull()
   })
 
-  it('replaceAll preserves is_pinned for channels still subscribed', () => {
-    repo.replaceAll(
+  it('syncSubscriptions preserves is_pinned for existing channels', () => {
+    repo.syncSubscriptions(
       [
         { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' },
         { id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }
@@ -70,7 +76,7 @@ describe('ChannelRepository', () => {
       1
     )
     repo.togglePin('UC1')
-    repo.replaceAll(
+    repo.syncSubscriptions(
       [
         { id: 'UC1', title: 'A renamed', uploadsPlaylistId: 'UU1' },
         { id: 'UC3', title: 'C', uploadsPlaylistId: 'UU3' }
@@ -81,6 +87,33 @@ describe('ChannelRepository', () => {
     const uc1 = list.find((c) => c.id === 'UC1')
     expect(uc1.isPinned).toBe(true)
     expect(uc1.title).toBe('A renamed')
-    expect(list.find((c) => c.id === 'UC2')).toBeUndefined()
+    // UC2 はサブスク外でも残る
+    expect(list.find((c) => c.id === 'UC2')).toBeDefined()
+    expect(list.find((c) => c.id === 'UC3')).toBeDefined()
+  })
+
+  it('upsertSeen adds channel without uploadsPlaylistId', () => {
+    repo.upsertSeen('UC_SEEN', 'Auto Seen Channel')
+    const list = repo.listAll()
+    const ch = list.find((c) => c.id === 'UC_SEEN')
+    expect(ch).toBeDefined()
+    expect(ch.title).toBe('Auto Seen Channel')
+    expect(ch.uploadsPlaylistId).toBeNull()
+  })
+
+  it('upsertSeen updates title but does not overwrite uploadsPlaylistId of subscribed channel', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'Old', uploadsPlaylistId: 'UU1' }], 1)
+    repo.upsertSeen('UC1', 'New Name')
+    const ch = repo.listAll().find((c) => c.id === 'UC1')
+    expect(ch.title).toBe('New Name')
+    expect(ch.uploadsPlaylistId).toBe('UU1')
+  })
+
+  it('upsertSeen preserves is_pinned', () => {
+    repo.upsertSeen('UC_SEEN', 'Channel')
+    repo.togglePin('UC_SEEN')
+    repo.upsertSeen('UC_SEEN', 'Channel Updated')
+    const ch = repo.listAll().find((c) => c.id === 'UC_SEEN')
+    expect(ch.isPinned).toBe(true)
   })
 })

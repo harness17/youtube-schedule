@@ -113,4 +113,22 @@ describe('ScheduleCard', () => {
     render(<ScheduleCard item={{ ...mockItem, viewedAt: 1000000 }} showViewedButton={true} />)
     expect(screen.getByTitle('視聴済みを解除')).toBeInTheDocument()
   })
+
+  it('isViewed=true のとき「見た」バッジを表示する', () => {
+    const item = { ...mockItem, viewedAt: 1_700_000_000_000 }
+    render(<ScheduleCard item={item} isViewed={true} />)
+    expect(screen.getByText('見た')).toBeInTheDocument()
+  })
+
+  it('isViewed=true のときカードの opacity が下がる', () => {
+    const item = { ...mockItem, viewedAt: 1_700_000_000_000 }
+    const { container } = render(<ScheduleCard item={item} isViewed={true} />)
+    const card = container.firstChild
+    expect(card).toHaveStyle({ opacity: '0.6' })
+  })
+
+  it('isViewed=false のとき「見た」バッジは表示されない', () => {
+    render(<ScheduleCard item={mockItem} isViewed={false} />)
+    expect(screen.queryByText('見た')).not.toBeInTheDocument()
+  })
 })

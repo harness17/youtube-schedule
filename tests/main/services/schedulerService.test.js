@@ -31,7 +31,8 @@ function createMocks() {
   const channelRepo = {
     getLastSyncTime: vi.fn().mockReturnValue(0),
     listAll: vi.fn().mockReturnValue([]),
-    replaceAll: vi.fn()
+    syncSubscriptions: vi.fn(),
+    upsertSeen: vi.fn()
   }
   const rssLogRepo = { record: vi.fn() }
   const metaRepo = { get: vi.fn(), set: vi.fn() }
@@ -78,7 +79,7 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.subsFetcher.fetch).toHaveBeenCalledTimes(1)
-    expect(mocks.channelRepo.replaceAll).toHaveBeenCalledTimes(1)
+    expect(mocks.channelRepo.syncSubscriptions).toHaveBeenCalledTimes(1)
   })
 
   it('skips subscriptions fetch when cache is fresh (< 24h)', async () => {
@@ -156,6 +157,12 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
+    expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultThreshold: expect.any(Number),
+        notifyThreshold: expect.any(Number)
+      })
+    )
     expect(mocks.metaRepo.set).toHaveBeenCalledWith(
       'last_cleanup_at',
       expect.any(String),
@@ -180,6 +187,14 @@ describe('SchedulerService.refresh', () => {
     expect(mocks.videoRepo.deleteExpiredEnded).toHaveBeenCalledTimes(1)
   })
 
+  it('calls cleanup with 30d default and 90d notify thresholds', async () => {
+    const mocks = createMocks()
+    const svc = createService(mocks)
+    await svc.refresh()
+    const call = mocks.videoRepo.deleteExpiredEnded.mock.calls[0][0]
+    expect(call.defaultThreshold - call.notifyThreshold).toBe(60 * 24 * 3600 * 1000)
+  })
+
   it('marks orphaned live videos as ended when API returns nothing', async () => {
     // V1 は RSS に出る通常動画、ORPHAN は DB に live で残るがRSSに出ない動画
     const mocks = createMocks()
@@ -194,6 +209,30 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.markEnded).toHaveBeenCalledWith('ORPHAN', expect.any(Number))
+  })
+
+  it('calls upsertSeen for each video processed', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.channelRepo.upsertSeen).toHaveBeenCalledWith('UC1', 'C')
+  })
+
+  it('does not recheck ended videos older than 24h', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
+    mocks.rssFetcher.fetch.mockResolvedValue({ success: true, videoIds: ['V1'], httpStatus: 200 })
+    mocks.videoRepo.getByIds.mockReturnValue([
+      { id: 'V1', status: 'ended', lastCheckedAt: Date.now() - 25 * 3600_000 }
+    ])
+    mocks.videoFetcher.fetch.mockResolvedValue([])
+    const svc = createService(mocks)
+    await svc.refresh()
+    const [, calledIds] = mocks.videoFetcher.fetch.mock.calls[0]
+    expect(calledIds).toEqual([])
   })
 
   it('upserts orphaned live video if API still returns it (e.g. delayed RSS)', async () => {

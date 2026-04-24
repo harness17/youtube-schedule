@@ -43,15 +43,18 @@ export function createVideoRepository(db) {
       scheduled_start_time ASC
   `)
   const listMissedStmt = db.prepare(`
-    SELECT * FROM videos
-    WHERE status = 'ended'
-      AND notify = 1
-      AND viewed_at IS NULL
+    SELECT v.* FROM videos v
+    LEFT JOIN channels c ON v.channel_id = c.id
+    WHERE v.status = 'ended'
+      AND v.notify = 1
+      AND v.viewed_at IS NULL
       AND (
-        (actual_start_time IS NOT NULL AND actual_start_time < @now) OR
-        (actual_start_time IS NULL AND scheduled_start_time IS NOT NULL AND scheduled_start_time < @now)
+        (v.actual_start_time IS NOT NULL AND v.actual_start_time < @now) OR
+        (v.actual_start_time IS NULL AND v.scheduled_start_time IS NOT NULL AND v.scheduled_start_time < @now)
       )
-    ORDER BY COALESCE(actual_start_time, scheduled_start_time) DESC
+    ORDER BY
+      CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
+      COALESCE(v.actual_start_time, v.scheduled_start_time) DESC
   `)
   const listArchiveStmt = db.prepare(`
     SELECT * FROM videos
@@ -60,9 +63,12 @@ export function createVideoRepository(db) {
     LIMIT @limit OFFSET @offset
   `)
   const listFavoritesStmt = db.prepare(`
-    SELECT * FROM videos
-    WHERE is_favorite = 1
-    ORDER BY COALESCE(scheduled_start_time, last_checked_at) DESC
+    SELECT v.* FROM videos v
+    LEFT JOIN channels c ON v.channel_id = c.id
+    WHERE v.is_favorite = 1
+    ORDER BY
+      CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
+      COALESCE(v.scheduled_start_time, v.last_checked_at) DESC
   `)
   const searchStmt = db.prepare(`
     SELECT * FROM videos
@@ -94,7 +100,11 @@ export function createVideoRepository(db) {
     DELETE FROM videos
     WHERE status = 'ended'
       AND is_favorite = 0
-      AND COALESCE(ended_at, last_checked_at) < ?
+      AND (
+        (notify = 1 AND viewed_at IS NULL AND COALESCE(ended_at, last_checked_at) < @notifyThreshold)
+        OR
+        ((notify = 0 OR viewed_at IS NOT NULL) AND COALESCE(ended_at, last_checked_at) < @defaultThreshold)
+      )
   `)
 
   function rowToVideo(row) {
@@ -197,8 +207,8 @@ export function createVideoRepository(db) {
       const r = markEndedStmt.run({ id, now })
       return r.changes > 0
     },
-    deleteExpiredEnded(thresholdMs) {
-      const result = deleteExpiredStmt.run(thresholdMs)
+    deleteExpiredEnded({ defaultThreshold, notifyThreshold }) {
+      const result = deleteExpiredStmt.run({ defaultThreshold, notifyThreshold })
       return result.changes
     }
   }

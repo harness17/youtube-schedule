@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { openDatabase, closeDatabase } from '../../../src/main/db/connection'
 import { runMigrations } from '../../../src/main/db/migrate'
 import { createVideoRepository } from '../../../src/main/repositories/videoRepository'
+import { createChannelRepository } from '../../../src/main/repositories/channelRepository'
 
 function sampleVideo(overrides = {}) {
   return {
@@ -23,12 +24,13 @@ function sampleVideo(overrides = {}) {
 }
 
 describe('VideoRepository', () => {
-  let db, repo
+  let db, repo, channelRepo
 
   beforeEach(() => {
     db = openDatabase(':memory:')
     runMigrations(db)
     repo = createVideoRepository(db)
+    channelRepo = createChannelRepository(db)
   })
   afterEach(() => closeDatabase(db))
 
@@ -100,13 +102,16 @@ describe('VideoRepository', () => {
     expect(got.map((v) => v.id)).toEqual(['a'])
   })
 
-  it('deleteExpiredEnded removes ended videos older than threshold', () => {
+  it('deleteExpiredEnded removes ended videos older than default threshold', () => {
     const now = 1_700_000_000_000
     repo.upsert(sampleVideo({ id: 'old', status: 'ended', lastCheckedAt: now - 31 * 24 * 3600e3 }))
     repo.upsert(
       sampleVideo({ id: 'fresh', status: 'ended', lastCheckedAt: now - 10 * 24 * 3600e3 })
     )
-    const removed = repo.deleteExpiredEnded(now - 30 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
     expect(removed).toBe(1)
     expect(repo.getById('old')).toBeNull()
     expect(repo.getById('fresh')).not.toBeNull()
@@ -116,9 +121,40 @@ describe('VideoRepository', () => {
     const now = 1_700_000_000_000
     repo.upsert(sampleVideo({ id: 'fav', status: 'ended', lastCheckedAt: now - 90 * 24 * 3600e3 }))
     repo.toggleFavorite('fav')
-    const removed = repo.deleteExpiredEnded(now - 30 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
     expect(removed).toBe(0)
     expect(repo.getById('fav')).not.toBeNull()
+  })
+
+  it('deleteExpiredEnded keeps notify=1 unread videos up to 90 days', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'n45', status: 'ended', lastCheckedAt: now - 45 * 24 * 3600e3 }))
+    repo.toggleNotify('n45')
+    repo.upsert(sampleVideo({ id: 'n95', status: 'ended', lastCheckedAt: now - 95 * 24 * 3600e3 }))
+    repo.toggleNotify('n95')
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
+    expect(removed).toBe(1)
+    expect(repo.getById('n45')).not.toBeNull()
+    expect(repo.getById('n95')).toBeNull()
+  })
+
+  it('deleteExpiredEnded drops notify=1 back to default threshold when viewed', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'v45', status: 'ended', lastCheckedAt: now - 45 * 24 * 3600e3 }))
+    repo.toggleNotify('v45')
+    repo.markViewed('v45', now - 40 * 24 * 3600e3)
+    const removed = repo.deleteExpiredEnded({
+      defaultThreshold: now - 30 * 24 * 3600e3,
+      notifyThreshold: now - 90 * 24 * 3600e3
+    })
+    expect(removed).toBe(1)
+    expect(repo.getById('v45')).toBeNull()
   })
 
   it('upsert sets ended_at when status becomes ended and clears it on revival', () => {
@@ -351,5 +387,57 @@ describe('VideoRepository', () => {
     expect(repo.searchByText('%').map((v) => v.id)).toEqual(['v1'])
     // '_' だけで検索しても _ を含まない動画はヒットしない
     expect(repo.searchByText('_').map((v) => v.id)).toEqual([])
+  })
+
+  it('listMissed は優先チャンネルの動画を先頭に返す', () => {
+    const now = 1_700_000_000_000
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
+        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
+      ],
+      now
+    )
+    channelRepo.togglePin('UCpinned')
+
+    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', actualStartTime: now - 1000, lastCheckedAt: now }))
+    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', actualStartTime: now - 2000, lastCheckedAt: now }))
+    repo.toggleNotify('normal')
+    repo.toggleNotify('pinned')
+
+    const ids = repo.listMissed(now).map((v) => v.id)
+    expect(ids[0]).toBe('pinned')
+    expect(ids[1]).toBe('normal')
+  })
+
+  it('listArchive は ended_at 降順で返す（優先ソートなし）', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(sampleVideo({ id: 'older', status: 'ended', lastCheckedAt: now - 2000 }))
+    repo.upsert(sampleVideo({ id: 'newer', status: 'ended', lastCheckedAt: now - 1000 }))
+
+    const ids = repo.listArchive().map((v) => v.id)
+    expect(ids[0]).toBe('newer')
+    expect(ids[1]).toBe('older')
+  })
+
+  it('listFavorites は優先チャンネルの動画を先頭に返す', () => {
+    const now = 1_700_000_000_000
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
+        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
+      ],
+      now
+    )
+    channelRepo.togglePin('UCpinned')
+
+    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 }))
+    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', scheduledStartTime: now + 500 }))
+    repo.toggleFavorite('normal')
+    repo.toggleFavorite('pinned')
+
+    const ids = repo.listFavorites().map((v) => v.id)
+    expect(ids[0]).toBe('pinned')
+    expect(ids[1]).toBe('normal')
   })
 })
