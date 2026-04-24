@@ -1,5 +1,5 @@
 export function createChannelRepository(db) {
-  const upsertStmt = db.prepare(`
+  const upsertSubStmt = db.prepare(`
     INSERT INTO channels (id, title, uploads_playlist_id, last_subscription_sync_at)
     VALUES (@id, @title, @uploadsPlaylistId, @syncAt)
     ON CONFLICT(id) DO UPDATE SET
@@ -7,17 +7,24 @@ export function createChannelRepository(db) {
       uploads_playlist_id = excluded.uploads_playlist_id,
       last_subscription_sync_at = excluded.last_subscription_sync_at
   `)
-  const deleteByIdStmt = db.prepare(`DELETE FROM channels WHERE id = ?`)
+  const upsertSeenStmt = db.prepare(`
+    INSERT INTO channels (id, title)
+    VALUES (@id, @title)
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title
+  `)
   const listAllStmt = db.prepare(`
     SELECT * FROM channels
     ORDER BY is_pinned DESC, id ASC
   `)
-  const maxSyncStmt = db.prepare(`SELECT MAX(last_subscription_sync_at) AS ts FROM channels`)
+  const maxSyncStmt = db.prepare(`
+    SELECT MAX(last_subscription_sync_at) AS ts FROM channels
+    WHERE uploads_playlist_id IS NOT NULL
+  `)
   const togglePinStmt = db.prepare(
     `UPDATE channels SET is_pinned = CASE is_pinned WHEN 1 THEN 0 ELSE 1 END WHERE id = ?`
   )
   const getByIdStmt = db.prepare(`SELECT * FROM channels WHERE id = ?`)
-  const listIdsStmt = db.prepare(`SELECT id FROM channels`)
 
   function rowToChannel(r) {
     return {
@@ -30,14 +37,10 @@ export function createChannelRepository(db) {
   }
 
   return {
-    replaceAll(channels, syncAt) {
+    syncSubscriptions(channels, syncAt) {
       const tx = db.transaction(() => {
-        const newIds = new Set(channels.map((c) => c.id))
-        for (const row of listIdsStmt.all()) {
-          if (!newIds.has(row.id)) deleteByIdStmt.run(row.id)
-        }
         for (const c of channels) {
-          upsertStmt.run({
+          upsertSubStmt.run({
             id: c.id,
             title: c.title ?? null,
             uploadsPlaylistId: c.uploadsPlaylistId,
@@ -46,6 +49,9 @@ export function createChannelRepository(db) {
         }
       })
       tx()
+    },
+    upsertSeen(id, title) {
+      upsertSeenStmt.run({ id, title: title ?? null })
     },
     listAll() {
       return listAllStmt.all().map(rowToChannel)

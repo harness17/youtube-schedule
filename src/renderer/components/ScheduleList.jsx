@@ -60,6 +60,13 @@ export default function ScheduleList({
     )
   }
 
+  const sortedLive = [...live].sort((a, b) => {
+    const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
+    const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
+    if (ap !== bp) return ap - bp
+    return (a.actualStartTime ?? a.scheduledStartTime ?? 0) - (b.actualStartTime ?? b.scheduledStartTime ?? 0)
+  })
+
   const groups = groupByDate(upcoming)
   const sortedEntries = getSortedGroupEntries(groups, upcoming).map(([dateLabel, items]) => [
     dateLabel,
@@ -135,7 +142,7 @@ export default function ScheduleList({
           >
             ライブ配信中
           </h2>
-          {live.map((item) => (
+          {sortedLive.map((item) => (
             <ScheduleCard
               key={item.id}
               item={item}

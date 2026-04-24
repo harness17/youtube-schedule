@@ -31,7 +31,8 @@ function createMocks() {
   const channelRepo = {
     getLastSyncTime: vi.fn().mockReturnValue(0),
     listAll: vi.fn().mockReturnValue([]),
-    replaceAll: vi.fn()
+    syncSubscriptions: vi.fn(),
+    upsertSeen: vi.fn()
   }
   const rssLogRepo = { record: vi.fn() }
   const metaRepo = { get: vi.fn(), set: vi.fn() }
@@ -78,7 +79,7 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.subsFetcher.fetch).toHaveBeenCalledTimes(1)
-    expect(mocks.channelRepo.replaceAll).toHaveBeenCalledTimes(1)
+    expect(mocks.channelRepo.syncSubscriptions).toHaveBeenCalledTimes(1)
   })
 
   it('skips subscriptions fetch when cache is fresh (< 24h)', async () => {
@@ -208,6 +209,15 @@ describe('SchedulerService.refresh', () => {
     const svc = createService(mocks)
     await svc.refresh()
     expect(mocks.videoRepo.markEnded).toHaveBeenCalledWith('ORPHAN', expect.any(Number))
+  })
+
+  it('calls upsertSeen for each video processed', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.channelRepo.upsertSeen).toHaveBeenCalledWith('UC1', 'C')
   })
 
   it('does not recheck ended videos older than 24h', async () => {

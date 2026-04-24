@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { openDatabase, closeDatabase } from '../../../src/main/db/connection'
 import { runMigrations } from '../../../src/main/db/migrate'
 import { createVideoRepository } from '../../../src/main/repositories/videoRepository'
+import { createChannelRepository } from '../../../src/main/repositories/channelRepository'
 
 function sampleVideo(overrides = {}) {
   return {
@@ -23,12 +24,13 @@ function sampleVideo(overrides = {}) {
 }
 
 describe('VideoRepository', () => {
-  let db, repo
+  let db, repo, channelRepo
 
   beforeEach(() => {
     db = openDatabase(':memory:')
     runMigrations(db)
     repo = createVideoRepository(db)
+    channelRepo = createChannelRepository(db)
   })
   afterEach(() => closeDatabase(db))
 
@@ -385,5 +387,66 @@ describe('VideoRepository', () => {
     expect(repo.searchByText('%').map((v) => v.id)).toEqual(['v1'])
     // '_' だけで検索しても _ を含まない動画はヒットしない
     expect(repo.searchByText('_').map((v) => v.id)).toEqual([])
+  })
+
+  it('listMissed は優先チャンネルの動画を先頭に返す', () => {
+    const now = 1_700_000_000_000
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
+        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
+      ],
+      now
+    )
+    channelRepo.togglePin('UCpinned')
+
+    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', actualStartTime: now - 1000, lastCheckedAt: now }))
+    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', actualStartTime: now - 2000, lastCheckedAt: now }))
+    repo.toggleNotify('normal')
+    repo.toggleNotify('pinned')
+
+    const ids = repo.listMissed(now).map((v) => v.id)
+    expect(ids[0]).toBe('pinned')
+    expect(ids[1]).toBe('normal')
+  })
+
+  it('listArchive は優先チャンネルの動画を先頭に返す', () => {
+    const now = 1_700_000_000_000
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
+        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
+      ],
+      now
+    )
+    channelRepo.togglePin('UCpinned')
+
+    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', lastCheckedAt: now - 1000 }))
+    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', lastCheckedAt: now - 2000 }))
+
+    const ids = repo.listArchive().map((v) => v.id)
+    expect(ids[0]).toBe('pinned')
+    expect(ids[1]).toBe('normal')
+  })
+
+  it('listFavorites は優先チャンネルの動画を先頭に返す', () => {
+    const now = 1_700_000_000_000
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
+        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
+      ],
+      now
+    )
+    channelRepo.togglePin('UCpinned')
+
+    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 }))
+    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', scheduledStartTime: now + 500 }))
+    repo.toggleFavorite('normal')
+    repo.toggleFavorite('pinned')
+
+    const ids = repo.listFavorites().map((v) => v.id)
+    expect(ids[0]).toBe('pinned')
+    expect(ids[1]).toBe('normal')
   })
 })

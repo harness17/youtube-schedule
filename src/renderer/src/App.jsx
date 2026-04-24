@@ -355,9 +355,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
   const [missedVideos, setMissedVideos] = useState([])
   const [archiveVideos, setArchiveVideos] = useState([])
-  const [searchTargets, setSearchTargets] = useState({ title: true, channel: true, description: false })
   const [favoriteVideos, setFavoriteVideos] = useState([])
   const [tabLoading, setTabLoading] = useState(false)
+  const SEARCH_TARGETS = { title: true, channel: true, description: false }
 
   async function handleTabChange(tab) {
     setActiveTab(tab)
@@ -369,7 +369,7 @@ export default function App() {
       setTabLoading(true)
       const q = searchQuery.trim()
       const data = q
-        ? ((await window.api.searchByText?.(q, searchTargets)) ?? [])
+        ? ((await window.api.searchByText?.(q, SEARCH_TARGETS)) ?? [])
         : ((await window.api.listArchive?.()) ?? [])
       setArchiveVideos(data)
       setTabLoading(false)
@@ -383,26 +383,18 @@ export default function App() {
   const archiveSearchSeqRef = useRef(0)
   const archiveSearchTimerRef = useRef(null)
 
-  function runArchiveSearch(query, targets) {
+  function runArchiveSearch(query) {
     clearTimeout(archiveSearchTimerRef.current)
     archiveSearchTimerRef.current = setTimeout(async () => {
       const seq = ++archiveSearchSeqRef.current
       setTabLoading(true)
       const data = query.trim()
-        ? ((await window.api.searchByText?.(query, targets)) ?? [])
+        ? ((await window.api.searchByText?.(query, SEARCH_TARGETS)) ?? [])
         : ((await window.api.listArchive?.()) ?? [])
       if (seq !== archiveSearchSeqRef.current) return
       setArchiveVideos(data)
       setTabLoading(false)
     }, 300)
-  }
-
-  function handleToggleSearchTarget(key) {
-    setSearchTargets((prev) => {
-      const next = { ...prev, [key]: !prev[key] }
-      if (activeTab === 'archive') runArchiveSearch(searchQuery, next)
-      return next
-    })
   }
 
   /**
@@ -586,14 +578,12 @@ export default function App() {
     (item) => {
       const q = searchQuery.trim().toLowerCase()
       if (!q) return true
-      const hits = []
-      if (searchTargets.title) hits.push((item.title ?? '').toLowerCase().includes(q))
-      if (searchTargets.channel) hits.push((item.channelTitle ?? '').toLowerCase().includes(q))
-      if (searchTargets.description)
-        hits.push((item.description ?? '').toLowerCase().includes(q))
-      return hits.length === 0 ? true : hits.some(Boolean)
+      return (
+        (item.title ?? '').toLowerCase().includes(q) ||
+        (item.channelTitle ?? '').toLowerCase().includes(q)
+      )
     },
-    [searchQuery, searchTargets]
+    [searchQuery]
   )
   const filterItem = useCallback(
     (item) => {
@@ -612,7 +602,7 @@ export default function App() {
 
   function handleSearchQueryChange(v) {
     setSearchQuery(v)
-    if (activeTab === 'archive') runArchiveSearch(v, searchTargets)
+    if (activeTab === 'archive') runArchiveSearch(v)
   }
 
   async function handleLogin() {
@@ -789,7 +779,7 @@ export default function App() {
       >
         <input
           type="text"
-          placeholder="キーワード検索"
+          placeholder="キーワード検索（タイトル・チャンネル名）"
           value={searchQuery}
           onChange={(e) => handleSearchQueryChange(e.target.value)}
           style={{
@@ -804,28 +794,6 @@ export default function App() {
             outline: 'none'
           }}
         />
-        {[
-          { key: 'title', label: 'タイトル' },
-          { key: 'channel', label: 'チャンネル' },
-          { key: 'description', label: '説明文' }
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => handleToggleSearchTarget(key)}
-            style={{
-              padding: '4px 10px',
-              fontSize: '12px',
-              background: searchTargets[key] ? (darkMode ? '#3a7bd5' : '#0066cc') : subBtnBg,
-              color: searchTargets[key] ? '#fff' : subBtnColor,
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: searchTargets[key] ? 'bold' : 'normal'
-            }}
-          >
-            {label}
-          </button>
-        ))}
         {activeTab === 'schedule' && channels.length > 0 && (
           <>
             <select

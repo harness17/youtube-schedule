@@ -64,13 +64,13 @@ export function createSchedulerService({
   async function resolveChannels(yt, now) {
     const lastSync = channelRepo.getLastSyncTime()
     if (lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
-      const cached = channelRepo.listAll()
+      const cached = channelRepo.listAll().filter((c) => c.uploadsPlaylistId)
       logger.info('scheduler.resolveChannels.cached', { count: cached.length })
       return cached
     }
     return logger.withTiming('scheduler.resolveChannels', async () => {
       const fresh = await subsFetcher.fetch(yt)
-      channelRepo.replaceAll(fresh, now)
+      channelRepo.syncSubscriptions(fresh, now)
       return fresh
     })
   }
@@ -156,6 +156,7 @@ export function createSchedulerService({
     for (const v of details) {
       if (!channelIds.has(v.snippet?.channelId)) continue
       videoRepo.upsert(toVideoRecord(v, now))
+      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
     }
 
     // RSS から消えた live/upcoming 動画を救済する
