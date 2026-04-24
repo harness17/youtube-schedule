@@ -29,6 +29,7 @@ import {
   getSetting,
   setSetting
 } from './store.js'
+import { createLogger } from './logger.js'
 
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
@@ -50,6 +51,7 @@ let videoRepo, channelRepo, rssLogRepo, metaRepo
 let scheduler
 let refreshTimer
 let dbBroken = false
+let logger
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -134,7 +136,8 @@ function initScheduler(authClient) {
     playlistFetcher: createPlaylistItemsFetcher(),
     videoFetcher: createVideoDetailsFetcher(),
     authClient,
-    ytFactory: (auth) => google.youtube({ version: 'v3', auth })
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth }),
+    logger
   })
 }
 
@@ -145,6 +148,7 @@ function startPolling(mainWindow) {
       await scheduler.refresh()
       mainWindow?.webContents.send('schedule:updated')
     } catch (err) {
+      logger?.error('scheduler.kick.error', { error: err })
       mainWindow?.webContents.send('schedule:error', {
         message: err?.message ?? String(err)
       })
@@ -156,6 +160,17 @@ function startPolling(mainWindow) {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('io.github.harness17.youtube-schedule')
+
+  logger = createLogger({ logsDir: join(app.getPath('userData'), 'logs') })
+  logger.cleanupOldLogs()
+  logger.info('app.start', { version: app.getVersion(), platform: process.platform })
+
+  process.on('uncaughtException', (err) => {
+    logger.error('process.uncaughtException', { error: err })
+  })
+  process.on('unhandledRejection', (reason) => {
+    logger.error('process.unhandledRejection', { error: reason })
+  })
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

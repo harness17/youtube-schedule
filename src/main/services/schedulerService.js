@@ -35,6 +35,16 @@ function toVideoRecord(v, now) {
   }
 }
 
+const NOOP_LOGGER = {
+  info() {},
+  warn() {},
+  error() {},
+  debug() {},
+  async withTiming(_phase, fn) {
+    return fn()
+  }
+}
+
 export function createSchedulerService({
   videoRepo,
   channelRepo,
@@ -45,43 +55,72 @@ export function createSchedulerService({
   playlistFetcher,
   videoFetcher,
   authClient,
-  ytFactory
+  ytFactory,
+  logger = NOOP_LOGGER
 }) {
   let inFlight = null
 
   async function resolveChannels(yt, now) {
     const lastSync = channelRepo.getLastSyncTime()
     if (lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
-      return channelRepo.listAll()
+      const cached = channelRepo.listAll()
+      logger.info('scheduler.resolveChannels.cached', { count: cached.length })
+      return cached
     }
-    const fresh = await subsFetcher.fetch(yt)
-    channelRepo.replaceAll(fresh, now)
-    return fresh
+    return logger.withTiming('scheduler.resolveChannels', async () => {
+      const fresh = await subsFetcher.fetch(yt)
+      channelRepo.replaceAll(fresh, now)
+      return fresh
+    })
   }
 
   async function collectVideoIds(yt, channels, now) {
-    const collected = new Set()
-    for (const batch of chunk(channels, RSS_PARALLEL)) {
-      await Promise.all(
-        batch.map(async (ch) => {
-          const res = await rssFetcher.fetch(ch.id)
-          rssLogRepo.record({
-            channelId: ch.id,
-            fetchedAt: now,
-            success: res.success,
-            httpStatus: res.httpStatus ?? null,
-            errorMessage: res.success ? null : res.reason
-          })
-          if (res.success) {
-            for (const id of res.videoIds) collected.add(id)
-          } else {
-            const fallback = await playlistFetcher.fetch(yt, ch.uploadsPlaylistId)
-            for (const id of fallback) collected.add(id)
-          }
+    return logger.withTiming(
+      'scheduler.collectVideoIds',
+      async () => {
+        const collected = new Set()
+        let rssSuccess = 0
+        let rssFailure = 0
+        let fallbackAttempts = 0
+        for (const batch of chunk(channels, RSS_PARALLEL)) {
+          await Promise.all(
+            batch.map(async (ch) => {
+              const res = await rssFetcher.fetch(ch.id)
+              rssLogRepo.record({
+                channelId: ch.id,
+                fetchedAt: now,
+                success: res.success,
+                httpStatus: res.httpStatus ?? null,
+                errorMessage: res.success ? null : res.reason
+              })
+              if (res.success) {
+                rssSuccess++
+                for (const id of res.videoIds) collected.add(id)
+              } else {
+                rssFailure++
+                fallbackAttempts++
+                logger.warn('scheduler.rss.fallback', {
+                  channelId: ch.id,
+                  reason: res.reason,
+                  httpStatus: res.httpStatus ?? null
+                })
+                const fallback = await playlistFetcher.fetch(yt, ch.uploadsPlaylistId)
+                for (const id of fallback) collected.add(id)
+              }
+            })
+          )
+        }
+        logger.info('scheduler.collectVideoIds.summary', {
+          channels: channels.length,
+          videoIds: collected.size,
+          rssSuccess,
+          rssFailure,
+          fallbackAttempts
         })
-      )
-    }
-    return [...collected]
+        return [...collected]
+      },
+      { channels: channels.length }
+    )
   }
 
   async function doRefresh({ forceFullRecheck = false } = {}) {
@@ -107,7 +146,11 @@ export function createSchedulerService({
     const newIds = videoIds.filter((id) => !knownIds.has(id))
     const target = Array.from(new Set([...newIds, ...recheckIds]))
 
-    const details = await videoFetcher.fetch(yt, target)
+    const details = await logger.withTiming(
+      'scheduler.videoDetails',
+      () => videoFetcher.fetch(yt, target),
+      { target: target.length, newIds: newIds.length, recheckIds: recheckIds.length }
+    )
     const fetchedIds = new Set(details.map((v) => v.id))
     for (const v of details) {
       if (!channelIds.has(v.snippet?.channelId)) continue
@@ -122,17 +165,29 @@ export function createSchedulerService({
       .map((v) => v.id)
       .filter((id) => !rssIdSet.has(id) && !fetchedIds.has(id))
     if (orphanIds.length > 0) {
-      const orphanDetails = await videoFetcher.fetch(yt, orphanIds)
-      const orphanFetchedIds = new Set(orphanDetails.map((v) => v.id))
-      for (const v of orphanDetails) {
-        videoRepo.upsert(toVideoRecord(v, now))
-      }
-      // API からも返ってこない → ended に落とす
-      for (const id of orphanIds) {
-        if (!orphanFetchedIds.has(id)) {
-          videoRepo.markEnded(id, now)
-        }
-      }
+      await logger.withTiming(
+        'scheduler.orphanCheck',
+        async () => {
+          const orphanDetails = await videoFetcher.fetch(yt, orphanIds)
+          const orphanFetchedIds = new Set(orphanDetails.map((v) => v.id))
+          for (const v of orphanDetails) {
+            videoRepo.upsert(toVideoRecord(v, now))
+          }
+          let endedCount = 0
+          for (const id of orphanIds) {
+            if (!orphanFetchedIds.has(id)) {
+              videoRepo.markEnded(id, now)
+              endedCount++
+            }
+          }
+          logger.info('scheduler.orphanCheck.summary', {
+            candidates: orphanIds.length,
+            recovered: orphanFetchedIds.size,
+            markedEnded: endedCount
+          })
+        },
+        { candidates: orphanIds.length }
+      )
     }
 
     metaRepo.set('last_full_refresh_at', String(now), now)
@@ -149,10 +204,22 @@ export function createSchedulerService({
 
   return {
     async refresh(opts = {}) {
-      if (inFlight) return inFlight
+      if (inFlight) {
+        logger.info('scheduler.refresh.deduplicated', {})
+        return inFlight
+      }
       inFlight = (async () => {
+        const startedAt = Date.now()
+        logger.info('scheduler.refresh.start', { forceFullRecheck: !!opts.forceFullRecheck })
         try {
           await doRefresh(opts)
+          logger.info('scheduler.refresh.done', { durationMs: Date.now() - startedAt })
+        } catch (err) {
+          logger.error('scheduler.refresh.error', {
+            durationMs: Date.now() - startedAt,
+            error: err
+          })
+          throw err
         } finally {
           inFlight = null
         }
