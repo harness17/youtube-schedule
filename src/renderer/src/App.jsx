@@ -355,9 +355,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
   const [missedVideos, setMissedVideos] = useState([])
   const [archiveVideos, setArchiveVideos] = useState([])
+  const [archiveHasMore, setArchiveHasMore] = useState(false)
+  const [archiveLoadingMore, setArchiveLoadingMore] = useState(false)
+  const archiveOffsetRef = useRef(0)
+  const archiveLoadingMoreRef = useRef(false)
+  const archiveSentinelRef = useRef(null)
+  const loadMoreArchiveFnRef = useRef(null)
   const [favoriteVideos, setFavoriteVideos] = useState([])
   const [tabLoading, setTabLoading] = useState(false)
   const SEARCH_TARGETS = { title: true, channel: true, description: false }
+  const ARCHIVE_LIMIT = 50
+  const SEARCH_LIMIT = 200
 
   async function handleTabChange(tab) {
     setActiveTab(tab)
@@ -366,12 +374,21 @@ export default function App() {
       setMissedVideos((await window.api.listMissed?.()) ?? [])
       setTabLoading(false)
     } else if (tab === 'archive') {
+      archiveOffsetRef.current = 0
+      setArchiveHasMore(false)
       setTabLoading(true)
       const q = searchQuery.trim()
-      const data = q
-        ? ((await window.api.searchByText?.(q, SEARCH_TARGETS)) ?? [])
-        : ((await window.api.listArchive?.()) ?? [])
+      let data, hasMore
+      if (q) {
+        data = (await window.api.searchByText?.(q, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
+        hasMore = false
+      } else {
+        data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
+        hasMore = data.length === ARCHIVE_LIMIT
+      }
+      archiveOffsetRef.current = q ? 0 : data.length
       setArchiveVideos(data)
+      setArchiveHasMore(hasMore)
       setTabLoading(false)
     } else if (tab === 'favorites') {
       setTabLoading(true)
@@ -379,6 +396,35 @@ export default function App() {
       setTabLoading(false)
     }
   }
+
+  async function loadMoreArchive() {
+    if (archiveLoadingMoreRef.current) return
+    archiveLoadingMoreRef.current = true
+    setArchiveLoadingMore(true)
+    const offset = archiveOffsetRef.current
+    const data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset })) ?? []
+    archiveOffsetRef.current = offset + data.length
+    setArchiveVideos((prev) => [...prev, ...data])
+    setArchiveHasMore(data.length === ARCHIVE_LIMIT)
+    archiveLoadingMoreRef.current = false
+    setArchiveLoadingMore(false)
+  }
+
+  loadMoreArchiveFnRef.current = loadMoreArchive
+
+  useEffect(() => {
+    if (activeTab !== 'archive' || !archiveHasMore) return
+    const sentinel = archiveSentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreArchiveFnRef.current?.()
+      },
+      { rootMargin: '300px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [activeTab, archiveHasMore, archiveVideos.length])
 
   const archiveSearchSeqRef = useRef(0)
   const archiveSearchTimerRef = useRef(null)
@@ -388,11 +434,18 @@ export default function App() {
     archiveSearchTimerRef.current = setTimeout(async () => {
       const seq = ++archiveSearchSeqRef.current
       setTabLoading(true)
-      const data = query.trim()
-        ? ((await window.api.searchByText?.(query, SEARCH_TARGETS)) ?? [])
-        : ((await window.api.listArchive?.()) ?? [])
+      let data, hasMore
+      if (query.trim()) {
+        data = (await window.api.searchByText?.(query, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
+        hasMore = false
+      } else {
+        data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
+        hasMore = data.length === ARCHIVE_LIMIT
+      }
       if (seq !== archiveSearchSeqRef.current) return
+      archiveOffsetRef.current = query.trim() ? 0 : data.length
       setArchiveVideos(data)
+      setArchiveHasMore(hasMore)
       setTabLoading(false)
     }, 300)
   }
@@ -1061,7 +1114,22 @@ export default function App() {
               {searchQuery.trim() ? '検索結果がありません' : 'アーカイブがありません'}
             </div>
           ) : (
-            archiveVideos.map((item) => renderTabCard(item))
+            <>
+              {archiveVideos.map((item) => renderTabCard(item))}
+              {archiveHasMore && (
+                <div ref={archiveSentinelRef} style={{ height: '1px' }} />
+              )}
+              {archiveLoadingMore && (
+                <div style={{ textAlign: 'center', color: '#888', padding: '16px' }}>
+                  読み込み中...
+                </div>
+              )}
+              {!archiveHasMore && archiveVideos.length > 0 && !searchQuery.trim() && (
+                <div style={{ textAlign: 'center', color: '#aaa', fontSize: '12px', padding: '16px' }}>
+                  すべて表示しました
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

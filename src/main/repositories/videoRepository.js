@@ -57,12 +57,9 @@ export function createVideoRepository(db) {
       COALESCE(v.actual_start_time, v.scheduled_start_time) DESC
   `)
   const listArchiveStmt = db.prepare(`
-    SELECT v.* FROM videos v
-    LEFT JOIN channels c ON v.channel_id = c.id
-    WHERE v.status = 'ended'
-    ORDER BY
-      CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
-      COALESCE(v.ended_at, v.last_checked_at) DESC
+    SELECT * FROM videos
+    WHERE status = 'ended'
+    ORDER BY COALESCE(ended_at, last_checked_at) DESC
     LIMIT @limit OFFSET @offset
   `)
   const listFavoritesStmt = db.prepare(`

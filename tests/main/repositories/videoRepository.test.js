@@ -410,23 +410,14 @@ describe('VideoRepository', () => {
     expect(ids[1]).toBe('normal')
   })
 
-  it('listArchive は優先チャンネルの動画を先頭に返す', () => {
+  it('listArchive は ended_at 降順で返す（優先ソートなし）', () => {
     const now = 1_700_000_000_000
-    channelRepo.syncSubscriptions(
-      [
-        { id: 'UCpinned', title: '優先チャンネル', uploadsPlaylistId: 'PLpinned' },
-        { id: 'UCnormal', title: '通常チャンネル', uploadsPlaylistId: 'PLnormal' }
-      ],
-      now
-    )
-    channelRepo.togglePin('UCpinned')
-
-    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', lastCheckedAt: now - 1000 }))
-    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', lastCheckedAt: now - 2000 }))
+    repo.upsert(sampleVideo({ id: 'older', status: 'ended', lastCheckedAt: now - 2000 }))
+    repo.upsert(sampleVideo({ id: 'newer', status: 'ended', lastCheckedAt: now - 1000 }))
 
     const ids = repo.listArchive().map((v) => v.id)
-    expect(ids[0]).toBe('pinned')
-    expect(ids[1]).toBe('normal')
+    expect(ids[0]).toBe('newer')
+    expect(ids[1]).toBe('older')
   })
 
   it('listFavorites は優先チャンネルの動画を先頭に返す', () => {
