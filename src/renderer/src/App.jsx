@@ -492,12 +492,32 @@ export default function App() {
 
   // ピン済みチャンネル
   const [pinnedChannelIds, setPinnedChannelIds] = useState(new Set())
+  const [modalChannels, setModalChannels] = useState([])
   const [showChannelManager, setShowChannelManager] = useState(false)
   const [channelManagerQuery, setChannelManagerQuery] = useState('')
-  useEffect(() => {
-    window.api.listAllChannels?.().then((channels) => {
-      setPinnedChannelIds(new Set(channels.filter((c) => c.isPinned).map((c) => c.id)))
+
+  const loadAllDbChannels = useCallback(() => {
+    window.api.listAllChannels?.().then((chs) => {
+      setPinnedChannelIds(new Set((chs ?? []).filter((c) => c.isPinned).map((c) => c.id)))
     })
+  }, [])
+
+  function openChannelManager() {
+    window.api.listAllChannels?.().then((chs) => {
+      const list = chs ?? []
+      setPinnedChannelIds(new Set(list.filter((c) => c.isPinned).map((c) => c.id)))
+      setModalChannels(
+        [...list].sort((a, b) => {
+          if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+          return (a.title ?? '').localeCompare(b.title ?? '', 'ja')
+        })
+      )
+      setShowChannelManager(true)
+    })
+  }
+
+  useEffect(() => {
+    loadAllDbChannels()
   }, [])
 
   async function handleToggleFavorite(id) {
@@ -520,6 +540,9 @@ export default function App() {
         else next.delete(channelId)
         return next
       })
+      setModalChannels((prev) =>
+        prev.map((c) => (c.id === channelId ? { ...c, isPinned: newVal } : c))
+      )
     }
   }
 
@@ -873,7 +896,7 @@ export default function App() {
             </select>
             <button
               title="チャンネル管理（優先チャンネルを設定）"
-              onClick={() => setShowChannelManager(true)}
+              onClick={() => openChannelManager()}
               style={{
                 padding: '6px 10px',
                 fontSize: '15px',
@@ -911,8 +934,9 @@ export default function App() {
               color: textColor,
               borderRadius: '12px',
               padding: '20px',
-              width: '340px',
-              maxHeight: '70vh',
+              width: '600px',
+              maxWidth: '90vw',
+              maxHeight: '80vh',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
@@ -961,11 +985,10 @@ export default function App() {
 
             {/* チャンネル一覧 */}
             <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[...channels]
-                .sort((a, b) => a.title.localeCompare(b.title, 'ja'))
+              {modalChannels
                 .filter(({ title }) =>
                   channelManagerQuery === '' ||
-                  title.toLowerCase().includes(channelManagerQuery.toLowerCase())
+                  (title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase())
                 )
                 .map(({ id, title }) => {
                   const isPinned = pinnedChannelIds.has(id)
@@ -1148,7 +1171,7 @@ export default function App() {
                 : 'お気に入りはまだありません'}
             </div>
           ) : (
-            filteredFavorites.map((item) => renderTabCard(item))
+            filteredFavorites.map((item) => renderTabCard(item, { showStatusBadge: true }))
           )}
         </div>
       )}
