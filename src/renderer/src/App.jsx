@@ -423,6 +423,7 @@ export default function App() {
         onMarkViewed={handleMarkViewed}
         onTogglePin={handleTogglePin}
         showViewedButton={true}
+        isViewed={item.viewedAt != null}
         {...extraProps}
       />
     )
