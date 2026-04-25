@@ -121,7 +121,7 @@ npm run dev
 
 ```bash
 npm run dev            # 開発サーバー起動
-npm run lint           # ESLint チェック
+npm run lint           # ESLint チェック（warning も 0 件必須）
 npm run test           # テスト実行
 npm run test:coverage  # カバレッジ付きテスト実行
 npm run build:win      # Windows 向けパッケージング
