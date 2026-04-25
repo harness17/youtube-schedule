@@ -82,6 +82,9 @@ jobs:
         run: |
           $exe = Get-ChildItem dist\*-setup.exe | Select-Object -First 1
           gh release upload "${{ github.ref_name }}" $exe.FullName --clobber
+          if (Test-Path dist\latest.yml) {
+            gh release upload "${{ github.ref_name }}" dist\latest.yml --clobber
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
