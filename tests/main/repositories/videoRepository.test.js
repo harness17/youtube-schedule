@@ -440,4 +440,32 @@ describe('VideoRepository', () => {
     expect(ids[0]).toBe('pinned')
     expect(ids[1]).toBe('normal')
   })
+
+  it('setFavorite: 存在する動画を is_favorite=1 にして true を返す', () => {
+    repo.upsert({
+      id: 'v_sfav',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      title: 'T',
+      description: '',
+      thumbnail: '',
+      status: 'ended',
+      scheduledStartTime: null,
+      actualStartTime: null,
+      concurrentViewers: null,
+      url: '',
+      firstSeenAt: 1,
+      lastCheckedAt: 1
+    })
+    const result = repo.setFavorite('v_sfav')
+    expect(result).toBe(true)
+    const video = repo.listFavorites().find((v) => v.id === 'v_sfav')
+    expect(video).toBeDefined()
+    expect(video.isFavorite).toBe(true)
+  })
+
+  it('setFavorite: 存在しない動画は null を返す', () => {
+    const result = repo.setFavorite('not_exist')
+    expect(result).toBeNull()
+  })
 })

@@ -116,4 +116,30 @@ describe('ChannelRepository', () => {
     const ch = repo.listAll().find((c) => c.id === 'UC_SEEN')
     expect(ch.isPinned).toBe(true)
   })
+
+  it('replacePinnedChannels: 指定チャンネルをピン、それ以外をアンピンする', () => {
+    repo.syncSubscriptions(
+      [
+        { id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' },
+        { id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' },
+        { id: 'UC3', title: 'C', uploadsPlaylistId: 'UU3' }
+      ],
+      1
+    )
+    repo.togglePin('UC1')
+    repo.replacePinnedChannels([{ id: 'UC2', title: 'B' }, { id: 'UC3', title: 'C' }])
+    const list = repo.listAll()
+    const byId = Object.fromEntries(list.map((c) => [c.id, c]))
+    expect(byId.UC1.isPinned).toBe(false)
+    expect(byId.UC2.isPinned).toBe(true)
+    expect(byId.UC3.isPinned).toBe(true)
+  })
+
+  it('replacePinnedChannels: DB に存在しないチャンネルは upsert してピンする', () => {
+    repo.replacePinnedChannels([{ id: 'UC_NEW', title: 'New Channel' }])
+    const list = repo.listAll()
+    const found = list.find((c) => c.id === 'UC_NEW')
+    expect(found).toBeDefined()
+    expect(found.isPinned).toBe(true)
+  })
 })

@@ -63,6 +63,18 @@ export function createChannelRepository(db) {
       const r = togglePinStmt.run(id)
       if (r.changes === 0) return null
       return getByIdStmt.get(id)?.is_pinned === 1
+    },
+    replacePinnedChannels(channels) {
+      const unpinAll = db.prepare('UPDATE channels SET is_pinned = 0')
+      const pinOne = db.prepare('UPDATE channels SET is_pinned = 1 WHERE id = ?')
+      const tx = db.transaction(() => {
+        unpinAll.run()
+        for (const c of channels) {
+          upsertSeenStmt.run({ id: c.id, title: c.title ?? null })
+          pinOne.run(c.id)
+        }
+      })
+      tx()
     }
   }
 }

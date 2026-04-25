@@ -4,6 +4,7 @@ import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
+import SettingsModal from '../components/SettingsModal.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
 
 export class ErrorBoundary extends Component {
@@ -316,6 +317,7 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [updateStatus, setUpdateStatus] = useState(null)
   const [appVersion, setAppVersion] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
@@ -820,23 +822,8 @@ export default function App() {
           {loading ? '更新中...' : '↺ 更新'}
         </button>
         <button
-          onClick={handleLogout}
-          style={{
-            padding: '7px 12px',
-            background: subBtnBg,
-            color: subBtnColor,
-            border: `1px solid ${inputBorder}`,
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontFamily: 'inherit'
-          }}
-        >
-          ログアウト
-        </button>
-        <button
-          onClick={() => setDarkMode((d) => !d)}
-          title={darkMode ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+          onClick={() => setShowSettings(true)}
+          title="設定"
           style={{
             padding: '7px 10px',
             background: subBtnBg,
@@ -848,7 +835,7 @@ export default function App() {
             lineHeight: 1
           }}
         >
-          {darkMode ? '☀️' : '🌙'}
+          ⚙️
         </button>
       </div>
 
@@ -1187,6 +1174,19 @@ export default function App() {
         </div>
       )}
 
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        darkMode={darkMode}
+        onDarkModeChange={(val) => {
+          setDarkMode(val)
+          window.api.setSetting('darkMode', val)
+        }}
+        onLogout={handleLogout}
+        onPinnedChannelsUpdated={loadAllDbChannels}
+        onToast={setToast}
+        appVersion={appVersion}
+      />
       {toast && <Toast message={toast} onClose={handleToastClose} />}
       <BackToTop />
     </div>

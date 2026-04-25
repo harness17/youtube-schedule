@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Notification, dialog } from 'electron'
 import { join, dirname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -30,6 +30,12 @@ import {
   setSetting
 } from './store.js'
 import { createLogger } from './logger.js'
+import {
+  buildSettingsExport,
+  validateImportData,
+  buildFavoritesExport,
+  applyFavoritesImport
+} from './services/settingsPorter.js'
 
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
@@ -87,7 +93,7 @@ function createWindow() {
 function setupAutoUpdater(mainWindow) {
   if (is.dev) return
 
-  autoUpdater.autoDownload = true
+  autoUpdater.autoDownload = getSetting('autoDownload', true)
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('update-available', (info) => {
@@ -383,4 +389,99 @@ ipcMain.handle('shell:openExternal', async (_, url) => {
   } catch {
     return { success: false, error: 'Invalid URL' }
   }
+})
+
+// 設定エクスポート
+ipcMain.handle('settings:export', async () => {
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    defaultPath: `settings-export-${dateStr}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (canceled || !filePath) return { canceled: true }
+  const pinnedChannels = (channelRepo?.listAll() ?? [])
+    .filter((c) => c.isPinned)
+    .map(({ id, title }) => ({ id, title }))
+  const data = buildSettingsExport({
+    settings: { darkMode: getSetting('darkMode', false) },
+    pinnedChannels
+  })
+  const fs = await import('node:fs/promises')
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+  return { success: true }
+})
+
+// 設定インポート
+ipcMain.handle('settings:import', async () => {
+  const { filePaths, canceled } = await dialog.showOpenDialog({
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  })
+  if (canceled || filePaths.length === 0) return { canceled: true }
+  const fs = await import('node:fs/promises')
+  let data
+  try {
+    data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
+    validateImportData(data)
+  } catch (err) {
+    return { error: err.message }
+  }
+  if (data.settings) {
+    if (typeof data.settings.darkMode === 'boolean') {
+      setSetting('darkMode', data.settings.darkMode)
+    }
+  }
+  if (Array.isArray(data.pinnedChannels) && channelRepo) {
+    channelRepo.replacePinnedChannels(data.pinnedChannels)
+  }
+  return {
+    success: true,
+    darkMode: data.settings?.darkMode ?? null,
+    pinnedChannels: data.pinnedChannels ?? []
+  }
+})
+
+// お気に入りエクスポート
+ipcMain.handle('favorites:export', async () => {
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    defaultPath: `favorites-export-${dateStr}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (canceled || !filePath) return { canceled: true }
+  const favorites = videoRepo?.listFavorites() ?? []
+  const data = buildFavoritesExport(favorites)
+  const fs = await import('node:fs/promises')
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+  return { success: true, count: favorites.length }
+})
+
+// お気に入りインポート
+ipcMain.handle('favorites:import', async () => {
+  const { filePaths, canceled } = await dialog.showOpenDialog({
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  })
+  if (canceled || filePaths.length === 0) return { canceled: true }
+  const fs = await import('node:fs/promises')
+  let data
+  try {
+    data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
+    validateImportData(data)
+  } catch (err) {
+    return { error: err.message }
+  }
+  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
+  const { applied, skipped } = applyFavoritesImport(data, (id) => videoRepo.setFavorite(id))
+  return { success: true, applied, skipped }
+})
+
+// アップデート手動確認
+ipcMain.handle('updater:checkNow', () => {
+  if (is.dev) {
+    const mainWindow = BrowserWindow.getAllWindows()[0]
+    mainWindow?.webContents.send('updater:error', '開発環境ではアップデート確認をスキップします')
+    return
+  }
+  autoUpdater.checkForUpdates()
 })
