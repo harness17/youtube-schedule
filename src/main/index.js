@@ -32,7 +32,7 @@ import {
 import { createLogger } from './logger.js'
 import {
   buildSettingsExport,
-  validateImportData,
+  validateSettingsImport,
   buildFavoritesExport,
   applyFavoritesImport
 } from './services/settingsPorter.js'
@@ -424,7 +424,7 @@ ipcMain.handle('settings:import', async () => {
   let data
   try {
     data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
-    validateImportData(data)
+    validateSettingsImport(data)
   } catch (err) {
     return { error: err.message }
   }
@@ -470,17 +470,17 @@ ipcMain.handle('favorites:import', async () => {
     properties: ['openFile']
   })
   if (canceled || filePaths.length === 0) return { canceled: true }
+  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
   const fs = await import('node:fs/promises')
-  let data
   try {
-    data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
-    validateImportData(data)
+    const data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
+    const { applied, skipped } = applyFavoritesImport(data, (entry) =>
+      videoRepo.importAsFavorite(entry)
+    )
+    return { success: true, applied, skipped }
   } catch (err) {
     return { error: err.message }
   }
-  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
-  const { applied, skipped } = applyFavoritesImport(data, (id, viewedAt) => videoRepo.setFavorite(id, viewedAt))
-  return { success: true, applied, skipped }
 })
 
 // アップデート手動確認

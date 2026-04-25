@@ -95,6 +95,30 @@ describe('VideoRepository', () => {
     expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b2')
   })
 
+  it('boundary: upcoming more than 31 days ahead is excluded', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(
+      sampleVideo({
+        id: 'b3',
+        status: 'upcoming',
+        scheduledStartTime: now + 32 * 24 * 3600e3
+      })
+    )
+    expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b3')
+  })
+
+  it('boundary: upcoming exactly 31 days ahead is excluded', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(
+      sampleVideo({
+        id: 'b4',
+        status: 'upcoming',
+        scheduledStartTime: now + 31 * 24 * 3600e3
+      })
+    )
+    expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b4')
+  })
+
   it('getByIds returns matching records only', () => {
     repo.upsert(sampleVideo({ id: 'a' }))
     repo.upsert(sampleVideo({ id: 'b' }))
@@ -487,5 +511,50 @@ describe('VideoRepository', () => {
     repo.upsert(sampleVideo({ id: 'vfc', status: 'ended' }))
     repo.setFavorite('vfc', null)
     expect(repo.getById('vfc').viewedAt).toBeNull()
+  })
+
+  it('importAsFavorite: DBに存在しない動画をスタブ挿入してお気に入りにする', () => {
+    const result = repo.importAsFavorite({
+      id: 'imp1',
+      title: 'インポート動画',
+      channelId: 'UCimport',
+      channelTitle: 'インポートチャンネル',
+      viewedAt: null
+    })
+    expect(result).toBe(true)
+    const video = repo.getById('imp1')
+    expect(video).not.toBeNull()
+    expect(video.isFavorite).toBe(true)
+    expect(video.title).toBe('インポート動画')
+    expect(video.channelId).toBe('UCimport')
+    expect(video.url).toBe('https://www.youtube.com/watch?v=imp1')
+    expect(video.status).toBe('ended')
+  })
+
+  it('importAsFavorite: viewedAt を渡すと復元される', () => {
+    repo.importAsFavorite({
+      id: 'imp2',
+      title: 'T',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      viewedAt: 1700000000000
+    })
+    expect(repo.getById('imp2').viewedAt).toBe(1700000000000)
+  })
+
+  it('importAsFavorite: 既存の動画は INSERT OR IGNORE でスキップし is_favorite だけ更新する', () => {
+    repo.upsert(sampleVideo({ id: 'imp3', title: '元のタイトル', status: 'ended' }))
+    repo.importAsFavorite({
+      id: 'imp3',
+      title: 'インポートタイトル',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      viewedAt: null
+    })
+    const video = repo.getById('imp3')
+    // 既存レコードは上書きされない
+    expect(video.title).toBe('元のタイトル')
+    // お気に入りだけ立つ
+    expect(video.isFavorite).toBe(true)
   })
 })
