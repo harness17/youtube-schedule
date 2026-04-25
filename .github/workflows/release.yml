@@ -47,7 +47,7 @@ jobs:
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'youtube-schedule'
           signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'installer'
+          artifact-configuration-slug: 'initial'
           github-artifact-name: 'unsigned-installer'
           wait-for-completion: true
           output-artifact-directory: 'dist-signed'
