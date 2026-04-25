@@ -902,13 +902,14 @@ export default function App() {
                 style={{
                   padding: '7px 8px',
                   fontSize: '13px',
-                  background: 'transparent',
+                  background: inputBg,
                   color: textColor,
                   border: 'none',
                   outline: 'none',
                   cursor: 'pointer',
                   maxWidth: '160px',
-                  fontFamily: 'inherit'
+                  fontFamily: 'inherit',
+                  colorScheme: darkMode ? 'dark' : 'light'
                 }}
               >
                 <option value="all">すべて</option>
