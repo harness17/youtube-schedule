@@ -4,8 +4,8 @@ import PropTypes from 'prop-types'
 function formatViewers(count) {
   const n = parseInt(count, 10)
   if (isNaN(n)) return null
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万人予定`
-  return `${n.toLocaleString()}人予定`
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}万人視聴中`
+  return `${n.toLocaleString()}人視聴中`
 }
 
 function formatTime(isoString) {
@@ -54,30 +54,46 @@ export default function ScheduleCard({
 
   const viewers = item.concurrentViewers ? formatViewers(item.concurrentViewers) : null
   const isLive = item.status === 'live'
+  const isUpcoming = item.status === 'upcoming'
 
-  const cardBg = darkMode ? '#2a2a2e' : '#fff'
-  const textColor = darkMode ? '#f0f0f0' : '#111'
-  const subColor = darkMode ? '#aaa' : '#666'
-  const timeColor = darkMode ? '#ccc' : '#444'
-  const descColor = darkMode ? '#bbb' : '#555'
-  const btnBg = darkMode ? '#444' : '#f0f0f0'
-  const btnColor = darkMode ? '#ccc' : '#333'
+  // カラートークン（light / dark）
+  const surfaceColor = darkMode ? '#16161e' : '#ffffff'
+  const textColor    = darkMode ? '#e8e8f0' : '#111120'
+  const subColor     = darkMode ? '#7878a0' : '#6060a0'
+  const timeColor    = darkMode ? '#a0a0c0' : '#505070'
+  const descColor    = darkMode ? '#8888a8' : '#707090'
+
+  // カードの枠線カラー
+  const borderColor = isLive
+    ? 'rgba(255,34,68,0.5)'
+    : isUpcoming
+      ? 'rgba(0,194,255,0.28)'
+      : isPinned
+        ? 'rgba(255,201,64,0.35)'
+        : darkMode ? '#2a2a38' : '#dddde8'
+
+  const cardClassName = [
+    'yt-card',
+    isLive ? 'yt-card--live' : '',
+    isUpcoming ? 'yt-card--upcoming' : ''
+  ].filter(Boolean).join(' ')
 
   return (
     <div
+      className={cardClassName}
       style={{
         display: 'flex',
         gap: '12px',
         padding: '12px',
-        background: cardBg,
-        borderRadius: '8px',
-        boxShadow: isLive ? '0 0 0 2px #FF0000' : '0 1px 4px rgba(0,0,0,0.1)',
+        background: surfaceColor,
+        borderRadius: '10px',
+        border: `1px solid ${borderColor}`,
+        borderLeft: isPinned ? `3px solid rgba(255,201,64,0.7)` : undefined,
         marginBottom: '8px',
-        position: 'relative',
-        borderLeft: isPinned ? '4px solid #FFD700' : undefined,
-        opacity: isViewed ? 0.6 : 1
+        opacity: isViewed ? 0.55 : 1
       }}
     >
+      {/* サムネイル */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <img
           src={item.thumbnail}
@@ -86,7 +102,7 @@ export default function ScheduleCard({
             width: '160px',
             height: '90px',
             objectFit: 'cover',
-            borderRadius: '4px',
+            borderRadius: '6px',
             display: 'block'
           }}
         />
@@ -94,49 +110,76 @@ export default function ScheduleCard({
           <span
             style={{
               position: 'absolute',
-              bottom: '4px',
-              left: '4px',
-              background: '#FF0000',
+              bottom: '5px',
+              left: '5px',
+              background: 'rgba(220,0,20,0.92)',
               color: 'white',
-              fontSize: '11px',
-              fontWeight: 'bold',
+              fontSize: '10px',
+              fontWeight: '700',
               padding: '2px 6px',
-              borderRadius: '3px'
+              borderRadius: '3px',
+              letterSpacing: '0.4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
             }}
           >
+            <span className="live-dot" />
             LIVE
           </span>
         )}
+        {isUpcoming && !isLive && (
+          <span
+            style={{
+              position: 'absolute',
+              bottom: '5px',
+              left: '5px',
+              background: 'rgba(0,150,200,0.88)',
+              color: 'white',
+              fontSize: '10px',
+              fontWeight: '700',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              letterSpacing: '0.3px'
+            }}
+          >
+            UPCOMING
+          </span>
+        )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: textColor }}
-        >
+
+      {/* コンテンツ */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+
+        {/* タイトル行 */}
+        <div style={{ fontWeight: '700', fontSize: '14px', color: textColor, lineHeight: 1.4 }}>
           {item.title}
           {isViewed && (
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 padding: '2px 6px',
                 marginLeft: '6px',
                 borderRadius: '4px',
-                background: darkMode ? '#555' : '#ddd',
-                color: darkMode ? '#fff' : '#333',
-                verticalAlign: 'middle'
+                background: darkMode ? '#2a2a38' : '#ebebf5',
+                color: subColor,
+                verticalAlign: 'middle',
+                fontWeight: 'normal'
               }}
             >
               見た
             </span>
           )}
-          {showStatusBadge && item.status === 'upcoming' && (
+          {showStatusBadge && isUpcoming && (
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 padding: '2px 6px',
                 marginLeft: '6px',
                 borderRadius: '4px',
-                background: '#1a73e8',
-                color: '#fff',
+                background: 'rgba(0,194,255,0.12)',
+                border: '1px solid rgba(0,194,255,0.3)',
+                color: darkMode ? '#00c2ff' : '#0099cc',
                 verticalAlign: 'middle',
                 fontWeight: 'normal'
               }}
@@ -144,15 +187,16 @@ export default function ScheduleCard({
               📅 配信予定
             </span>
           )}
-          {showStatusBadge && item.status === 'live' && (
+          {showStatusBadge && isLive && (
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 padding: '2px 6px',
                 marginLeft: '6px',
                 borderRadius: '4px',
-                background: '#FF0000',
-                color: '#fff',
+                background: 'rgba(255,34,68,0.12)',
+                border: '1px solid rgba(255,34,68,0.3)',
+                color: darkMode ? '#ff2244' : '#e8001c',
                 verticalAlign: 'middle',
                 fontWeight: 'normal'
               }}
@@ -161,7 +205,9 @@ export default function ScheduleCard({
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+
+        {/* チャンネル行 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span
             onClick={(e) => {
               e.stopPropagation()
@@ -172,16 +218,19 @@ export default function ScheduleCard({
             title={item.channelTitle}
             style={{
               fontSize: '12px',
-              color: isPinned ? '#D4A017' : subColor,
-              fontWeight: isPinned ? 'bold' : 'normal',
+              color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subColor,
+              fontWeight: isPinned ? '600' : 'normal',
               flex: 1,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               cursor: item.channelId ? 'pointer' : 'default',
               textDecoration: item.channelId ? 'underline' : 'none',
-              textDecorationColor: isPinned ? '#D4A017' : subColor
+              textDecorationColor: 'transparent',
+              transition: 'text-decoration-color 0.12s'
             }}
+            onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = subColor}
+            onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
           >
             {item.channelTitle}
           </span>
@@ -190,30 +239,39 @@ export default function ScheduleCard({
             onClick={(e) => { e.stopPropagation(); onTogglePin?.(item.channelId) }}
             style={{
               flexShrink: 0,
-              padding: '1px 5px',
+              padding: '2px 6px',
               fontSize: '11px',
-              background: isPinned ? '#FFD700' : (darkMode ? '#3a3a3e' : '#e8e8e8'),
-              color: isPinned ? '#333' : (darkMode ? '#aaa' : '#666'),
-              border: 'none',
-              borderRadius: '4px',
+              background: isPinned
+                ? (darkMode ? 'rgba(255,201,64,0.18)' : 'rgba(212,144,10,0.12)')
+                : (darkMode ? '#1e1e2c' : '#ebebf5'),
+              color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subColor,
+              border: isPinned
+                ? `1px solid ${darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)'}`
+                : `1px solid ${darkMode ? '#2a2a38' : '#dddde8'}`,
+              borderRadius: '5px',
               cursor: 'pointer',
-              lineHeight: '18px'
+              lineHeight: '16px',
+              transition: 'all 0.12s'
             }}
           >
             📌
           </button>
         </div>
-        <div style={{ fontSize: '12px', color: timeColor, marginBottom: '4px' }}>
+
+        {/* 時刻・カウントダウン行 */}
+        <div style={{ fontSize: '12px', color: timeColor }}>
           {isLive
             ? `配信中（${formatTime(item.actualStartTime)}〜）`
             : `${formatTime(item.scheduledStartTime)}〜`}
           {!isLive && countdown && (
-            <span style={{ marginLeft: '8px', color: '#FF6600', fontWeight: 'bold' }}>
+            <span style={{ marginLeft: '8px', color: '#e07800', fontWeight: '700' }}>
               {countdown}
             </span>
           )}
-          {viewers && <span style={{ marginLeft: '8px' }}>👥 {viewers}</span>}
+          {viewers && <span style={{ marginLeft: '8px', color: subColor }}>👥 {viewers}</span>}
         </div>
+
+        {/* 説明文 */}
         <div
           onClick={() => setExpanded(!expanded)}
           style={{
@@ -224,71 +282,51 @@ export default function ScheduleCard({
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
             WebkitLineClamp: expanded ? 'unset' : 2,
-            marginBottom: '8px'
+            lineHeight: 1.5
           }}
         >
           {item.description}
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+
+        {/* アクションボタン行 */}
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '2px' }}>
           <button
             onClick={() => window.api.openExternal(item.url)}
             style={{
               padding: '4px 12px',
-              fontSize: '12px',
-              background: '#FF0000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
+              fontSize: '11px',
+              background: darkMode ? 'rgba(255,34,68,0.15)' : 'rgba(220,0,20,0.1)',
+              color: darkMode ? '#ff5566' : '#cc001a',
+              border: `1px solid ${darkMode ? 'rgba(255,34,68,0.35)' : 'rgba(220,0,20,0.28)'}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: '500'
             }}
           >
-            YouTube で開く
+            ▶ 開く
           </button>
           <button
             title={watched ? '通知オン（クリックで解除）' : '通知をオンにする'}
             onClick={() => onToggleWatch?.(item.id)}
-            style={{
-              padding: '4px 10px',
-              fontSize: '14px',
-              background: watched ? '#FF6600' : btnBg,
-              color: watched ? '#fff' : btnColor,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className={`yt-action-btn${watched ? ' yt-action-btn--notify' : ''}`}
           >
-            🔔
+            🔔{watched ? ' ON' : ''}
           </button>
           <button
             title={item.isFavorite ? 'お気に入り解除' : 'お気に入りに追加'}
             onClick={() => onToggleFavorite?.(item.id)}
-            style={{
-              padding: '4px 10px',
-              fontSize: '14px',
-              background: item.isFavorite ? '#FFD700' : btnBg,
-              color: item.isFavorite ? '#333' : btnColor,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className={`yt-action-btn${item.isFavorite ? ' yt-action-btn--fav' : ''}`}
           >
-            ⭐
+            ⭐{item.isFavorite ? '' : ''}
           </button>
           {showViewedButton && (
             <button
               title={item.viewedAt ? '視聴済みを解除' : '見た'}
               onClick={() => onMarkViewed?.(item.id, !item.viewedAt)}
-              style={{
-                padding: '4px 10px',
-                fontSize: '14px',
-                background: item.viewedAt ? '#4CAF50' : btnBg,
-                color: item.viewedAt ? '#fff' : btnColor,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className={`yt-action-btn${item.viewedAt ? ' yt-action-btn--viewed' : ''}`}
             >
-              ✓
+              ✓{item.viewedAt ? ' 済' : ''}
             </button>
           )}
         </div>

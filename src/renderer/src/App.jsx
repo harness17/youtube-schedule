@@ -672,7 +672,10 @@ export default function App() {
   const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
   const filteredMissed = useMemo(() => missedVideos.filter(matchesQuery), [missedVideos, matchesQuery])
   const filteredFavorites = useMemo(
-    () => favoriteVideos.filter(matchesQuery),
+    () =>
+      favoriteVideos
+        .filter(matchesQuery)
+        .sort((a, b) => (a.viewedAt != null ? 1 : 0) - (b.viewedAt != null ? 1 : 0)),
     [favoriteVideos, matchesQuery]
   )
 
@@ -758,23 +761,21 @@ export default function App() {
     return <AuthScreen onLogin={handleLogin} loading={authLoading} />
   }
 
-  const bg = darkMode ? '#1b1b1f' : '#f5f5f5'
-  const textColor = darkMode ? '#f0f0f0' : '#111'
-  const inputBg = darkMode ? '#2a2a2e' : '#fff'
-  const inputBorder = darkMode ? '#444' : '#ddd'
-  const subBtnBg = darkMode ? '#3a3a3e' : '#f0f0f0'
-  const subBtnColor = darkMode ? '#ccc' : '#333'
+  const textColor   = darkMode ? '#e8e8f0' : '#111120'
+  const subColor    = darkMode ? '#7878a0' : '#6060a0'
+  const inputBg     = darkMode ? '#16161e' : '#ffffff'
+  const inputBorder = darkMode ? '#2a2a38' : '#dddde8'
+  const subBtnBg    = darkMode ? '#1e1e2c' : '#ebebf5'
+  const subBtnColor = darkMode ? '#8888b0' : '#555570'
 
   return (
     <div
       style={{
-        maxWidth: '800px',
+        maxWidth: '840px',
         margin: '0 auto',
-        padding: updateStatus ? '48px 16px 16px' : '16px',
-        fontFamily: 'sans-serif',
+        padding: updateStatus ? '48px 16px 24px' : '16px 16px 24px',
         color: textColor,
-        minHeight: '100vh',
-        background: bg
+        minHeight: '100vh'
       }}
     >
       <UpdateBanner status={updateStatus} onInstall={() => window.api.quitAndInstall()} />
@@ -785,14 +786,17 @@ export default function App() {
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          marginBottom: '8px',
+          marginBottom: '10px',
           flexWrap: 'wrap'
         }}
       >
-        <h1 style={{ fontSize: '20px', fontWeight: 'bold', flex: 1, color: textColor }}>
-          YouTube 配信予定{' '}
+        <h1
+          className="yt-display"
+          style={{ fontSize: '26px', flex: 1, color: textColor, margin: 0, lineHeight: 1 }}
+        >
+          YouTube Schedule{' '}
           {appVersion && (
-            <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#888' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'normal', color: subColor, fontFamily: 'inherit', letterSpacing: 0 }}>
               v{appVersion}
             </span>
           )}
@@ -801,28 +805,31 @@ export default function App() {
           onClick={refresh}
           disabled={loading}
           style={{
-            padding: '6px 16px',
-            background: '#FF0000',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
+            padding: '7px 16px',
+            background: darkMode ? 'rgba(255,34,68,0.18)' : 'rgba(220,0,20,0.1)',
+            color: darkMode ? '#ff4466' : '#cc001a',
+            border: `1px solid ${darkMode ? 'rgba(255,34,68,0.4)' : 'rgba(220,0,20,0.3)'}`,
+            borderRadius: '8px',
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.6 : 1,
-            fontSize: '13px'
+            fontSize: '12px',
+            fontWeight: '600',
+            fontFamily: 'inherit'
           }}
         >
-          {loading ? '更新中...' : '更新'}
+          {loading ? '更新中...' : '↺ 更新'}
         </button>
         <button
           onClick={handleLogout}
           style={{
-            padding: '6px 12px',
+            padding: '7px 12px',
             background: subBtnBg,
             color: subBtnColor,
-            border: 'none',
-            borderRadius: '6px',
+            border: `1px solid ${inputBorder}`,
+            borderRadius: '8px',
             cursor: 'pointer',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontFamily: 'inherit'
           }}
         >
           ログアウト
@@ -831,59 +838,60 @@ export default function App() {
           onClick={() => setDarkMode((d) => !d)}
           title={darkMode ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
           style={{
-            padding: '6px 10px',
+            padding: '7px 10px',
             background: subBtnBg,
             color: subBtnColor,
-            border: 'none',
-            borderRadius: '6px',
+            border: `1px solid ${inputBorder}`,
+            borderRadius: '8px',
             cursor: 'pointer',
-            fontSize: '14px'
+            fontSize: '14px',
+            lineHeight: 1
           }}
         >
           {darkMode ? '☀️' : '🌙'}
         </button>
       </div>
 
-      {/* ヘッダー行2: 共通検索・検索対象トグル・チャンネルフィルター */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '12px',
-          flexWrap: 'wrap'
-        }}
-      >
-        <input
-          type="text"
-          placeholder="キーワード検索（タイトル・チャンネル名）"
-          value={searchQuery}
-          onChange={(e) => handleSearchQueryChange(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: '160px',
-            padding: '6px 10px',
-            fontSize: '13px',
-            background: inputBg,
-            color: textColor,
-            border: `1px solid ${inputBorder}`,
-            borderRadius: '6px',
-            outline: 'none'
-          }}
-        />
+      {/* ヘッダー行2: 共通検索・チャンネルフィルター */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
+          <span style={{
+            position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
+            color: subColor, fontSize: '13px', pointerEvents: 'none', lineHeight: 1
+          }}>🔍</span>
+          <input
+            type="text"
+            placeholder="キーワード検索（タイトル・チャンネル名）"
+            value={searchQuery}
+            onChange={(e) => handleSearchQueryChange(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 10px 8px 30px',
+              fontSize: '13px',
+              background: inputBg,
+              color: textColor,
+              border: `1px solid ${inputBorder}`,
+              borderRadius: '8px',
+              outline: 'none',
+              fontFamily: 'inherit'
+            }}
+          />
+        </div>
         {activeTab === 'schedule' && channels.length > 0 && (
           <>
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
               style={{
-                padding: '6px 10px',
+                padding: '8px 10px',
                 fontSize: '13px',
                 background: inputBg,
                 color: textColor,
                 border: `1px solid ${inputBorder}`,
-                borderRadius: '6px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                maxWidth: '200px'
+                maxWidth: '200px',
+                fontFamily: 'inherit'
               }}
             >
               <option value="all">すべてのチャンネル</option>
@@ -898,13 +906,20 @@ export default function App() {
               title="チャンネル管理（優先チャンネルを設定）"
               onClick={() => openChannelManager()}
               style={{
-                padding: '6px 10px',
-                fontSize: '15px',
-                background: pinnedChannelIds.size > 0 ? '#FFD700' : subBtnBg,
-                color: subBtnColor,
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
+                padding: '7px 12px',
+                fontSize: '14px',
+                background: pinnedChannelIds.size > 0
+                  ? (darkMode ? 'rgba(255,201,64,0.15)' : 'rgba(212,144,10,0.1)')
+                  : subBtnBg,
+                color: pinnedChannelIds.size > 0
+                  ? (darkMode ? '#ffc940' : '#d4900a')
+                  : subBtnColor,
+                border: `1px solid ${pinnedChannelIds.size > 0
+                  ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)')
+                  : inputBorder}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                lineHeight: 1
               }}
             >
               📌
@@ -920,7 +935,8 @@ export default function App() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(3px)',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
@@ -930,39 +946,45 @@ export default function App() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: darkMode ? '#2a2a2e' : '#fff',
+              background: darkMode ? '#16161e' : '#ffffff',
               color: textColor,
-              borderRadius: '12px',
-              padding: '20px',
-              width: '600px',
-              maxWidth: '90vw',
-              maxHeight: '80vh',
+              borderRadius: '14px',
+              padding: '24px',
+              width: '620px',
+              maxWidth: '92vw',
+              maxHeight: '82vh',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+              gap: '14px',
+              border: `1px solid ${inputBorder}`,
+              boxShadow: darkMode
+                ? '0 20px 60px rgba(0,0,0,0.7)'
+                : '0 12px 40px rgba(0,0,0,0.15)'
             }}
           >
             {/* モーダルヘッダー */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
-                📌 チャンネル管理
+              <h2 className="yt-display" style={{ margin: 0, fontSize: '20px', color: textColor }}>
+                チャンネル管理
               </h2>
               <button
                 onClick={() => { setShowChannelManager(false); setChannelManagerQuery('') }}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '18px',
+                  width: '28px', height: '28px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: subBtnBg,
+                  border: `1px solid ${inputBorder}`,
+                  borderRadius: '7px',
+                  fontSize: '13px',
                   cursor: 'pointer',
-                  color: textColor,
+                  color: subColor,
                   lineHeight: 1
                 }}
               >
                 ✕
               </button>
             </div>
-            <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>
+            <p style={{ margin: 0, fontSize: '12px', color: subColor }}>
               優先設定したチャンネルが予定・ライブ一覧の上部に表示されます。
             </p>
 
@@ -973,18 +995,19 @@ export default function App() {
               value={channelManagerQuery}
               onChange={(e) => setChannelManagerQuery(e.target.value)}
               style={{
-                padding: '6px 10px',
+                padding: '8px 12px',
                 fontSize: '13px',
-                background: inputBg,
+                background: darkMode ? '#1e1e28' : '#f4f4fb',
                 color: textColor,
                 border: `1px solid ${inputBorder}`,
-                borderRadius: '6px',
-                outline: 'none'
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
               }}
             />
 
             {/* チャンネル一覧 */}
-            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {modalChannels
                 .filter(({ title }) =>
                   channelManagerQuery === '' ||
@@ -995,24 +1018,14 @@ export default function App() {
                   return (
                     <div
                       key={id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        background: isPinned
-                          ? darkMode
-                            ? '#3a3200'
-                            : '#fffbe6'
-                          : darkMode
-                            ? '#1b1b1f'
-                            : '#f5f5f5',
-                        border: `1px solid ${isPinned ? '#FFD700' : 'transparent'}`
-                      }}
+                      className={`yt-ch-row${isPinned ? ' yt-ch-row--pinned' : ''}`}
                     >
-                      <span style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {isPinned && <span style={{ marginRight: '4px' }}>📌</span>}
+                      <span style={{
+                        flex: 1, fontSize: '13px',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : textColor
+                      }}>
+                        {isPinned && <span style={{ marginRight: '5px' }}>📌</span>}
                         {title}
                       </span>
                       <button
@@ -1020,14 +1033,21 @@ export default function App() {
                         title={isPinned ? '優先解除' : '優先に設定'}
                         style={{
                           flexShrink: 0,
-                          padding: '4px 10px',
+                          padding: '4px 12px',
                           fontSize: '12px',
-                          background: isPinned ? '#FFD700' : subBtnBg,
-                          color: isPinned ? '#333' : subBtnColor,
-                          border: 'none',
+                          background: isPinned
+                            ? (darkMode ? 'rgba(255,201,64,0.15)' : 'rgba(212,144,10,0.1)')
+                            : subBtnBg,
+                          color: isPinned
+                            ? (darkMode ? '#ffc940' : '#d4900a')
+                            : subBtnColor,
+                          border: `1px solid ${isPinned
+                            ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.3)')
+                            : inputBorder}`,
                           borderRadius: '6px',
                           cursor: 'pointer',
-                          fontWeight: isPinned ? 'bold' : 'normal'
+                          fontWeight: isPinned ? '700' : 'normal',
+                          fontFamily: 'inherit'
                         }}
                       >
                         {isPinned ? '優先中' : '優先'}
@@ -1040,16 +1060,8 @@ export default function App() {
         </div>
       )}
 
-      {/* タブバー */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '16px',
-          borderBottom: `2px solid ${darkMode ? '#444' : '#ddd'}`,
-          paddingBottom: '0'
-        }}
-      >
+      {/* タブバー（ピル型） */}
+      <div className="yt-tabs">
         {[
           { key: 'schedule', label: '予定・ライブ' },
           { key: 'missed', label: '見逃し' },
@@ -1059,19 +1071,12 @@ export default function App() {
           <button
             key={key}
             onClick={() => handleTabChange(key)}
-            style={{
-              padding: '6px 14px',
-              fontSize: '13px',
-              background: 'none',
-              color: activeTab === key ? '#FF0000' : darkMode ? '#aaa' : '#666',
-              border: 'none',
-              borderBottom: activeTab === key ? '2px solid #FF0000' : '2px solid transparent',
-              marginBottom: '-2px',
-              cursor: 'pointer',
-              fontWeight: activeTab === key ? 'bold' : 'normal'
-            }}
+            className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
           >
             {label}
+            {key === 'missed' && missedVideos.length > 0 && (
+              <span className="yt-tab-badge">{missedVideos.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -1080,17 +1085,7 @@ export default function App() {
       {activeTab === 'schedule' && (
         <>
           {error && error !== 'QUOTA_EXCEEDED' && (
-            <div
-              style={{
-                background: '#fff3f3',
-                border: '1px solid #ffcccc',
-                borderRadius: '6px',
-                padding: '8px 12px',
-                marginBottom: '12px',
-                fontSize: '13px',
-                color: '#cc0000'
-              }}
-            >
+            <div className="banner banner--error" style={{ marginBottom: '12px' }}>
               {error === 'NOT_AUTHENTICATED' ? '認証が必要です' : 'データの取得に失敗しました'}
             </div>
           )}
@@ -1110,11 +1105,11 @@ export default function App() {
       {activeTab === 'missed' && (
         <div>
           {tabLoading ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               読み込み中...
             </div>
           ) : filteredMissed.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               {searchQuery.trim() && missedVideos.length > 0
                 ? '検索結果がありません'
                 : '見逃した配信はありません 🎉'}
@@ -1129,11 +1124,11 @@ export default function App() {
       {activeTab === 'archive' && (
         <div>
           {tabLoading ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
               読み込み中...
             </div>
           ) : archiveVideos.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '32px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
               {searchQuery.trim() ? '検索結果がありません' : 'アーカイブがありません'}
             </div>
           ) : (
@@ -1143,12 +1138,12 @@ export default function App() {
                 <div ref={archiveSentinelRef} style={{ height: '1px' }} />
               )}
               {archiveLoadingMore && (
-                <div style={{ textAlign: 'center', color: '#888', padding: '16px' }}>
+                <div style={{ textAlign: 'center', color: subColor, padding: '16px' }}>
                   読み込み中...
                 </div>
               )}
               {!archiveHasMore && archiveVideos.length > 0 && !searchQuery.trim() && (
-                <div style={{ textAlign: 'center', color: '#aaa', fontSize: '12px', padding: '16px' }}>
+                <div style={{ textAlign: 'center', color: subColor, fontSize: '12px', padding: '16px' }}>
                   すべて表示しました
                 </div>
               )}
@@ -1161,17 +1156,33 @@ export default function App() {
       {activeTab === 'favorites' && (
         <div>
           {tabLoading ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               読み込み中...
             </div>
           ) : filteredFavorites.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '48px' }}>
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               {searchQuery.trim() && favoriteVideos.length > 0
                 ? '検索結果がありません'
                 : 'お気に入りはまだありません'}
             </div>
           ) : (
-            filteredFavorites.map((item) => renderTabCard(item, { showStatusBadge: true }))
+            (() => {
+              const unviewed = filteredFavorites.filter((item) => item.viewedAt == null)
+              const viewed = filteredFavorites.filter((item) => item.viewedAt != null)
+              return (
+                <>
+                  {unviewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                  {viewed.length > 0 && (
+                    <>
+                      <div className="yt-section-label" style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}>
+                        ✓ 視聴済み
+                      </div>
+                      {viewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                    </>
+                  )}
+                </>
+              )
+            })()
           )}
         </div>
       )}

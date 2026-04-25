@@ -268,6 +268,8 @@ ipcMain.handle('schedule:get', () => {
 ipcMain.handle('schedule:refresh', async () => {
   if (!scheduler) return { error: 'NOT_INITIALIZED' }
   await scheduler.refresh({ forceFullRecheck: true })
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  mainWindow?.webContents.send('schedule:updated')
 })
 
 // RSS 失敗率診断
