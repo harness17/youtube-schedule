@@ -468,4 +468,24 @@ describe('VideoRepository', () => {
     const result = repo.setFavorite('not_exist')
     expect(result).toBeNull()
   })
+
+  it('setFavorite: viewedAt を渡すと viewed_at に復元される', () => {
+    repo.upsert(sampleVideo({ id: 'vfa', status: 'ended' }))
+    repo.setFavorite('vfa', 1700000000000)
+    expect(repo.getById('vfa').viewedAt).toBe(1700000000000)
+  })
+
+  it('setFavorite: viewedAt=null のときは既存の viewed_at を上書きしない', () => {
+    const now = 1700000000000
+    repo.upsert(sampleVideo({ id: 'vfb', status: 'ended' }))
+    repo.markViewed('vfb', now)
+    repo.setFavorite('vfb', null)
+    expect(repo.getById('vfb').viewedAt).toBe(now)
+  })
+
+  it('setFavorite: viewed_at が未セットで viewedAt=null を渡しても null のまま', () => {
+    repo.upsert(sampleVideo({ id: 'vfc', status: 'ended' }))
+    repo.setFavorite('vfc', null)
+    expect(repo.getById('vfc').viewedAt).toBeNull()
+  })
 })

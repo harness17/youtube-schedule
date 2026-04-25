@@ -479,7 +479,7 @@ ipcMain.handle('favorites:import', async () => {
     return { error: err.message }
   }
   if (!videoRepo) return { error: 'NOT_INITIALIZED' }
-  const { applied, skipped } = applyFavoritesImport(data, (id) => videoRepo.setFavorite(id))
+  const { applied, skipped } = applyFavoritesImport(data, (id, viewedAt) => videoRepo.setFavorite(id, viewedAt))
   return { success: true, applied, skipped }
 })
 

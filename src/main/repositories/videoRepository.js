@@ -86,7 +86,12 @@ export function createVideoRepository(db) {
   const toggleFavStmt = db.prepare(
     `UPDATE videos SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
   )
-  const setFavStmt = db.prepare(`UPDATE videos SET is_favorite = 1 WHERE id = @id`)
+  const setFavStmt = db.prepare(`
+    UPDATE videos
+    SET is_favorite = 1,
+        viewed_at = COALESCE(@viewedAt, viewed_at)
+    WHERE id = @id
+  `)
   const getByIdForFavStmt = db.prepare(`SELECT id FROM videos WHERE id = @id`)
   const toggleNotifyStmt = db.prepare(
     `UPDATE videos SET notify = CASE notify WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
@@ -200,10 +205,10 @@ export function createVideoRepository(db) {
       if (r.changes === 0) return null
       return getByIdStmt.get(id)?.is_favorite === 1
     },
-    setFavorite(id) {
+    setFavorite(id, viewedAt = null) {
       const exists = getByIdForFavStmt.get({ id })
       if (!exists) return null
-      setFavStmt.run({ id })
+      setFavStmt.run({ id, viewedAt })
       return true
     },
     toggleNotify(id) {

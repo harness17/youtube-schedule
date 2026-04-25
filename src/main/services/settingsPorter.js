@@ -21,19 +21,21 @@ export function buildFavoritesExport(favorites) {
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    favorites: favorites.map(({ id, title, channelId, channelTitle }) => ({
+    favorites: favorites.map(({ id, title, channelId, channelTitle, viewedAt }) => ({
       id,
       title,
       channelId,
-      channelTitle
+      channelTitle,
+      viewedAt: viewedAt ?? null
     }))
   }
 }
 
 /**
  * @param {object} data - インポートJSON
- * @param {(id: string) => boolean|null} setFavorite - DBに id を登録する関数。
- *   存在しない id なら null、成功なら true/false を返す。
+ * @param {(id: string, viewedAt: number|null) => boolean|null} setFavorite
+ *   DBに id を登録する関数。存在しない id なら null、成功なら true を返す。
+ *   viewedAt は復元する視聴済みタイムスタンプ（null なら変更しない）。
  * @returns {{ applied: number, skipped: number }}
  */
 export function applyFavoritesImport(data, setFavorite) {
@@ -46,7 +48,7 @@ export function applyFavoritesImport(data, setFavorite) {
       skipped++
       continue
     }
-    const result = setFavorite(entry.id)
+    const result = setFavorite(entry.id, entry.viewedAt ?? null)
     if (result != null) {
       applied++
     } else {
