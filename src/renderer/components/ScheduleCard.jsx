@@ -38,7 +38,8 @@ export default function ScheduleCard({
   onTogglePin,
   isPinned = false,
   showViewedButton = false,
-  isViewed = false
+  isViewed = false,
+  showStatusBadge = false
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -125,6 +126,38 @@ export default function ScheduleCard({
               }}
             >
               見た
+            </span>
+          )}
+          {showStatusBadge && item.status === 'upcoming' && (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 6px',
+                marginLeft: '6px',
+                borderRadius: '4px',
+                background: '#1a73e8',
+                color: '#fff',
+                verticalAlign: 'middle',
+                fontWeight: 'normal'
+              }}
+            >
+              📅 配信予定
+            </span>
+          )}
+          {showStatusBadge && item.status === 'live' && (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 6px',
+                marginLeft: '6px',
+                borderRadius: '4px',
+                background: '#FF0000',
+                color: '#fff',
+                verticalAlign: 'middle',
+                fontWeight: 'normal'
+              }}
+            >
+              🔴 配信中
             </span>
           )}
         </div>
@@ -290,5 +323,6 @@ ScheduleCard.propTypes = {
   onTogglePin: PropTypes.func,
   isPinned: PropTypes.bool,
   showViewedButton: PropTypes.bool,
-  isViewed: PropTypes.bool
+  isViewed: PropTypes.bool,
+  showStatusBadge: PropTypes.bool
 }
