@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export function useSchedule() {
   const [live, setLive] = useState([])
@@ -7,7 +7,7 @@ export function useSchedule() {
   const [error, setError] = useState(null)
   const [dbBroken, setDbBroken] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -28,9 +28,9 @@ export function useSchedule() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -40,14 +40,14 @@ export function useSchedule() {
       setError(e.message ?? 'FETCH_FAILED')
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     load()
     // schedule:updated イベントで自動リロード
     const off = window.api.onScheduleUpdated?.(() => load())
     return () => off?.()
-  }, [])
+  }, [load])
 
   function updateVideo(id, patch) {
     setLive((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))

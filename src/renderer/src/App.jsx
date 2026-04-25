@@ -506,7 +506,7 @@ export default function App() {
 
   useEffect(() => {
     loadAllDbChannels()
-  }, [])
+  }, [loadAllDbChannels])
 
   async function handleToggleFavorite(id) {
     const newVal = await window.api.toggleFavorite?.(id)
@@ -581,7 +581,7 @@ export default function App() {
         setAuthLoading(false)
       }
     })()
-  }, [])
+  }, [refresh])
 
   // 自動リフレッシュ（10分ごと）
   useEffect(() => {
