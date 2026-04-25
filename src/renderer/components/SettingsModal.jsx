@@ -576,10 +576,13 @@ export default function SettingsModal({
 
         <div
           style={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${TABS.length}, minmax(0, 1fr))`,
+            gap: '8px',
+            padding: '10px 12px',
             borderBottom: `1px solid ${inputBorder}`,
             background: darkMode ? '#18181f' : '#fafafa',
-            overflowX: 'auto'
+            alignItems: 'stretch'
           }}
         >
           {TABS.map(({ key, label }) => (
@@ -587,16 +590,30 @@ export default function SettingsModal({
               key={key}
               onClick={() => setActiveTab(key)}
               style={{
-                padding: '9px 16px',
+                padding: '10px 12px',
+                minWidth: 0,
                 fontSize: '12px',
                 cursor: 'pointer',
-                border: 'none',
-                borderBottom: activeTab === key ? '2px solid #6060c0' : '2px solid transparent',
-                background: activeTab === key ? bgColor : 'transparent',
+                border: `1px solid ${
+                  activeTab === key ? '#6060c0' : darkMode ? '#232331' : '#e4e4ef'
+                }`,
+                borderRadius: '9px',
+                background: activeTab === key ? bgColor : darkMode ? '#1b1b25' : '#f4f4f8',
                 color: activeTab === key ? '#6060c0' : subColor,
                 fontWeight: activeTab === key ? 'bold' : 'normal',
                 whiteSpace: 'nowrap',
-                fontFamily: 'inherit'
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                lineHeight: 1.2,
+                boxShadow:
+                  activeTab === key
+                    ? darkMode
+                      ? 'inset 0 0 0 1px rgba(96,96,192,0.15)'
+                      : '0 1px 2px rgba(0,0,0,0.04)'
+                    : 'none'
               }}
             >
               {label}
