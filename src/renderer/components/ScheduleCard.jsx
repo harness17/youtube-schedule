@@ -239,7 +239,7 @@ export default function ScheduleCard({
             onClick={(e) => { e.stopPropagation(); onTogglePin?.(item.channelId) }}
             style={{
               flexShrink: 0,
-              padding: '2px 6px',
+              padding: '2px 8px',
               fontSize: '11px',
               background: isPinned
                 ? (darkMode ? 'rgba(255,201,64,0.18)' : 'rgba(212,144,10,0.12)')
@@ -251,10 +251,12 @@ export default function ScheduleCard({
               borderRadius: '5px',
               cursor: 'pointer',
               lineHeight: '16px',
-              transition: 'all 0.12s'
+              fontWeight: isPinned ? '600' : 'normal',
+              transition: 'all 0.12s',
+              fontFamily: 'inherit'
             }}
           >
-            📌
+            📌 {isPinned ? '優先中' : '優先'}
           </button>
         </div>
 

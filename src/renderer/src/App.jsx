@@ -866,35 +866,67 @@ export default function App() {
         </div>
         {activeTab === 'schedule' && channels.length > 0 && (
           <>
-            <select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
+            {/* チャンネルフィルター（ラベル付きグループ） */}
+            <div
               style={{
-                padding: '8px 10px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
+                display: 'flex',
+                alignItems: 'center',
+                border: `1px solid ${selectedChannel !== 'all'
+                  ? (darkMode ? 'rgba(0,194,255,0.5)' : 'rgba(0,150,200,0.45)')
+                  : inputBorder}`,
                 borderRadius: '8px',
-                cursor: 'pointer',
-                maxWidth: '200px',
-                fontFamily: 'inherit'
+                background: inputBg,
+                overflow: 'hidden'
               }}
             >
-              <option value="all">すべてのチャンネル</option>
-              {channels.map(({ id, title, isPinned }) => (
-                <option key={id} value={id}>
-                  {isPinned ? '📌 ' : ''}
-                  {title}
-                </option>
-              ))}
-            </select>
+              <span
+                style={{
+                  padding: '7px 8px 7px 10px',
+                  fontSize: '11px',
+                  color: selectedChannel !== 'all'
+                    ? (darkMode ? '#00c2ff' : '#0099cc')
+                    : subColor,
+                  whiteSpace: 'nowrap',
+                  userSelect: 'none',
+                  borderRight: `1px solid ${selectedChannel !== 'all'
+                    ? (darkMode ? 'rgba(0,194,255,0.3)' : 'rgba(0,150,200,0.3)')
+                    : inputBorder}`,
+                  fontWeight: selectedChannel !== 'all' ? '600' : 'normal'
+                }}
+              >
+                チャンネル
+              </span>
+              <select
+                value={selectedChannel}
+                onChange={(e) => setSelectedChannel(e.target.value)}
+                style={{
+                  padding: '7px 8px',
+                  fontSize: '13px',
+                  background: 'transparent',
+                  color: textColor,
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  maxWidth: '160px',
+                  fontFamily: 'inherit'
+                }}
+              >
+                <option value="all">すべて</option>
+                {channels.map(({ id, title, isPinned }) => (
+                  <option key={id} value={id}>
+                    {isPinned ? '📌 ' : ''}
+                    {title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* チャンネル管理ボタン */}
             <button
               title="チャンネル管理（優先チャンネルを設定）"
               onClick={() => openChannelManager()}
               style={{
                 padding: '7px 12px',
-                fontSize: '14px',
+                fontSize: '12px',
                 background: pinnedChannelIds.size > 0
                   ? (darkMode ? 'rgba(255,201,64,0.15)' : 'rgba(212,144,10,0.1)')
                   : subBtnBg,
@@ -906,10 +938,12 @@ export default function App() {
                   : inputBorder}`,
                 borderRadius: '8px',
                 cursor: 'pointer',
-                lineHeight: 1
+                fontFamily: 'inherit',
+                fontWeight: pinnedChannelIds.size > 0 ? '600' : 'normal',
+                whiteSpace: 'nowrap'
               }}
             >
-              📌
+              📌 {pinnedChannelIds.size > 0 ? '優先中' : '優先設定'}
             </button>
           </>
         )}
@@ -1158,13 +1192,23 @@ export default function App() {
               const viewed = filteredFavorites.filter((item) => item.viewedAt != null)
               return (
                 <>
-                  {unviewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                  {unviewed.map((item) =>
+                    renderTabCard(item, {
+                      showStatusBadge: true,
+                      showViewedButton: item.status === 'ended'
+                    })
+                  )}
                   {viewed.length > 0 && (
                     <>
                       <div className="yt-section-label" style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}>
                         ✓ 視聴済み
                       </div>
-                      {viewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                      {viewed.map((item) =>
+                        renderTabCard(item, {
+                          showStatusBadge: true,
+                          showViewedButton: item.status === 'ended'
+                        })
+                      )}
                     </>
                   )}
                 </>
