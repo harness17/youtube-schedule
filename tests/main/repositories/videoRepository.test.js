@@ -340,19 +340,38 @@ describe('VideoRepository', () => {
   })
 
   it('searchByText がチャンネル名で検索できる', () => {
-    repo.upsert(sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' }))
-    repo.upsert(sampleVideo({ id: 'v2', channelTitle: '別のチャンネル', title: 'ホロ雑談', status: 'ended' }))
+    repo.upsert(
+      sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' })
+    )
+    repo.upsert(
+      sampleVideo({ id: 'v2', channelTitle: '別のチャンネル', title: 'ホロ雑談', status: 'ended' })
+    )
     // channel=true, title=false → チャンネル名のみ検索
-    const ids = repo.searchByText('ホロ', { title: false, channel: true, description: false }).map((v) => v.id)
+    const ids = repo
+      .searchByText('ホロ', { title: false, channel: true, description: false })
+      .map((v) => v.id)
     expect(ids).toEqual(['v1'])
   })
 
   it('searchByText のトグルで対象カラムを絞り込める', () => {
-    repo.upsert(sampleVideo({ id: 'v1', title: 'テストタイトル', description: 'キーワードあり', status: 'ended' }))
+    repo.upsert(
+      sampleVideo({
+        id: 'v1',
+        title: 'テストタイトル',
+        description: 'キーワードあり',
+        status: 'ended'
+      })
+    )
     // タイトルのみ → ヒットしない
-    expect(repo.searchByText('キーワード', { title: true, channel: false, description: false })).toEqual([])
+    expect(
+      repo.searchByText('キーワード', { title: true, channel: false, description: false })
+    ).toEqual([])
     // 説明文のみ → ヒットする
-    expect(repo.searchByText('キーワード', { title: false, channel: false, description: true }).map((v) => v.id)).toEqual(['v1'])
+    expect(
+      repo
+        .searchByText('キーワード', { title: false, channel: false, description: true })
+        .map((v) => v.id)
+    ).toEqual(['v1'])
   })
 
   it('searchByText がタイトルの部分一致で ended 動画を返す', () => {
@@ -365,14 +384,24 @@ describe('VideoRepository', () => {
 
   it('searchByText が説明文の部分一致で ended 動画を返す（description:true 指定時）', () => {
     repo.upsert(
-      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
+      sampleVideo({
+        id: 'v1',
+        title: '配信タイトル',
+        description: '今日は地獄コラボです',
+        status: 'ended'
+      })
     )
     expect(repo.searchByText('地獄', { description: true }).map((v) => v.id)).toEqual(['v1'])
   })
 
   it('searchByText はデフォルトで説明文を検索しない', () => {
     repo.upsert(
-      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
+      sampleVideo({
+        id: 'v1',
+        title: '配信タイトル',
+        description: '今日は地獄コラボです',
+        status: 'ended'
+      })
     )
     // デフォルト: title=true, channel=true, description=false
     expect(repo.searchByText('地獄')).toEqual([])
@@ -381,10 +410,18 @@ describe('VideoRepository', () => {
   it('searchByText はタイトルとチャンネル名を同時に検索する', () => {
     repo.upsert(sampleVideo({ id: 'v1', title: 'announcement stream', status: 'ended' }))
     repo.upsert(
-      sampleVideo({ id: 'v2', channelTitle: 'announcement channel', title: 'Cooking stream', status: 'ended' })
+      sampleVideo({
+        id: 'v2',
+        channelTitle: 'announcement channel',
+        title: 'Cooking stream',
+        status: 'ended'
+      })
     )
     repo.upsert(sampleVideo({ id: 'v3', title: 'Random talk', status: 'ended' }))
-    const ids = repo.searchByText('announcement').map((v) => v.id).sort()
+    const ids = repo
+      .searchByText('announcement')
+      .map((v) => v.id)
+      .sort()
     expect(ids).toEqual(['v1', 'v2'])
   })
 
@@ -424,8 +461,24 @@ describe('VideoRepository', () => {
     )
     channelRepo.togglePin('UCpinned')
 
-    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', actualStartTime: now - 1000, lastCheckedAt: now }))
-    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', actualStartTime: now - 2000, lastCheckedAt: now }))
+    repo.upsert(
+      sampleVideo({
+        id: 'normal',
+        channelId: 'UCnormal',
+        status: 'ended',
+        actualStartTime: now - 1000,
+        lastCheckedAt: now
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'pinned',
+        channelId: 'UCpinned',
+        status: 'ended',
+        actualStartTime: now - 2000,
+        lastCheckedAt: now
+      })
+    )
     repo.toggleNotify('normal')
     repo.toggleNotify('pinned')
 
@@ -455,7 +508,9 @@ describe('VideoRepository', () => {
     )
     channelRepo.togglePin('UCpinned')
 
-    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 }))
+    repo.upsert(
+      sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 })
+    )
     repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', scheduledStartTime: now + 500 }))
     repo.toggleFavorite('normal')
     repo.toggleFavorite('pinned')

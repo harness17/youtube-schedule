@@ -132,7 +132,9 @@ export default function SettingsModal({
       onToast(`インポート失敗: ${result.error}`)
       return
     }
-    onToast(`お気に入りを読み込みました（適用: ${result.applied}件 / スキップ: ${result.skipped}件）`)
+    onToast(
+      `お気に入りを読み込みました（適用: ${result.applied}件 / スキップ: ${result.skipped}件）`
+    )
   }
 
   async function handleCheckUpdate() {
@@ -146,9 +148,11 @@ export default function SettingsModal({
     if (nextValue === null || nextValue === undefined) return
 
     setChannels((prev) =>
-      sortChannels(prev.map((channel) => (
-        channel.id === channelId ? { ...channel, isPinned: nextValue } : channel
-      )))
+      sortChannels(
+        prev.map((channel) =>
+          channel.id === channelId ? { ...channel, isPinned: nextValue } : channel
+        )
+      )
     )
     onPinnedChannelsUpdated()
   }
@@ -185,9 +189,10 @@ export default function SettingsModal({
   }
 
   function renderChannels() {
-    const filteredChannels = channels.filter(({ title }) =>
-      channelManagerQuery === '' ||
-      (title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase())
+    const filteredChannels = channels.filter(
+      ({ title }) =>
+        channelManagerQuery === '' ||
+        (title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase())
     )
 
     return (
@@ -238,11 +243,17 @@ export default function SettingsModal({
                       gap: '10px',
                       padding: '9px 10px',
                       background: isPinned
-                        ? (darkMode ? 'rgba(255,201,64,0.08)' : 'rgba(212,144,10,0.06)')
+                        ? darkMode
+                          ? 'rgba(255,201,64,0.08)'
+                          : 'rgba(212,144,10,0.06)'
                         : bgColor,
-                      border: `1px solid ${isPinned
-                        ? (darkMode ? 'rgba(255,201,64,0.24)' : 'rgba(212,144,10,0.22)')
-                        : inputBorder}`,
+                      border: `1px solid ${
+                        isPinned
+                          ? darkMode
+                            ? 'rgba(255,201,64,0.24)'
+                            : 'rgba(212,144,10,0.22)'
+                          : inputBorder
+                      }`,
                       borderRadius: '8px'
                     }}
                   >
@@ -269,12 +280,18 @@ export default function SettingsModal({
                         ...btnStyle('secondary'),
                         padding: '5px 12px',
                         background: isPinned
-                          ? (darkMode ? 'rgba(255,201,64,0.18)' : 'rgba(212,144,10,0.12)')
+                          ? darkMode
+                            ? 'rgba(255,201,64,0.18)'
+                            : 'rgba(212,144,10,0.12)'
                           : subBtnBg,
                         color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subBtnColor,
-                        border: `1px solid ${isPinned
-                          ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)')
-                          : inputBorder}`,
+                        border: `1px solid ${
+                          isPinned
+                            ? darkMode
+                              ? 'rgba(255,201,64,0.4)'
+                              : 'rgba(212,144,10,0.35)'
+                            : inputBorder
+                        }`,
                         fontWeight: isPinned ? '600' : 'normal'
                       }}
                     >
@@ -311,7 +328,9 @@ export default function SettingsModal({
           <div style={sectionLabelStyle}>設定のエクスポート / インポート</div>
           <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>アプリ設定を JSON で保存・読み込み</div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                アプリ設定を JSON で保存・読み込み
+              </div>
               <div style={descStyle}>含まれる内容: 優先チャンネル（📌）・テーマ設定</div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -357,9 +376,7 @@ export default function SettingsModal({
             <button
               style={btnStyle('danger')}
               onClick={async () => {
-                if (
-                  !window.confirm('データベースをリセットしますか？この操作は取り消せません。')
-                ) {
+                if (!window.confirm('データベースをリセットしますか？この操作は取り消せません。')) {
                   return
                 }
                 await window.api.resetDatabase()
@@ -388,7 +405,11 @@ export default function SettingsModal({
                 {updateChecking ? '　確認中...' : ''}
               </div>
             </div>
-            <button style={btnStyle('primary')} onClick={handleCheckUpdate} disabled={updateChecking}>
+            <button
+              style={btnStyle('primary')}
+              onClick={handleCheckUpdate}
+              disabled={updateChecking}
+            >
               🔍 今すぐ確認
             </button>
           </div>
@@ -459,7 +480,9 @@ export default function SettingsModal({
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               style={btnStyle('secondary')}
-              onClick={() => window.api.openExternal('https://github.com/harness17/youtube-schedule')}
+              onClick={() =>
+                window.api.openExternal('https://github.com/harness17/youtube-schedule')
+              }
             >
               GitHub ↗
             </button>
@@ -477,7 +500,9 @@ export default function SettingsModal({
           <div style={sectionLabelStyle}>アカウント</div>
           <div style={rowStyle}>
             <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>Google アカウントからログアウト</div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                Google アカウントからログアウト
+              </div>
               <div style={descStyle}>再ログインが必要になります</div>
             </div>
             <button
@@ -529,9 +554,7 @@ export default function SettingsModal({
           display: 'flex',
           flexDirection: 'column',
           border: `1px solid ${inputBorder}`,
-          boxShadow: darkMode
-            ? '0 20px 60px rgba(0,0,0,0.7)'
-            : '0 12px 40px rgba(0,0,0,0.15)',
+          boxShadow: darkMode ? '0 20px 60px rgba(0,0,0,0.7)' : '0 12px 40px rgba(0,0,0,0.15)',
           overflow: 'hidden'
         }}
       >
@@ -599,7 +622,9 @@ export default function SettingsModal({
           ))}
         </div>
 
-        <div style={{ padding: '18px', overflowY: 'auto', flex: 1 }}>{tabContent[activeTab]?.()}</div>
+        <div style={{ padding: '18px', overflowY: 'auto', flex: 1 }}>
+          {tabContent[activeTab]?.()}
+        </div>
       </div>
     </div>
   )

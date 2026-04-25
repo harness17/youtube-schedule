@@ -28,7 +28,10 @@ describe('ChannelRepository', () => {
   it('syncSubscriptions does not delete channels removed from subscriptions', () => {
     repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
     repo.syncSubscriptions([{ id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }], 2)
-    const ids = repo.listAll().map((c) => c.id).sort()
+    const ids = repo
+      .listAll()
+      .map((c) => c.id)
+      .sort()
     expect(ids).toEqual(['UC1', 'UC2'])
   })
 
@@ -127,7 +130,10 @@ describe('ChannelRepository', () => {
       1
     )
     repo.togglePin('UC1')
-    repo.replacePinnedChannels([{ id: 'UC2', title: 'B' }, { id: 'UC3', title: 'C' }])
+    repo.replacePinnedChannels([
+      { id: 'UC2', title: 'B' },
+      { id: 'UC3', title: 'C' }
+    ])
     const list = repo.listAll()
     const byId = Object.fromEntries(list.map((c) => [c.id, c]))
     expect(byId.UC1.isPinned).toBe(false)

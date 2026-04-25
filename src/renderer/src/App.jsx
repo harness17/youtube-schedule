@@ -383,7 +383,8 @@ export default function App() {
       const q = searchQuery.trim()
       let data, hasMore
       if (q) {
-        data = (await window.api.searchByText?.(q, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
+        data =
+          (await window.api.searchByText?.(q, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
         hasMore = false
       } else {
         data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
@@ -439,7 +440,8 @@ export default function App() {
       setTabLoading(true)
       let data, hasMore
       if (query.trim()) {
-        data = (await window.api.searchByText?.(query, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
+        data =
+          (await window.api.searchByText?.(query, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
         hasMore = false
       } else {
         data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
@@ -754,11 +756,11 @@ export default function App() {
     return <AuthScreen onLogin={handleLogin} loading={authLoading} />
   }
 
-  const textColor   = darkMode ? '#e8e8f0' : '#111120'
-  const subColor    = darkMode ? '#7878a0' : '#6060a0'
-  const inputBg     = darkMode ? '#16161e' : '#ffffff'
+  const textColor = darkMode ? '#e8e8f0' : '#111120'
+  const subColor = darkMode ? '#7878a0' : '#6060a0'
+  const inputBg = darkMode ? '#16161e' : '#ffffff'
   const inputBorder = darkMode ? '#2a2a38' : '#dddde8'
-  const subBtnBg    = darkMode ? '#1e1e2c' : '#ebebf5'
+  const subBtnBg = darkMode ? '#1e1e2c' : '#ebebf5'
   const subBtnColor = darkMode ? '#8888b0' : '#555570'
 
   return (
@@ -789,7 +791,15 @@ export default function App() {
         >
           YouTube Schedule{' '}
           {appVersion && (
-            <span style={{ fontSize: '11px', fontWeight: 'normal', color: subColor, fontFamily: 'inherit', letterSpacing: 0 }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 'normal',
+                color: subColor,
+                fontFamily: 'inherit',
+                letterSpacing: 0
+              }}
+            >
               v{appVersion}
             </span>
           )}
@@ -833,10 +843,20 @@ export default function App() {
       {/* ヘッダー行2: 共通検索・チャンネルフィルター */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
-          <span style={{
-            position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
-            color: subColor, fontSize: '13px', pointerEvents: 'none', lineHeight: 1
-          }}>🔍</span>
+          <span
+            style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: subColor,
+              fontSize: '13px',
+              pointerEvents: 'none',
+              lineHeight: 1
+            }}
+          >
+            🔍
+          </span>
           <input
             type="text"
             placeholder="キーワード検索（タイトル・チャンネル名）"
@@ -862,9 +882,13 @@ export default function App() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                border: `1px solid ${selectedChannel !== 'all'
-                  ? (darkMode ? 'rgba(0,194,255,0.5)' : 'rgba(0,150,200,0.45)')
-                  : inputBorder}`,
+                border: `1px solid ${
+                  selectedChannel !== 'all'
+                    ? darkMode
+                      ? 'rgba(0,194,255,0.5)'
+                      : 'rgba(0,150,200,0.45)'
+                    : inputBorder
+                }`,
                 borderRadius: '8px',
                 background: inputBg,
                 overflow: 'hidden'
@@ -874,14 +898,16 @@ export default function App() {
                 style={{
                   padding: '7px 8px 7px 10px',
                   fontSize: '11px',
-                  color: selectedChannel !== 'all'
-                    ? (darkMode ? '#00c2ff' : '#0099cc')
-                    : subColor,
+                  color: selectedChannel !== 'all' ? (darkMode ? '#00c2ff' : '#0099cc') : subColor,
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
-                  borderRight: `1px solid ${selectedChannel !== 'all'
-                    ? (darkMode ? 'rgba(0,194,255,0.3)' : 'rgba(0,150,200,0.3)')
-                    : inputBorder}`,
+                  borderRight: `1px solid ${
+                    selectedChannel !== 'all'
+                      ? darkMode
+                        ? 'rgba(0,194,255,0.3)'
+                        : 'rgba(0,150,200,0.3)'
+                      : inputBorder
+                  }`,
                   fontWeight: selectedChannel !== 'all' ? '600' : 'normal'
                 }}
               >
@@ -985,21 +1011,28 @@ export default function App() {
             </div>
           ) : filteredArchiveVideos.length === 0 ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
-              {searchQuery.trim() || selectedChannel !== 'all' ? '検索結果がありません' : 'アーカイブがありません'}
+              {searchQuery.trim() || selectedChannel !== 'all'
+                ? '検索結果がありません'
+                : 'アーカイブがありません'}
             </div>
           ) : (
             <>
               {filteredArchiveVideos.map((item) => renderTabCard(item))}
-              {archiveHasMore && (
-                <div ref={archiveSentinelRef} style={{ height: '1px' }} />
-              )}
+              {archiveHasMore && <div ref={archiveSentinelRef} style={{ height: '1px' }} />}
               {archiveLoadingMore && (
                 <div style={{ textAlign: 'center', color: subColor, padding: '16px' }}>
                   読み込み中...
                 </div>
               )}
               {!archiveHasMore && filteredArchiveVideos.length > 0 && !searchQuery.trim() && (
-                <div style={{ textAlign: 'center', color: subColor, fontSize: '12px', padding: '16px' }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: subColor,
+                    fontSize: '12px',
+                    padding: '16px'
+                  }}
+                >
                   すべて表示しました
                 </div>
               )}
@@ -1035,7 +1068,10 @@ export default function App() {
                   )}
                   {viewed.length > 0 && (
                     <>
-                      <div className="yt-section-label" style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}>
+                      <div
+                        className="yt-section-label"
+                        style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}
+                      >
                         ✓ 視聴済み
                       </div>
                       {viewed.map((item) =>

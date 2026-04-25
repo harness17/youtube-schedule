@@ -49,21 +49,17 @@ describe('validateSettingsImport', () => {
   })
 
   it('favorites キーを持つデータはエラー（お気に入りファイルの誤投入）', () => {
-    expect(() =>
-      validateSettingsImport({ version: 1, favorites: [] })
-    ).toThrow('お気に入りのエクスポート')
-  })
-
-  it('settings も pinnedChannels もないデータはエラー', () => {
-    expect(() => validateSettingsImport({ version: 1 })).toThrow(
-      'settings または pinnedChannels'
+    expect(() => validateSettingsImport({ version: 1, favorites: [] })).toThrow(
+      'お気に入りのエクスポート'
     )
   })
 
+  it('settings も pinnedChannels もないデータはエラー', () => {
+    expect(() => validateSettingsImport({ version: 1 })).toThrow('settings または pinnedChannels')
+  })
+
   it('version:1 以外はエラー', () => {
-    expect(() =>
-      validateSettingsImport({ version: 2, settings: {} })
-    ).toThrow('Unknown version')
+    expect(() => validateSettingsImport({ version: 2, settings: {} })).toThrow('Unknown version')
   })
 })
 
@@ -73,9 +69,9 @@ describe('validateFavoritesImport', () => {
   })
 
   it('settings キーを持つデータはエラー（設定ファイルの誤投入）', () => {
-    expect(() =>
-      validateFavoritesImport({ version: 1, settings: {}, pinnedChannels: [] })
-    ).toThrow('設定のエクスポート')
+    expect(() => validateFavoritesImport({ version: 1, settings: {}, pinnedChannels: [] })).toThrow(
+      '設定のエクスポート'
+    )
   })
 
   it('favorites が配列でない場合はエラー', () => {

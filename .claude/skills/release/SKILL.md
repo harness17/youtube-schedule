@@ -34,11 +34,11 @@ feature/xxx → develop → master（リリース時のみ）
 
 ユーザーが明示していなければ必ず聞く。
 
-| 種別  | 例               | 変更内容           |
-| ----- | ---------------- | ------------------ |
-| patch | バグ修正のみ     | `1.0.0` → `1.0.1`  |
-| minor | 後方互換の新機能 | `1.0.0` → `1.1.0`  |
-| major | 破壊的変更       | `1.0.0` → `2.0.0`  |
+| 種別  | 例               | 変更内容          |
+| ----- | ---------------- | ----------------- |
+| patch | バグ修正のみ     | `1.0.0` → `1.0.1` |
+| minor | 後方互換の新機能 | `1.0.0` → `1.1.0` |
+| major | 破壊的変更       | `1.0.0` → `2.0.0` |
 
 現在のバージョンは `package.json` の `"version"` を読んで確認する。
 
@@ -111,6 +111,7 @@ gh run watch <Release の run-id>
 ```
 
 **CI が失敗した場合**（lint/test エラー）：
+
 - ログを確認する → `develop` に戻って fix コミットを積む（**master への直接修正は禁止**）
 - タグを削除してから再作成する：`git tag -d vX.X.X && git push origin :refs/tags/vX.X.X`
 - その後、Step 3〜4（必要なら README 再コミット）→ Step 5（develop → master マージ）→ Step 6（タグ作成 → push）をやり直す
@@ -121,6 +122,7 @@ gh run view <run-id> --log-failed 2>&1 | tail -60
 ```
 
 **Release が失敗した場合**（ビルド/publish エラー）：
+
 ```bash
 gh run view <run-id> --log-failed 2>&1 | tail -60
 ```
@@ -174,9 +176,9 @@ git checkout master
 
 ## よくあるエラーと対処
 
-| エラー                            | 原因                                       | 対処                                                                                                                             |
-| --------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| CI が lint/test 失敗              | ローカルでは通ったが CI 環境で差異         | `gh run view <id> --log-failed` でエラー確認 → fix コミット → タグ打ち直し                                                       |
-| `Cannot create symbolic link`     | Windows でシンボリックリンク作成不可       | ローカルビルド不可。GitHub Actions を使う                                                                                         |
-| `403 Forbidden` on release create | `GITHUB_TOKEN` に `contents: write` がない | `.github/workflows/release.yml` の `permissions` を確認                                                                          |
-| ワークフローがトリガーされない    | タグが古いコミットを指している             | `git tag -d vX.X.X && git push origin :refs/tags/vX.X.X && git tag vX.X.X && git push origin vX.X.X`                            |
+| エラー                            | 原因                                       | 対処                                                                                                 |
+| --------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| CI が lint/test 失敗              | ローカルでは通ったが CI 環境で差異         | `gh run view <id> --log-failed` でエラー確認 → fix コミット → タグ打ち直し                           |
+| `Cannot create symbolic link`     | Windows でシンボリックリンク作成不可       | ローカルビルド不可。GitHub Actions を使う                                                            |
+| `403 Forbidden` on release create | `GITHUB_TOKEN` に `contents: write` がない | `.github/workflows/release.yml` の `permissions` を確認                                              |
+| ワークフローがトリガーされない    | タグが古いコミットを指している             | `git tag -d vX.X.X && git push origin :refs/tags/vX.X.X && git tag vX.X.X && git push origin vX.X.X` |
