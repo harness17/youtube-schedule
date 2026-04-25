@@ -672,7 +672,10 @@ export default function App() {
   const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
   const filteredMissed = useMemo(() => missedVideos.filter(matchesQuery), [missedVideos, matchesQuery])
   const filteredFavorites = useMemo(
-    () => favoriteVideos.filter(matchesQuery),
+    () =>
+      favoriteVideos
+        .filter(matchesQuery)
+        .sort((a, b) => (a.viewedAt != null ? 1 : 0) - (b.viewedAt != null ? 1 : 0)),
     [favoriteVideos, matchesQuery]
   )
 
@@ -1163,7 +1166,23 @@ export default function App() {
                 : 'お気に入りはまだありません'}
             </div>
           ) : (
-            filteredFavorites.map((item) => renderTabCard(item, { showStatusBadge: true }))
+            (() => {
+              const unviewed = filteredFavorites.filter((item) => item.viewedAt == null)
+              const viewed = filteredFavorites.filter((item) => item.viewedAt != null)
+              return (
+                <>
+                  {unviewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                  {viewed.length > 0 && (
+                    <>
+                      <div className="yt-section-label" style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}>
+                        ✓ 視聴済み
+                      </div>
+                      {viewed.map((item) => renderTabCard(item, { showStatusBadge: true }))}
+                    </>
+                  )}
+                </>
+              )
+            })()
           )}
         </div>
       )}
