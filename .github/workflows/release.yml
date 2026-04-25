@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run（GitHub Release を作成しない）'
+        type: boolean
+        default: true
 
 jobs:
   release:
@@ -59,15 +65,16 @@ jobs:
         run: Copy-Item dist-signed\*.exe dist\ -Force
         shell: pwsh
 
-      # GitHub Release を作成（タグがすでに存在する場合はスキップ）
+      # GitHub Release を作成してアップロード（dry_run 時はスキップ）
       - name: Create GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
         run: gh release create "${{ github.ref_name }}" --generate-notes --title "${{ github.ref_name }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      # installer を GitHub Release にアップロード
       - name: Upload installer to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
         run: |
           $exe = Get-ChildItem dist\*-setup.exe | Select-Object -First 1
           gh release upload "${{ github.ref_name }}" $exe.FullName --clobber
