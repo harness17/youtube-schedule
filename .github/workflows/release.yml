@@ -37,6 +37,7 @@ jobs:
 
       # SignPath がアーティファクトを取得するために GitHub Actions artifact としてアップロード
       - name: Upload unsigned installer as artifact
+        id: upload-unsigned
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer
@@ -57,7 +58,8 @@ jobs:
           project-slug: 'youtube-schedule'
           signing-policy-slug: 'release-signing'
           artifact-configuration-slug: 'initial'
-          github-artifact-name: 'unsigned-installer'
+          github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
           wait-for-completion: true
           output-artifact-directory: 'dist-signed'
         continue-on-error: true
