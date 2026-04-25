@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 
 const TABS = [
   { key: 'appearance', label: '🎨 外観' },
+  { key: 'channels', label: '📌 チャンネル' },
   { key: 'data', label: '📦 データ管理' },
   { key: 'update', label: '🔄 アップデート' },
   { key: 'about', label: '📄 情報' }
@@ -21,10 +22,22 @@ export default function SettingsModal({
   const [activeTab, setActiveTab] = useState('appearance')
   const [autoDownload, setAutoDownload] = useState(true)
   const [updateChecking, setUpdateChecking] = useState(false)
+  const [channelManagerQuery, setChannelManagerQuery] = useState('')
+  const [channels, setChannels] = useState([])
+
+  function sortChannels(list) {
+    return [...list].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+      return (a.title ?? '').localeCompare(b.title ?? '', 'ja')
+    })
+  }
 
   useEffect(() => {
     if (!open) return
     window.api.getSetting('autoDownload', true).then(setAutoDownload)
+    window.api.listAllChannels?.().then((chs) => {
+      setChannels(sortChannels(chs ?? []))
+    })
   }, [open])
 
   if (!open) return null
@@ -128,6 +141,18 @@ export default function SettingsModal({
     setTimeout(() => setUpdateChecking(false), 3000)
   }
 
+  async function handleTogglePin(channelId) {
+    const nextValue = await window.api.togglePin?.(channelId)
+    if (nextValue === null || nextValue === undefined) return
+
+    setChannels((prev) =>
+      sortChannels(prev.map((channel) => (
+        channel.id === channelId ? { ...channel, isPinned: nextValue } : channel
+      )))
+    )
+    onPinnedChannelsUpdated()
+  }
+
   function renderAppearance() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -153,6 +178,126 @@ export default function SettingsModal({
             >
               {darkMode ? 'ON' : 'OFF'}
             </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderChannels() {
+    const filteredChannels = channels.filter(({ title }) =>
+      channelManagerQuery === '' ||
+      (title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase())
+    )
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <div style={sectionLabelStyle}>優先チャンネル</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                予定・ライブ一覧の上部に表示するチャンネルを管理
+              </div>
+              <div style={descStyle}>
+                配信カードの 📌 ボタンと同じ設定です。ここからまとめて見直せます。
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="チャンネル名で絞り込み"
+              value={channelManagerQuery}
+              onChange={(e) => setChannelManagerQuery(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                maxHeight: '320px',
+                overflowY: 'auto'
+              }}
+            >
+              {filteredChannels.length > 0 ? (
+                filteredChannels.map(({ id, title, isPinned }) => (
+                  <div
+                    key={id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 10px',
+                      background: isPinned
+                        ? (darkMode ? 'rgba(255,201,64,0.08)' : 'rgba(212,144,10,0.06)')
+                        : bgColor,
+                      border: `1px solid ${isPinned
+                        ? (darkMode ? 'rgba(255,201,64,0.24)' : 'rgba(212,144,10,0.22)')
+                        : inputBorder}`,
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: '13px',
+                        color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : textColor,
+                        fontWeight: isPinned ? '600' : 'normal',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title={title}
+                    >
+                      {isPinned && <span style={{ marginRight: '5px' }}>📌</span>}
+                      {title}
+                    </div>
+                    <button
+                      onClick={() => handleTogglePin(id)}
+                      title={isPinned ? '優先解除' : '優先に設定'}
+                      style={{
+                        ...btnStyle('secondary'),
+                        padding: '5px 12px',
+                        background: isPinned
+                          ? (darkMode ? 'rgba(255,201,64,0.18)' : 'rgba(212,144,10,0.12)')
+                          : subBtnBg,
+                        color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subBtnColor,
+                        border: `1px solid ${isPinned
+                          ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)')
+                          : inputBorder}`,
+                        fontWeight: isPinned ? '600' : 'normal'
+                      }}
+                    >
+                      {isPinned ? '優先中' : '優先'}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: bgColor,
+                    border: `1px dashed ${inputBorder}`,
+                    color: subColor,
+                    fontSize: '12px',
+                    textAlign: 'center'
+                  }}
+                >
+                  該当するチャンネルがありません
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -352,6 +497,7 @@ export default function SettingsModal({
 
   const tabContent = {
     appearance: renderAppearance,
+    channels: renderChannels,
     data: renderData,
     update: renderUpdate,
     about: renderAbout
