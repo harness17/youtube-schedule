@@ -256,7 +256,7 @@ export default function ScheduleCard({
               fontFamily: 'inherit'
             }}
           >
-            📌 {isPinned ? '優先中' : '優先'}
+            📌 {isPinned ? '優先中' : 'チャンネル優先'}
           </button>
         </div>
 

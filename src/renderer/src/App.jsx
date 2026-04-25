@@ -943,7 +943,7 @@ export default function App() {
                 whiteSpace: 'nowrap'
               }}
             >
-              📌 {pinnedChannelIds.size > 0 ? '優先中' : '優先設定'}
+              📌 チャンネル設定
             </button>
           </>
         )}
