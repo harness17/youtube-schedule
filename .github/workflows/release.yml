@@ -16,7 +16,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
-      id-token: write   # SignPath の Trusted Build Verification に必要
     env:
       SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
       SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
