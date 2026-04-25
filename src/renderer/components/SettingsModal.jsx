@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 
 const TABS = [
-  { key: 'appearance', label: '🎨 外観' },
+  { key: 'general', label: '⚙️ 基本' },
   { key: 'channels', label: '📌 チャンネル' },
-  { key: 'data', label: '📦 データ管理' },
-  { key: 'update', label: '🔄 アップデート' },
-  { key: 'about', label: '📄 情報' }
+  { key: 'data', label: '📦 データ管理' }
 ]
 
 export default function SettingsModal({
@@ -19,7 +17,7 @@ export default function SettingsModal({
   onToast,
   appVersion
 }) {
-  const [activeTab, setActiveTab] = useState('appearance')
+  const [activeTab, setActiveTab] = useState('general')
   const [autoDownload, setAutoDownload] = useState(true)
   const [updateChecking, setUpdateChecking] = useState(false)
   const [channelManagerQuery, setChannelManagerQuery] = useState('')
@@ -157,7 +155,7 @@ export default function SettingsModal({
     onPinnedChannelsUpdated()
   }
 
-  function renderAppearance() {
+  function renderGeneral() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
@@ -181,6 +179,120 @@ export default function SettingsModal({
               }}
             >
               {darkMode ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>アップデート確認</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>最新バージョンを確認する</div>
+              <div style={descStyle}>
+                現在: v{appVersion}
+                {updateChecking ? '　確認中...' : ''}
+              </div>
+            </div>
+            <button
+              style={btnStyle('primary')}
+              onClick={handleCheckUpdate}
+              disabled={updateChecking}
+            >
+              🔍 今すぐ確認
+            </button>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>自動アップデート</div>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
+              <div style={descStyle}>
+                新しいバージョンが見つかると自動でダウンロードします
+                <br />
+                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
+                  ※ 変更は次回起動時に反映されます
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={handleAutoDownloadToggle}
+              style={{
+                padding: '4px 14px',
+                fontSize: '11px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                background: autoDownload ? '#6060c0' : '#ddd',
+                color: autoDownload ? 'white' : '#666'
+              }}
+            >
+              {autoDownload ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>バージョン情報</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
+            {[
+              ['アプリ名', 'YouTube Schedule'],
+              ['バージョン', `v${appVersion}`]
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}
+              >
+                <span style={{ color: subColor }}>{label}</span>
+                <span style={{ color: textColor }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>ライセンス</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', gap: '2px' }}>
+            <div style={{ color: textColor, fontSize: '13px' }}>MIT License</div>
+            <div style={descStyle}>Copyright © 2026 harness17</div>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>リンク</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={btnStyle('secondary')}
+              onClick={() =>
+                window.api.openExternal('https://github.com/harness17/youtube-schedule')
+              }
+            >
+              GitHub ↗
+            </button>
+            <button
+              style={btnStyle('secondary')}
+              onClick={() =>
+                window.api.openExternal('https://github.com/harness17/youtube-schedule/issues')
+              }
+            >
+              バグ報告 ↗
+            </button>
+          </div>
+        </div>
+        <div style={{ borderTop: `1px solid ${inputBorder}`, paddingTop: '14px' }}>
+          <div style={sectionLabelStyle}>アカウント</div>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                Google アカウントからログアウト
+              </div>
+              <div style={descStyle}>再ログインが必要になります</div>
+            </div>
+            <button
+              style={btnStyle('danger')}
+              onClick={() => {
+                onClose()
+                onLogout()
+              }}
+            >
+              ログアウト
             </button>
           </div>
         </div>
@@ -392,140 +504,10 @@ export default function SettingsModal({
     )
   }
 
-  function renderUpdate() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>アップデート確認</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>最新バージョンを確認する</div>
-              <div style={descStyle}>
-                現在: v{appVersion}
-                {updateChecking ? '　確認中...' : ''}
-              </div>
-            </div>
-            <button
-              style={btnStyle('primary')}
-              onClick={handleCheckUpdate}
-              disabled={updateChecking}
-            >
-              🔍 今すぐ確認
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>自動アップデート</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
-              <div style={descStyle}>
-                新しいバージョンが見つかると自動でダウンロードします
-                <br />
-                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
-                  ※ 変更は次回起動時に反映されます
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleAutoDownloadToggle}
-              style={{
-                padding: '4px 14px',
-                fontSize: '11px',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                background: autoDownload ? '#6060c0' : '#ddd',
-                color: autoDownload ? 'white' : '#666'
-              }}
-            >
-              {autoDownload ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderAbout() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>バージョン情報</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
-            {[
-              ['アプリ名', 'YouTube Schedule'],
-              ['バージョン', `v${appVersion}`]
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}
-              >
-                <span style={{ color: subColor }}>{label}</span>
-                <span style={{ color: textColor }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>ライセンス</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '2px' }}>
-            <div style={{ color: textColor, fontSize: '13px' }}>MIT License</div>
-            <div style={descStyle}>Copyright © 2026 harness17</div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>リンク</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule')
-              }
-            >
-              GitHub ↗
-            </button>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule/issues')
-              }
-            >
-              バグ報告 ↗
-            </button>
-          </div>
-        </div>
-        <div style={{ borderTop: `1px solid ${inputBorder}`, paddingTop: '14px' }}>
-          <div style={sectionLabelStyle}>アカウント</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                Google アカウントからログアウト
-              </div>
-              <div style={descStyle}>再ログインが必要になります</div>
-            </div>
-            <button
-              style={btnStyle('danger')}
-              onClick={() => {
-                onClose()
-                onLogout()
-              }}
-            >
-              ログアウト
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const tabContent = {
-    appearance: renderAppearance,
+    general: renderGeneral,
     channels: renderChannels,
-    data: renderData,
-    update: renderUpdate,
-    about: renderAbout
+    data: renderData
   }
 
   return (
