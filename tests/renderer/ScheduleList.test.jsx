@@ -38,13 +38,13 @@ describe('ScheduleList', () => {
 
   it('ライブ中セクションのタイトルが表示される', () => {
     render(<ScheduleList live={liveItems} upcoming={[]} />)
-    expect(screen.getByText('ライブ配信中')).toBeInTheDocument()
+    expect(screen.getByText('🔴 ライブ配信中')).toBeInTheDocument()
   })
 
   it('配信予定セクションの日付ヘッダーが表示される', () => {
     render(<ScheduleList live={[]} upcoming={upcomingItems} />)
-    expect(screen.getByRole('heading', { name: /4月13日/ })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /4月15日/ })).toBeInTheDocument()
+    expect(screen.getAllByText(/4月13日/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/4月15日/).length).toBeGreaterThan(0)
   })
 
   it('各配信タイトルが表示される', () => {

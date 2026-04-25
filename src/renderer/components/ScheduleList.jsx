@@ -54,7 +54,7 @@ export default function ScheduleList({
 
   if (isEmpty) {
     return (
-      <div style={{ textAlign: 'center', color: darkMode ? '#888' : '#888', marginTop: '48px' }}>
+      <div style={{ textAlign: 'center', color: darkMode ? '#7878a0' : '#6060a0', marginTop: '48px' }}>
         予定された配信はありません
       </div>
     )
@@ -87,42 +87,17 @@ export default function ScheduleList({
     }))
   ]
 
-  const navBg = darkMode ? '#2a2a2e' : '#fff'
-  const navBtnBg = darkMode ? '#3a3a3e' : '#f0f0f0'
-  const navBtnColor = darkMode ? '#ccc' : '#333'
-  const headingColor = darkMode ? '#f0f0f0' : '#333'
-  const dividerColor = darkMode ? '#444' : '#ccc'
-
   return (
     <div>
       {navItems.length > 1 && (
-        <nav
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px',
-            marginBottom: '20px',
-            padding: '10px 12px',
-            background: navBg,
-            borderRadius: '8px',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
-          }}
-        >
+        <nav className="yt-nav">
           {navItems.map(({ label, id, isLive }) => (
             <button
               key={id}
               onClick={() => scrollToSection(id)}
-              style={{
-                padding: '4px 10px',
-                fontSize: '12px',
-                background: isLive ? '#FF0000' : navBtnBg,
-                color: isLive ? '#fff' : navBtnColor,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className={`yt-nav-btn${isLive ? ' yt-nav-btn--live' : ''}`}
             >
-              {label}
+              {isLive ? '🔴 ' : ''}{label}
             </button>
           ))}
         </nav>
@@ -130,18 +105,9 @@ export default function ScheduleList({
 
       {live.length > 0 && (
         <div id="section-live" style={{ marginBottom: '24px' }}>
-          <h2
-            style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#FF0000',
-              padding: '4px 0',
-              marginBottom: '8px',
-              borderBottom: '2px solid #FF0000'
-            }}
-          >
-            ライブ配信中
-          </h2>
+          <div className="yt-section-label" style={{ color: darkMode ? '#ff4466' : '#e8001c' }}>
+            🔴 ライブ配信中
+          </div>
           {sortedLive.map((item) => (
             <ScheduleCard
               key={item.id}
@@ -159,18 +125,9 @@ export default function ScheduleList({
 
       {sortedEntries.map(([dateLabel, groupItems]) => (
         <div key={dateLabel} id={toAnchorId(dateLabel)} style={{ marginBottom: '24px' }}>
-          <h2
-            style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: headingColor,
-              padding: '4px 0',
-              marginBottom: '8px',
-              borderBottom: `2px solid ${dividerColor}`
-            }}
-          >
-            {dateLabel}
-          </h2>
+          <div className="yt-section-label">
+            📅 {dateLabel}
+          </div>
           {groupItems.map((item) => (
             <ScheduleCard
               key={item.id}

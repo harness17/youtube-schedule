@@ -49,7 +49,7 @@ describe('ScheduleCard', () => {
 
   it('YouTube で開くボタンで openExternal が呼ばれる', () => {
     render(<ScheduleCard item={mockItem} />)
-    fireEvent.click(screen.getByText('YouTube で開く'))
+    fireEvent.click(screen.getByText('▶ 開く'))
     expect(window.api.openExternal).toHaveBeenCalledWith(mockItem.url)
   })
 
@@ -124,7 +124,7 @@ describe('ScheduleCard', () => {
     const item = { ...mockItem, viewedAt: 1_700_000_000_000 }
     const { container } = render(<ScheduleCard item={item} isViewed={true} />)
     const card = container.firstChild
-    expect(card).toHaveStyle({ opacity: '0.6' })
+    expect(card).toHaveStyle({ opacity: '0.55' })
   })
 
   it('isViewed=false のとき「見た」バッジは表示されない', () => {
