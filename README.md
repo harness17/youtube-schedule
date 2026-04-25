@@ -131,6 +131,12 @@ npm run build:win      # Windows 向けパッケージング
 - [electron-vite](https://electron-vite.org/)
 - [YouTube Data API v3](https://developers.google.com/youtube/v3)
 
+## コード署名
+
+このプロジェクトのリリースバイナリは [SignPath Foundation](https://signpath.io/solutions/open-source-community) によるコード署名を使用しています。
+
+[![Signed by SignPath Foundation](https://signpath.io/assets/favicon-50x50.png)](https://signpath.io/solutions/open-source-community)
+
 ## 注意事項
 
 - YouTube の閲覧専用スコープ（`youtube.readonly`）のみを使用します
