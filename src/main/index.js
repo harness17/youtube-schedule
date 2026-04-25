@@ -393,8 +393,9 @@ ipcMain.handle('shell:openExternal', async (_, url) => {
 
 // 設定エクスポート
 ipcMain.handle('settings:export', async () => {
+  const mainWindow = BrowserWindow.getAllWindows()[0]
   const dateStr = new Date().toISOString().slice(0, 10)
-  const { filePath, canceled } = await dialog.showSaveDialog({
+  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
     defaultPath: `settings-export-${dateStr}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }]
   })
@@ -413,7 +414,8 @@ ipcMain.handle('settings:export', async () => {
 
 // 設定インポート
 ipcMain.handle('settings:import', async () => {
-  const { filePaths, canceled } = await dialog.showOpenDialog({
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
     filters: [{ name: 'JSON', extensions: ['json'] }],
     properties: ['openFile']
   })
@@ -432,19 +434,23 @@ ipcMain.handle('settings:import', async () => {
     }
   }
   if (Array.isArray(data.pinnedChannels) && channelRepo) {
-    channelRepo.replacePinnedChannels(data.pinnedChannels)
+    const safeChannels = data.pinnedChannels.filter(
+      (c) => c && typeof c.id === 'string' && c.id.length > 0
+    )
+    channelRepo.replacePinnedChannels(safeChannels)
   }
   return {
     success: true,
-    darkMode: data.settings?.darkMode ?? null,
+    darkMode: typeof data.settings?.darkMode === 'boolean' ? data.settings.darkMode : null,
     pinnedChannels: data.pinnedChannels ?? []
   }
 })
 
 // お気に入りエクスポート
 ipcMain.handle('favorites:export', async () => {
+  const mainWindow = BrowserWindow.getAllWindows()[0]
   const dateStr = new Date().toISOString().slice(0, 10)
-  const { filePath, canceled } = await dialog.showSaveDialog({
+  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
     defaultPath: `favorites-export-${dateStr}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }]
   })
@@ -458,7 +464,8 @@ ipcMain.handle('favorites:export', async () => {
 
 // お気に入りインポート
 ipcMain.handle('favorites:import', async () => {
-  const { filePaths, canceled } = await dialog.showOpenDialog({
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
     filters: [{ name: 'JSON', extensions: ['json'] }],
     properties: ['openFile']
   })

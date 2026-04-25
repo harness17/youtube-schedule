@@ -253,7 +253,13 @@ export default function SettingsModal({
           <div style={rowStyle}>
             <div>
               <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
-              <div style={descStyle}>新しいバージョンが見つかると自動でダウンロードします</div>
+              <div style={descStyle}>
+                新しいバージョンが見つかると自動でダウンロードします
+                <br />
+                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
+                  ※ 変更は次回起動時に反映されます
+                </span>
+              </div>
             </div>
             <button
               onClick={handleAutoDownloadToggle}

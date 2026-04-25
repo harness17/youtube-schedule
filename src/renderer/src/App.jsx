@@ -1180,7 +1180,6 @@ export default function App() {
         darkMode={darkMode}
         onDarkModeChange={(val) => {
           setDarkMode(val)
-          window.api.setSetting('darkMode', val)
         }}
         onLogout={handleLogout}
         onPinnedChannelsUpdated={loadAllDbChannels}
