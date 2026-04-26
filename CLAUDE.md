@@ -28,6 +28,42 @@ Prettier で管理。デフォルトから外れる設定：
 - `trailingComma: 'none'` — 末尾カンマなし
 - インデント: 2 スペース
 
+## ファイル構成
+
+```
+src/main/
+  index.js                アプリ初期化・DB初期化・ポーリング（IPC ハンドラー登録のみ）
+  ipc/
+    authHandlers.js       auth:check / auth:login / auth:logout
+    videoHandlers.js      schedule:* / videos:* / channels:* / diag:*
+    settingsHandlers.js   settings:* / favorites:*
+    appHandlers.js        app:* / shell:* / notification:* / updater:*
+  services/
+    schedulerService.js   30分ポーリング・フェーズ別取得
+    settingsPorter.js     設定・お気に入りのエクスポート/インポート
+    videoStatus.js        ステータス判定
+
+src/renderer/
+  src/App.jsx             メインUI（タブ切り替え・状態管理）
+  hooks/
+    useAuth.js            認証状態管理
+    useDarkMode.js        ダークモード永続化
+    useNotificationCheck.js  配信前通知チェック（60s ポーリング）
+    useSchedule.js        スケジュールデータ取得
+    useTabState.js        タブ状態・無限スクロール・検索デバウンス
+  components/
+    AuthScreen.jsx        認証画面
+    BackToTop.jsx         トップへ戻るボタン
+    CredentialsSetupScreen.jsx  credentials.json 配置案内
+    ErrorBoundary.jsx     React エラー境界
+    ScheduleCard.jsx      動画カード
+    ScheduleList.jsx      予定・ライブ一覧
+    SettingsModal.jsx     設定モーダル（⚙️基本 / 📌チャンネル / 📦データ管理）
+    StatusBanners.jsx     状態バナー群
+    Toast.jsx             トースト通知
+    UpdateBanner.jsx      自動更新バナー
+```
+
 ## Electron アーキテクチャ
 
 ```

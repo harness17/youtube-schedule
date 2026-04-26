@@ -1,7 +1,7 @@
 # YouTube Schedule — アプリケーション仕様書
 
-バージョン: **1.7.1**  
-最終更新: 2026-04-25
+バージョン: **1.9.1**  
+最終更新: 2026-04-26
 
 ---
 
@@ -88,44 +88,63 @@ YouTube 登録チャンネルの **配信予定・ライブ中動画** を一覧
 ## 3. アーキテクチャ
 
 ```
-┌─────────────────────────────────────────┐
-│  Renderer プロセス（ブラウザ環境）         │
-│  src/renderer/                          │
-│  ├─ App.jsx          メインUI           │
-│  ├─ ScheduleList.jsx 予定・ライブ一覧   │
-│  ├─ ScheduleCard.jsx カードコンポーネント│
-│  ├─ StatusBanners.jsx 状態バナー        │
-│  └─ AuthScreen.jsx   認証画面           │
-├─────────────────────────────────────────┤
-│  Preload スクリプト（contextBridge）     │
-│  src/preload/index.js                   │
-│  → window.api として Renderer に公開    │
-├─────────────────────────────────────────┤
-│  Main プロセス（Node.js 環境）           │
-│  src/main/                             │
-│  ├─ index.js         IPC ハンドラー群  │
-│  ├─ auth.js          OAuth 認証        │
-│  ├─ logger.js        構造化ログ        │
-│  ├─ store.js         electron-store    │
-│  ├─ db/              SQLite 管理       │
-│  │  ├─ connection.js DB 接続・WAL設定  │
-│  │  ├─ migrate.js    マイグレーション  │
-│  │  ├─ schema.js     テーブル定義      │
-│  │  └─ migrations/   001〜005         │
-│  ├─ repositories/    DB アクセス層     │
-│  │  ├─ videoRepository.js             │
-│  │  ├─ channelRepository.js           │
-│  │  ├─ metaRepository.js              │
-│  │  └─ rssFetchLogRepository.js       │
-│  ├─ fetchers/        外部データ取得    │
-│  │  ├─ rssFetcher.js                  │
-│  │  ├─ playlistItemsFetcher.js        │
-│  │  ├─ videoDetailsFetcher.js         │
-│  │  └─ subscriptionsFetcher.js        │
-│  └─ services/                          │
-│     ├─ schedulerService.js  定期取得  │
-│     └─ videoStatus.js       状態判定  │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Renderer プロセス（ブラウザ環境）                 │
+│  src/renderer/                                  │
+│  ├─ src/App.jsx          メインUI・タブ管理      │
+│  ├─ hooks/                                      │
+│  │  ├─ useSchedule.js    スケジュール取得        │
+│  │  ├─ useAuth.js        認証状態管理            │
+│  │  ├─ useDarkMode.js    ダークモード永続化      │
+│  │  ├─ useNotificationCheck.js  通知チェック     │
+│  │  └─ useTabState.js    タブ状態・無限スクロール│
+│  └─ components/                                 │
+│     ├─ ScheduleList.jsx   予定・ライブ一覧       │
+│     ├─ ScheduleCard.jsx   カードコンポーネント   │
+│     ├─ StatusBanners.jsx  状態バナー             │
+│     ├─ AuthScreen.jsx     認証画面               │
+│     ├─ SettingsModal.jsx  設定モーダル（3タブ）  │
+│     ├─ ErrorBoundary.jsx  エラー境界             │
+│     ├─ Toast.jsx          トースト通知           │
+│     ├─ BackToTop.jsx      トップへ戻るボタン     │
+│     ├─ CredentialsSetupScreen.jsx  認証情報案内  │
+│     └─ UpdateBanner.jsx   自動更新バナー         │
+├─────────────────────────────────────────────────┤
+│  Preload スクリプト（contextBridge）              │
+│  src/preload/index.js                           │
+│  → window.api として Renderer に公開            │
+├─────────────────────────────────────────────────┤
+│  Main プロセス（Node.js 環境）                   │
+│  src/main/                                      │
+│  ├─ index.js         アプリ初期化・ポーリング    │
+│  ├─ auth.js          OAuth 認証                 │
+│  ├─ logger.js        構造化ログ                 │
+│  ├─ store.js         electron-store             │
+│  ├─ ipc/             IPC ハンドラー（責務別）   │
+│  │  ├─ authHandlers.js      auth:*              │
+│  │  ├─ videoHandlers.js     schedule:* videos:* channels:* diag:* │
+│  │  ├─ settingsHandlers.js  settings:* favorites:* │
+│  │  └─ appHandlers.js       app:* shell:* notification:* updater:* │
+│  ├─ db/              SQLite 管理                │
+│  │  ├─ connection.js DB 接続・WAL設定           │
+│  │  ├─ migrate.js    マイグレーション           │
+│  │  ├─ schema.js     テーブル定義               │
+│  │  └─ migrations/   001〜005                  │
+│  ├─ repositories/    DB アクセス層              │
+│  │  ├─ videoRepository.js                      │
+│  │  ├─ channelRepository.js                    │
+│  │  ├─ metaRepository.js                       │
+│  │  └─ rssFetchLogRepository.js                │
+│  ├─ fetchers/        外部データ取得             │
+│  │  ├─ rssFetcher.js                           │
+│  │  ├─ playlistItemsFetcher.js                 │
+│  │  ├─ videoDetailsFetcher.js                  │
+│  │  └─ subscriptionsFetcher.js                 │
+│  └─ services/                                   │
+│     ├─ schedulerService.js  定期取得           │
+│     ├─ settingsPorter.js    設定インポートエクスポート │
+│     └─ videoStatus.js       状態判定           │
+└─────────────────────────────────────────────────┘
          ↕ IPC（ipcMain / ipcRenderer）
 ```
 
@@ -232,43 +251,39 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 | `isViewed`         | bool   | `item.viewedAt != null`。既読スタイル |
 | `showStatusBadge`  | bool   | upcoming/live バッジを表示するか      |
 
-### 4.4 チャンネル管理モーダル
+### 4.4 設定モーダル（SettingsModal）
 
-#### 構成
+ヘッダーの ⚙️ ボタンで開く。3タブ構成。
 
-```
-[オーバーレイ（クリックで閉じる）]
-  └─ [モーダル本体]
-      ├─ タイトル「📌 チャンネル管理」
-      ├─ 説明文
-      ├─ 🔍 検索ボックス（チャンネル名で絞り込み）
-      └─ チャンネル一覧
-          ├─ 推し済み → 黄背景 + 📌 アイコン
-          └─ 各行：チャンネル名 + [優先 / 優先中] ボタン
-```
+#### タブ構成
 
-#### 動作フロー
+| タブキー    | ラベル         | 内容                                                                 |
+| ----------- | -------------- | -------------------------------------------------------------------- |
+| `general`   | ⚙️ 基本        | ダークモード切り替え・アップデート確認・自動アップデート・バージョン情報・ログアウト |
+| `channels`  | 📌 チャンネル  | チャンネル一覧の検索・推し設定（SettingsModal に統合）              |
+| `data`      | 📦 データ管理  | 設定エクスポート/インポート・お気に入りエクスポート/インポート・DBリセット |
 
-1. **開く**（`openChannelManager()`）
+#### チャンネルタブの動作フロー
+
+1. **モーダルを開く**
    - `channels:listAll` IPC で DB から全チャンネル取得
-   - `is_pinned DESC → title ASC` でソートし `modalChannels` に格納
-   - `showChannelManager = true`
+   - `is_pinned DESC → title ASC` でソートしたスナップショットを `channels` に格納
 
 2. **トグル**（`handleTogglePin(channelId)`）
    - `channels:togglePin` IPC 実行
-   - `modalChannels` の `isPinned` のみ更新（リスト順は変わらない）
-   - `pinnedChannelIds` Set を更新
+   - `channels` の `isPinned` のみ更新（**リスト順は変わらない**）
+   - モーダルを閉じて再度開いたときに最新状態でソートされる
 
 3. **閉じて再度開く**
-   - 再度 `openChannelManager()` が呼ばれ、最新状態で再ソートされる
+   - `useEffect([open])` が再実行され、最新状態で再ソート
 
-#### カラースキーム
+#### チャンネルタブのカラースキーム
 
-| 状態             | ライト             | ダーク             |
-| ---------------- | ------------------ | ------------------ |
-| 推し済み行       | #fffbe6            | #3a3200            |
-| 「優先中」ボタン | #FFD700 背景、太字 | #FFD700 背景、太字 |
-| 「優先」ボタン   | グレー背景         | グレー背景         |
+| 状態           | ライト                            | ダーク                            |
+| -------------- | --------------------------------- | --------------------------------- |
+| 推し済み行     | rgba(212,144,10,0.06) 背景        | rgba(255,201,64,0.08) 背景        |
+| 「優先中」ボタン | #d4900a 色・太字                 | #ffc940 色・太字                  |
+| 「優先」ボタン | グレー背景                        | グレー背景                        |
 
 ### 4.5 StatusBanners
 
@@ -392,18 +407,28 @@ if (remaining > 0 && remaining <= THRESHOLD) {
 | `channels:togglePin` | invoke | `id` | `bool \| null` | 推し設定反転                                 |
 | `channels:listAll`   | invoke | —    | `Channel[]`    | 全チャンネル取得（`is_pinned DESC, id ASC`） |
 
+### 設定・エクスポート系
+
+| チャネル            | 方向   | 入力 | 出力                                                      | 説明                                     |
+| ------------------- | ------ | ---- | --------------------------------------------------------- | ---------------------------------------- |
+| `settings:get`      | invoke | `key, defaultValue` | any                                    | electron-store から取得                  |
+| `settings:set`      | invoke | `key, value`        | —                                      | electron-store に保存                    |
+| `settings:export`   | invoke | —    | `{success?, canceled?, error?}`                           | 設定 JSON を保存ダイアログでエクスポート |
+| `settings:import`   | invoke | —    | `{success?, canceled?, error?, darkMode?, pinnedChannels?}` | 設定 JSON を開くダイアログでインポート   |
+| `favorites:export`  | invoke | —    | `{success?, canceled?, error?, count?}`                   | お気に入り JSON をエクスポート           |
+| `favorites:import`  | invoke | —    | `{success?, canceled?, error?, applied?, skipped?}`       | お気に入り JSON をインポート             |
+
 ### システム系
 
 | チャネル                 | 方向   | 入力                | 出力                 | 説明                               |
 | ------------------------ | ------ | ------------------- | -------------------- | ---------------------------------- |
 | `diag:rssFailureRate`    | invoke | —                   | `number`             | 過去 24h の RSS 失敗率（0〜1）     |
 | `notification:show`      | invoke | `{title, body}`     | —                    | デスクトップ通知                   |
-| `settings:get`           | invoke | `key, defaultValue` | any                  | electron-store から取得            |
-| `settings:set`           | invoke | `key, value`        | —                    | electron-store に保存              |
 | `app:version`            | invoke | —                   | `string`             | アプリバージョン                   |
 | `shell:openFolder`       | invoke | `filePath`          | `{success}`          | 親フォルダをエクスプローラーで開く |
 | `shell:openExternal`     | invoke | `url`               | `{success?, error?}` | http/https のみ外部ブラウザで開く  |
 | `updater:quitAndInstall` | invoke | —                   | —                    | アップデートを適用して再起動       |
+| `updater:checkNow`       | invoke | —                   | —                    | 手動でアップデートを確認           |
 
 ### アップデーター系（受信イベント）
 
@@ -412,6 +437,13 @@ if (remaining > 0 && remaining <= THRESHOLD) {
 | `updater:update-available`  | 新バージョン検出（ダウンロード開始） |
 | `updater:update-downloaded` | ダウンロード完了（インストール可能） |
 | `updater:error`             | アップデートエラー                   |
+
+### スケジューラー系（受信イベント）
+
+| チャネル           | 説明                                 |
+| ------------------ | ------------------------------------ |
+| `schedule:updated` | 自動リフレッシュ完了通知             |
+| `schedule:error`   | リフレッシュ失敗通知（`{message}`）  |
 
 ---
 
@@ -741,8 +773,8 @@ feature/xxx  →  develop  →  master（リリース時のみ）
 
 ### CI/CD
 
-- **CI ワークフロー**（`.github/workflows/ci.yml`）：push/PR 時に lint + test を実行
-- **Release ワークフロー**（`.github/workflows/release.yml`）：`v*` タグ push 時に Windows インストーラーをビルドして GitHub Releases に draft 公開
+- **CI ワークフロー**（`.github/workflows/ci.yml`）：push/PR 時に lint + test を実行（Node.js 24）
+- **Release ワークフロー**（`.github/workflows/release.yml`）：`v*` タグ push 時に Windows インストーラーをビルドして GitHub Releases に draft 公開（Node.js 24）
 
 ### ネイティブ依存リビルド
 
@@ -763,10 +795,15 @@ node scripts/rebuild-native.js
 youtube-schedule/
 ├─ src/
 │  ├─ main/
-│  │  ├─ index.js                  IPC ハンドラー・アプリ初期化
+│  │  ├─ index.js                  アプリ初期化・DB初期化・ポーリング
 │  │  ├─ auth.js                   OAuth 認証フロー
 │  │  ├─ logger.js                 構造化ログ（JSON Lines、7日保持）
 │  │  ├─ store.js                  electron-store 設定管理
+│  │  ├─ ipc/                      IPC ハンドラー（責務別に分割）
+│  │  │  ├─ authHandlers.js        auth:check / auth:login / auth:logout
+│  │  │  ├─ videoHandlers.js       schedule:* / videos:* / channels:* / diag:*
+│  │  │  ├─ settingsHandlers.js    settings:* / favorites:*
+│  │  │  └─ appHandlers.js         app:* / shell:* / notification:* / updater:*
 │  │  ├─ db/
 │  │  │  ├─ connection.js          DB 接続・WAL・外部キー設定
 │  │  │  ├─ migrate.js             マイグレーション実行
@@ -788,17 +825,30 @@ youtube-schedule/
 │  │  │  ├─ videoDetailsFetcher.js
 │  │  │  └─ subscriptionsFetcher.js
 │  │  └─ services/
-│  │     ├─ schedulerService.js
-│  │     └─ videoStatus.js
+│  │     ├─ schedulerService.js    定期取得オーケストレーション
+│  │     ├─ settingsPorter.js      設定・お気に入りのエクスポート/インポート
+│  │     └─ videoStatus.js         ステータス判定
 │  ├─ renderer/
-│  │  ├─ src/App.jsx               メイン UI（タブ・モーダル・状態管理）
+│  │  ├─ src/
+│  │  │  ├─ App.jsx                メイン UI（タブ切り替え・状態管理）
+│  │  │  └─ main.jsx               React エントリーポイント
 │  │  ├─ components/
-│  │  │  ├─ ScheduleList.jsx
-│  │  │  ├─ ScheduleCard.jsx
-│  │  │  ├─ StatusBanners.jsx
-│  │  │  └─ AuthScreen.jsx
+│  │  │  ├─ AuthScreen.jsx         認証画面
+│  │  │  ├─ BackToTop.jsx          トップへ戻るボタン
+│  │  │  ├─ CredentialsSetupScreen.jsx  credentials.json 配置案内
+│  │  │  ├─ ErrorBoundary.jsx      React エラー境界
+│  │  │  ├─ ScheduleCard.jsx       動画カード
+│  │  │  ├─ ScheduleList.jsx       予定・ライブ一覧
+│  │  │  ├─ SettingsModal.jsx      設定モーダル（3タブ）
+│  │  │  ├─ StatusBanners.jsx      状態バナー群
+│  │  │  ├─ Toast.jsx              トースト通知
+│  │  │  └─ UpdateBanner.jsx       自動更新バナー
 │  │  └─ hooks/
-│  │     └─ useSchedule.js
+│  │     ├─ useAuth.js             認証状態管理
+│  │     ├─ useDarkMode.js         ダークモード永続化
+│  │     ├─ useNotificationCheck.js  配信前通知チェック（60s ポーリング）
+│  │     ├─ useSchedule.js         スケジュールデータ取得
+│  │     └─ useTabState.js         タブ状態・無限スクロール・検索デバウンス
 │  └─ preload/
 │     └─ index.js                  contextBridge（window.api）
 ├─ docs/
@@ -807,8 +857,8 @@ youtube-schedule/
 │  └─ rebuild-native.js            electron-rebuild スクリプト
 ├─ .github/
 │  └─ workflows/
-│     ├─ ci.yml
-│     └─ release.yml
+│     ├─ ci.yml                    lint + test（Node.js 24）
+│     └─ release.yml               Windows ビルド・Releases 公開（Node.js 24）
 ├─ .claude/
 │  ├─ rules/                       Claude Code ルール群
 │  └─ skills/                      カスタムスキル群
