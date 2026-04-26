@@ -112,7 +112,7 @@ export default function App() {
     setArchiveLoadingMore(false)
   }
 
-  // eslint-disable-next-line react-hooks/refs
+  // eslint-disable-next-line react-hooks/refs -- stale closure 対策。IntersectionObserver コールバックが最新の loadMoreArchive を参照できるよう render 時に同期する
   loadMoreArchiveFnRef.current = loadMoreArchive
 
   useEffect(() => {
