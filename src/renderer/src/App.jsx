@@ -10,15 +10,13 @@ import BackToTop from '../components/BackToTop.jsx'
 import CredentialsSetupScreen from '../components/CredentialsSetupScreen.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
+import { useDarkMode } from '../hooks/useDarkMode.js'
+import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
+import { useAuth } from '../hooks/useAuth.js'
 
 export { ErrorBoundary }
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [loginSuccess, setLoginSuccess] = useState(false)
-  const [credentialsMissing, setCredentialsMissing] = useState(false)
-  const [credentialsPath, setCredentialsPath] = useState('')
   const [toast, setToast] = useState(null)
   const [updateStatus, setUpdateStatus] = useState(null)
   const [appVersion, setAppVersion] = useState('')
@@ -28,6 +26,17 @@ export default function App() {
     window.api.getVersion().then((v) => setAppVersion(v))
   }, [])
   const { live, upcoming, loading, error, dbBroken, refresh, updateVideo } = useSchedule()
+  const {
+    isAuthenticated,
+    authLoading,
+    loginSuccess,
+    credentialsMissing,
+    credentialsPath,
+    handleLogin,
+    handleLogout
+  } = useAuth({ onAuthenticated: refresh })
+  const { darkMode, setDarkMode } = useDarkMode()
+  useNotificationCheck({ upcoming, isAuthenticated })
   const handleToastClose = useCallback(() => setToast(null), [])
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
@@ -41,22 +50,6 @@ export default function App() {
       window.removeEventListener('offline', onOffline)
     }
   }, [])
-
-  // ダークモード（electron-store で永続化）
-  const [darkMode, setDarkMode] = useState(false)
-  const darkModeLoaded = useRef(false)
-  useEffect(() => {
-    window.api.getSetting('darkMode', false).then((val) => {
-      darkModeLoaded.current = true
-      setDarkMode(val)
-    })
-  }, [])
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-    if (darkModeLoaded.current) {
-      window.api.setSetting('darkMode', darkMode)
-    }
-  }, [darkMode])
 
   // タブ管理
   const [activeTab, setActiveTab] = useState('schedule')
@@ -119,6 +112,7 @@ export default function App() {
     setArchiveLoadingMore(false)
   }
 
+  // eslint-disable-next-line react-hooks/refs
   loadMoreArchiveFnRef.current = loadMoreArchive
 
   useEffect(() => {
@@ -247,18 +241,11 @@ export default function App() {
     }
   }
 
-  // 通知チェック用 ref（interval クロージャでの stale 防止）
-  const upcomingRef = useRef(upcoming)
-  useEffect(() => {
-    upcomingRef.current = upcoming
-  }, [upcoming])
-  const notifiedRef = useRef(new Set())
+  // 自動アップデートイベントの購読
   const refreshRef = useRef(refresh)
   useEffect(() => {
     refreshRef.current = refresh
   }, [refresh])
-
-  // 自動アップデートイベントの購読
 
   useEffect(() => {
     window.api.onUpdateAvailable(() => setUpdateStatus('downloading'))
@@ -269,52 +256,10 @@ export default function App() {
     })
   }, [])
 
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const result = await window.api.checkAuth()
-        if (result.error === 'CREDENTIALS_NOT_FOUND') {
-          setCredentialsMissing(true)
-          setCredentialsPath(result.credentialsPath || '')
-        } else {
-          setIsAuthenticated(result.isAuthenticated)
-          if (result.isAuthenticated) refresh()
-        }
-      } catch {
-        // silent
-      } finally {
-        setAuthLoading(false)
-      }
-    })()
-  }, [refresh])
-
   // 自動リフレッシュ（10分ごと）
   useEffect(() => {
     if (!isAuthenticated) return
     const id = setInterval(() => refreshRef.current(), 10 * 60 * 1000)
-    return () => clearInterval(id)
-  }, [isAuthenticated])
-
-  // 通知チェック（1分ごと）
-  useEffect(() => {
-    if (!isAuthenticated) return
-    const THRESHOLD = 5 * 60 * 1000
-    const id = setInterval(() => {
-      const now = Date.now()
-      for (const item of upcomingRef.current) {
-        if (!item.isNotify) continue
-        if (notifiedRef.current.has(item.id)) continue
-        const start = new Date(item.scheduledStartTime).getTime()
-        const remaining = start - now
-        if (remaining > 0 && remaining <= THRESHOLD) {
-          notifiedRef.current.add(item.id)
-          window.api?.showNotification?.(
-            'もうすぐ配信開始',
-            `${item.channelTitle}「${item.title}」が5分後に始まります`
-          )
-        }
-      }
-    }, 60 * 1000)
     return () => clearInterval(id)
   }, [isAuthenticated])
 
@@ -382,25 +327,6 @@ export default function App() {
   function handleSearchQueryChange(v) {
     setSearchQuery(v)
     if (activeTab === 'archive') runArchiveSearch(v)
-  }
-
-  async function handleLogin() {
-    setAuthLoading(true)
-    const result = await window.api.login()
-    setAuthLoading(false)
-    if (result.isAuthenticated) {
-      setLoginSuccess(true)
-      setTimeout(() => {
-        setLoginSuccess(false)
-        setIsAuthenticated(true)
-        refresh()
-      }, 2000)
-    }
-  }
-
-  async function handleLogout() {
-    await window.api.logout()
-    setIsAuthenticated(false)
   }
 
   if (authLoading) {
