@@ -26,13 +26,13 @@
 
 YouTube 登録チャンネルの **配信予定・ライブ中動画** を一覧表示する Windows/Mac/Linux 対応デスクトップアプリ。
 
-| 項目 | 内容 |
-|---|---|
-| プラットフォーム | Electron 39.2.6（Windows / macOS / Linux） |
-| 言語 | JavaScript (ES Modules) + React 19 |
-| データソース | YouTube Data API v3（OAuth 2.0）+ RSS フィード |
-| ローカル DB | SQLite（better-sqlite3 12.9.0） |
-| リポジトリ | https://github.com/harness17/youtube-schedule |
+| 項目             | 内容                                           |
+| ---------------- | ---------------------------------------------- |
+| プラットフォーム | Electron 39.2.6（Windows / macOS / Linux）     |
+| 言語             | JavaScript (ES Modules) + React 19             |
+| データソース     | YouTube Data API v3（OAuth 2.0）+ RSS フィード |
+| ローカル DB      | SQLite（better-sqlite3 12.9.0）                |
+| リポジトリ       | https://github.com/harness17/youtube-schedule  |
 
 ### 主な機能
 
@@ -48,40 +48,40 @@ YouTube 登録チャンネルの **配信予定・ライブ中動画** を一覧
 
 ### フロントエンド
 
-| パッケージ | バージョン | 役割 |
-|---|---|---|
-| React | 19.2.1 | UI フレームワーク |
-| Vite | 7.2.6 | ビルドツール |
-| @vitejs/plugin-react | 5.2.0 | JSX 変換 |
-| ESLint | 9.39.1 | 静的解析 |
-| Prettier | 3.7.4 | コード整形 |
+| パッケージ           | バージョン | 役割              |
+| -------------------- | ---------- | ----------------- |
+| React                | 19.2.1     | UI フレームワーク |
+| Vite                 | 7.2.6      | ビルドツール      |
+| @vitejs/plugin-react | 5.2.0      | JSX 変換          |
+| ESLint               | 9.39.1     | 静的解析          |
+| Prettier             | 3.7.4      | コード整形        |
 
 ### メインプロセス
 
-| パッケージ | バージョン | 役割 |
-|---|---|---|
-| Electron | 39.2.6 | デスクトップフレームワーク |
-| electron-vite | 5.0.0 | Electron 用 Vite |
-| electron-builder | 26.0.12 | パッケージング |
-| electron-updater | 6.8.3 | 自動アップデート |
-| better-sqlite3 | 12.9.0 | SQLite ドライバ（同期） |
-| electron-store | 8.2.0 | 設定永続化（JSON） |
-| googleapis | 171.4.0 | YouTube Data API v3 |
-| @google-cloud/local-auth | 3.0.1 | OAuth 認証フロー |
-| fast-xml-parser | 4.5.6 | RSS XML パース |
-| dotenv | 17.4.1 | 環境変数読み込み |
-| @electron/rebuild | 4.0.3 | ネイティブ依存リビルド |
+| パッケージ               | バージョン | 役割                       |
+| ------------------------ | ---------- | -------------------------- |
+| Electron                 | 39.2.6     | デスクトップフレームワーク |
+| electron-vite            | 5.0.0      | Electron 用 Vite           |
+| electron-builder         | 26.0.12    | パッケージング             |
+| electron-updater         | 6.8.3      | 自動アップデート           |
+| better-sqlite3           | 12.9.0     | SQLite ドライバ（同期）    |
+| electron-store           | 8.2.0      | 設定永続化（JSON）         |
+| googleapis               | 171.4.0    | YouTube Data API v3        |
+| @google-cloud/local-auth | 3.0.1      | OAuth 認証フロー           |
+| fast-xml-parser          | 4.5.6      | RSS XML パース             |
+| dotenv                   | 17.4.1     | 環境変数読み込み           |
+| @electron/rebuild        | 4.0.3      | ネイティブ依存リビルド     |
 
 ### テスト
 
-| パッケージ | バージョン | 役割 |
-|---|---|---|
-| Vitest | 4.1.4 | ユニットテスト |
-| @vitest/coverage-v8 | 4.1.4 | カバレッジ |
-| @testing-library/react | 16.3.2 | React テスト |
-| @testing-library/jest-dom | 6.9.1 | DOM アサーション |
-| jsdom | 29.0.2 | DOM 実装 |
-| nock | 13.5.6 | HTTP モック |
+| パッケージ                | バージョン | 役割             |
+| ------------------------- | ---------- | ---------------- |
+| Vitest                    | 4.1.4      | ユニットテスト   |
+| @vitest/coverage-v8       | 4.1.4      | カバレッジ       |
+| @testing-library/react    | 16.3.2     | React テスト     |
+| @testing-library/jest-dom | 6.9.1      | DOM アサーション |
+| jsdom                     | 29.0.2     | DOM 実装         |
+| nock                      | 13.5.6     | HTTP モック      |
 
 ---
 
@@ -152,40 +152,40 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 
 `credentials.json` が存在しない場合、または未認証の場合に表示。
 
-| 状態 | 表示内容 |
-|---|---|
+| 状態                    | 表示内容                                                    |
+| ----------------------- | ----------------------------------------------------------- |
 | `CREDENTIALS_NOT_FOUND` | credentials.json の配置手順を案内。「フォルダを開く」ボタン |
-| 未認証 | 「Google でログイン」ボタン |
-| 認証エラー | エラーメッセージ + 再ログインボタン |
+| 未認証                  | 「Google でログイン」ボタン                                 |
+| 認証エラー              | エラーメッセージ + 再ログインボタン                         |
 
 ### 4.2 メイン画面（App）
 
 #### ヘッダー（行 1）
 
-| 要素 | 機能 |
-|---|---|
-| アプリタイトル | 表示のみ |
-| バージョン番号 | `app:version` IPC で取得 |
-| 🔄 更新ボタン | 手動リフレッシュ（デバウンス付き） |
-| 🚪 ログアウトボタン | `auth:logout` IPC → 認証画面に戻る |
+| 要素                      | 機能                                 |
+| ------------------------- | ------------------------------------ |
+| アプリタイトル            | 表示のみ                             |
+| バージョン番号            | `app:version` IPC で取得             |
+| 🔄 更新ボタン             | 手動リフレッシュ（デバウンス付き）   |
+| 🚪 ログアウトボタン       | `auth:logout` IPC → 認証画面に戻る   |
 | 🌙/☀ ダークモード切り替え | `settings:set darkMode` IPC で永続化 |
 
 #### ヘッダー（行 2）
 
-| 要素 | 表示タブ | 機能 |
-|---|---|---|
-| 🔍 検索ボックス | 全タブ | タイトル・チャンネル名のリアルタイム絞り込み |
-| チャンネル選択ドロップダウン | schedule のみ | チャンネル単位でフィルター |
-| 📌 チャンネル管理ボタン | schedule のみ | チャンネル管理モーダルを開く |
+| 要素                         | 表示タブ      | 機能                                         |
+| ---------------------------- | ------------- | -------------------------------------------- |
+| 🔍 検索ボックス              | 全タブ        | タイトル・チャンネル名のリアルタイム絞り込み |
+| チャンネル選択ドロップダウン | schedule のみ | チャンネル単位でフィルター                   |
+| 📌 チャンネル管理ボタン      | schedule のみ | チャンネル管理モーダルを開く                 |
 
 #### タブ構成
 
-| タブキー | 表示名 | 表示内容 | フィルタ条件 |
-|---|---|---|---|
-| `schedule` | 予定・ライブ | live セクション + upcoming セクション（日付グループ） | キーワード + チャンネル選択 |
-| `missed` | 見逃し | お知らせ登録済みで未視聴の終了配信 | `status='ended' AND notify=1 AND viewed_at IS NULL` |
-| `archive` | アーカイブ | 全終了配信（無限スクロール・全文検索） | `status='ended'` |
-| `favorites` | お気に入り | お気に入り登録済みの動画 | `is_favorite=1` |
+| タブキー    | 表示名       | 表示内容                                              | フィルタ条件                                        |
+| ----------- | ------------ | ----------------------------------------------------- | --------------------------------------------------- |
+| `schedule`  | 予定・ライブ | live セクション + upcoming セクション（日付グループ） | キーワード + チャンネル選択                         |
+| `missed`    | 見逃し       | お知らせ登録済みで未視聴の終了配信                    | `status='ended' AND notify=1 AND viewed_at IS NULL` |
+| `archive`   | アーカイブ   | 全終了配信（無限スクロール・全文検索）                | `status='ended'`                                    |
+| `favorites` | お気に入り   | お気に入り登録済みの動画                              | `is_favorite=1`                                     |
 
 ### 4.3 ScheduleCard（動画カード）
 
@@ -193,44 +193,44 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 
 #### 表示内容
 
-| 項目 | 条件 |
-|---|---|
-| サムネイル | 常時 |
-| チャンネル名 | 常時。推し済みなら金色（#D4A017） |
-| 動画タイトル | 常時 |
-| ステータスバッジ | live / upcoming |
-| 配信開始時刻 / カウントダウン | upcoming のみ |
-| 同時視聴者数 | live のみ |
-| 推し済みゴールドボーダー | `isPinned=true` 時、左枠 4px #FFD700 |
-| 既読（薄表示） | `viewedAt != null` 時、opacity 60% |
-| 「見た」バッジ | `viewedAt != null` 時 |
+| 項目                          | 条件                                 |
+| ----------------------------- | ------------------------------------ |
+| サムネイル                    | 常時                                 |
+| チャンネル名                  | 常時。推し済みなら金色（#D4A017）    |
+| 動画タイトル                  | 常時                                 |
+| ステータスバッジ              | live / upcoming                      |
+| 配信開始時刻 / カウントダウン | upcoming のみ                        |
+| 同時視聴者数                  | live のみ                            |
+| 推し済みゴールドボーダー      | `isPinned=true` 時、左枠 4px #FFD700 |
+| 既読（薄表示）                | `viewedAt != null` 時、opacity 60%   |
+| 「見た」バッジ                | `viewedAt != null` 時                |
 
 #### ボタン
 
-| ボタン | 動作 | 表示条件 |
-|---|---|---|
-| YouTube で開く | `shell:openExternal` で外部ブラウザ | 常時 |
-| 🔔 お知らせ | `videos:toggleNotify` → 5分前通知 | 常時 |
-| ⭐ お気に入り | `videos:toggleFavorite` | 常時 |
-| ✓ 見た | `videos:markViewed` / `clearViewed` | `showViewedButton=true` 時（アーカイブ系タブのみ） |
-| 📌 推し設定 | `channels:togglePin` | 常時 |
+| ボタン         | 動作                                | 表示条件                                           |
+| -------------- | ----------------------------------- | -------------------------------------------------- |
+| YouTube で開く | `shell:openExternal` で外部ブラウザ | 常時                                               |
+| 🔔 お知らせ    | `videos:toggleNotify` → 5分前通知   | 常時                                               |
+| ⭐ お気に入り  | `videos:toggleFavorite`             | 常時                                               |
+| ✓ 見た         | `videos:markViewed` / `clearViewed` | `showViewedButton=true` 時（アーカイブ系タブのみ） |
+| 📌 推し設定    | `channels:togglePin`                | 常時                                               |
 
 #### ScheduleCard props
 
-| prop | 型 | 説明 |
-|---|---|---|
-| `item` | object | 動画データ |
-| `darkMode` | bool | ダークモード |
-| `watched` | bool | `item.isNotify`。🔔 スタイル切り替え |
-| `onToggleWatch` | func | `(id) => void` |
-| `isFavorite` | bool | ⭐ スタイル切り替え |
-| `onToggleFavorite` | func | `(id) => void` |
-| `showViewedButton` | bool | ✓ ボタンを表示するか |
-| `onMarkViewed` | func | `(id, viewed: bool) => void` |
-| `isPinned` | bool | 推し済みフラグ |
-| `onTogglePin` | func | `(channelId) => void` |
-| `isViewed` | bool | `item.viewedAt != null`。既読スタイル |
-| `showStatusBadge` | bool | upcoming/live バッジを表示するか |
+| prop               | 型     | 説明                                  |
+| ------------------ | ------ | ------------------------------------- |
+| `item`             | object | 動画データ                            |
+| `darkMode`         | bool   | ダークモード                          |
+| `watched`          | bool   | `item.isNotify`。🔔 スタイル切り替え  |
+| `onToggleWatch`    | func   | `(id) => void`                        |
+| `isFavorite`       | bool   | ⭐ スタイル切り替え                   |
+| `onToggleFavorite` | func   | `(id) => void`                        |
+| `showViewedButton` | bool   | ✓ ボタンを表示するか                  |
+| `onMarkViewed`     | func   | `(id, viewed: bool) => void`          |
+| `isPinned`         | bool   | 推し済みフラグ                        |
+| `onTogglePin`      | func   | `(channelId) => void`                 |
+| `isViewed`         | bool   | `item.viewedAt != null`。既読スタイル |
+| `showStatusBadge`  | bool   | upcoming/live バッジを表示するか      |
 
 ### 4.4 チャンネル管理モーダル
 
@@ -264,22 +264,22 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 
 #### カラースキーム
 
-| 状態 | ライト | ダーク |
-|---|---|---|
-| 推し済み行 | #fffbe6 | #3a3200 |
+| 状態             | ライト             | ダーク             |
+| ---------------- | ------------------ | ------------------ |
+| 推し済み行       | #fffbe6            | #3a3200            |
 | 「優先中」ボタン | #FFD700 背景、太字 | #FFD700 背景、太字 |
-| 「優先」ボタン | グレー背景 | グレー背景 |
+| 「優先」ボタン   | グレー背景         | グレー背景         |
 
 ### 4.5 StatusBanners
 
-| バナー | 表示条件 |
-|---|---|
-| DB 破損 | `dbBroken=true` |
-| オフライン | `navigator.onLine = false` |
-| RSS 失敗率警告 | `diag:rssFailureRate` が閾値超過 |
-| クォータ超過 | YouTube API 403 応答 |
-| アップデート（ダウンロード中） | `updater:update-available` |
-| アップデート（完了） | `updater:update-downloaded` + 再起動ボタン |
+| バナー                         | 表示条件                                   |
+| ------------------------------ | ------------------------------------------ |
+| DB 破損                        | `dbBroken=true`                            |
+| オフライン                     | `navigator.onLine = false`                 |
+| RSS 失敗率警告                 | `diag:rssFailureRate` が閾値超過           |
+| クォータ超過                   | YouTube API 403 応答                       |
+| アップデート（ダウンロード中） | `updater:update-available`                 |
+| アップデート（完了）           | `updater:update-downloaded` + 再起動ボタン |
 
 ---
 
@@ -300,7 +300,7 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 5. 保持期間：**90 日**（viewed_at を設定すると 30 日に短縮）
 
 ```javascript
-const THRESHOLD = 5 * 60 * 1000  // 5分
+const THRESHOLD = 5 * 60 * 1000 // 5分
 const remaining = scheduledStartTime - Date.now()
 if (remaining > 0 && remaining <= THRESHOLD) {
   window.api.showNotification('もうすぐ配信開始', `${channel}「${title}」が5分後に始まります`)
@@ -357,61 +357,61 @@ if (remaining > 0 && remaining <= THRESHOLD) {
 
 ### 認証系
 
-| チャネル | 方向 | 入力 | 出力 | 説明 |
-|---|---|---|---|---|
-| `auth:check` | invoke | — | `{isAuthenticated, error?, credentialsPath?}` | 認証状態確認 |
-| `auth:login` | invoke | — | `{isAuthenticated, error?}` | OAuth フロー開始 |
-| `auth:logout` | invoke | — | `{isAuthenticated: false}` | token.json 削除・スケジューラー停止 |
+| チャネル      | 方向   | 入力 | 出力                                          | 説明                                |
+| ------------- | ------ | ---- | --------------------------------------------- | ----------------------------------- |
+| `auth:check`  | invoke | —    | `{isAuthenticated, error?, credentialsPath?}` | 認証状態確認                        |
+| `auth:login`  | invoke | —    | `{isAuthenticated, error?}`                   | OAuth フロー開始                    |
+| `auth:logout` | invoke | —    | `{isAuthenticated: false}`                    | token.json 削除・スケジューラー停止 |
 
 ### スケジュール系
 
-| チャネル | 方向 | 入力 | 出力 | 説明 |
-|---|---|---|---|---|
-| `schedule:get` | invoke | — | `{live: Video[], upcoming: Video[], dbBroken?}` | 現在の表示データ取得 |
-| `schedule:refresh` | invoke | `{forceFullRecheck?: bool}` | — | 手動リフレッシュ |
-| `schedule:resetDatabase` | invoke | — | — | DB 削除→再初期化 |
-| `schedule:updated` | on（受信） | — | — | 自動リフレッシュ完了通知 |
+| チャネル                 | 方向       | 入力                        | 出力                                            | 説明                     |
+| ------------------------ | ---------- | --------------------------- | ----------------------------------------------- | ------------------------ |
+| `schedule:get`           | invoke     | —                           | `{live: Video[], upcoming: Video[], dbBroken?}` | 現在の表示データ取得     |
+| `schedule:refresh`       | invoke     | `{forceFullRecheck?: bool}` | —                                               | 手動リフレッシュ         |
+| `schedule:resetDatabase` | invoke     | —                           | —                                               | DB 削除→再初期化         |
+| `schedule:updated`       | on（受信） | —                           | —                                               | 自動リフレッシュ完了通知 |
 
 ### 動画系
 
-| チャネル | 方向 | 入力 | 出力 | 説明 |
-|---|---|---|---|---|
-| `videos:listMissed` | invoke | — | `Video[]` | 見逃し一覧取得 |
-| `videos:listArchive` | invoke | `{limit?, offset?}` | `Video[]` | アーカイブ一覧（デフォルト limit=50） |
-| `videos:listFavorites` | invoke | — | `Video[]` | お気に入り一覧取得 |
-| `videos:searchByText` | invoke | `query, {title?, channel?, description?, limit?}` | `Video[]` | LIKE 検索 |
-| `videos:markViewed` | invoke | `id` | `bool` | 視聴済みマーク |
-| `videos:clearViewed` | invoke | `id` | `bool` | 視聴済み解除 |
-| `videos:toggleFavorite` | invoke | `id` | `bool \| null` | お気に入り反転 |
-| `videos:toggleNotify` | invoke | `id` | `bool \| null` | お知らせ反転 |
+| チャネル                | 方向   | 入力                                              | 出力           | 説明                                  |
+| ----------------------- | ------ | ------------------------------------------------- | -------------- | ------------------------------------- |
+| `videos:listMissed`     | invoke | —                                                 | `Video[]`      | 見逃し一覧取得                        |
+| `videos:listArchive`    | invoke | `{limit?, offset?}`                               | `Video[]`      | アーカイブ一覧（デフォルト limit=50） |
+| `videos:listFavorites`  | invoke | —                                                 | `Video[]`      | お気に入り一覧取得                    |
+| `videos:searchByText`   | invoke | `query, {title?, channel?, description?, limit?}` | `Video[]`      | LIKE 検索                             |
+| `videos:markViewed`     | invoke | `id`                                              | `bool`         | 視聴済みマーク                        |
+| `videos:clearViewed`    | invoke | `id`                                              | `bool`         | 視聴済み解除                          |
+| `videos:toggleFavorite` | invoke | `id`                                              | `bool \| null` | お気に入り反転                        |
+| `videos:toggleNotify`   | invoke | `id`                                              | `bool \| null` | お知らせ反転                          |
 
 ### チャンネル系
 
-| チャネル | 方向 | 入力 | 出力 | 説明 |
-|---|---|---|---|---|
-| `channels:togglePin` | invoke | `id` | `bool \| null` | 推し設定反転 |
-| `channels:listAll` | invoke | — | `Channel[]` | 全チャンネル取得（`is_pinned DESC, id ASC`） |
+| チャネル             | 方向   | 入力 | 出力           | 説明                                         |
+| -------------------- | ------ | ---- | -------------- | -------------------------------------------- |
+| `channels:togglePin` | invoke | `id` | `bool \| null` | 推し設定反転                                 |
+| `channels:listAll`   | invoke | —    | `Channel[]`    | 全チャンネル取得（`is_pinned DESC, id ASC`） |
 
 ### システム系
 
-| チャネル | 方向 | 入力 | 出力 | 説明 |
-|---|---|---|---|---|
-| `diag:rssFailureRate` | invoke | — | `number` | 過去 24h の RSS 失敗率（0〜1） |
-| `notification:show` | invoke | `{title, body}` | — | デスクトップ通知 |
-| `settings:get` | invoke | `key, defaultValue` | any | electron-store から取得 |
-| `settings:set` | invoke | `key, value` | — | electron-store に保存 |
-| `app:version` | invoke | — | `string` | アプリバージョン |
-| `shell:openFolder` | invoke | `filePath` | `{success}` | 親フォルダをエクスプローラーで開く |
-| `shell:openExternal` | invoke | `url` | `{success?, error?}` | http/https のみ外部ブラウザで開く |
-| `updater:quitAndInstall` | invoke | — | — | アップデートを適用して再起動 |
+| チャネル                 | 方向   | 入力                | 出力                 | 説明                               |
+| ------------------------ | ------ | ------------------- | -------------------- | ---------------------------------- |
+| `diag:rssFailureRate`    | invoke | —                   | `number`             | 過去 24h の RSS 失敗率（0〜1）     |
+| `notification:show`      | invoke | `{title, body}`     | —                    | デスクトップ通知                   |
+| `settings:get`           | invoke | `key, defaultValue` | any                  | electron-store から取得            |
+| `settings:set`           | invoke | `key, value`        | —                    | electron-store に保存              |
+| `app:version`            | invoke | —                   | `string`             | アプリバージョン                   |
+| `shell:openFolder`       | invoke | `filePath`          | `{success}`          | 親フォルダをエクスプローラーで開く |
+| `shell:openExternal`     | invoke | `url`               | `{success?, error?}` | http/https のみ外部ブラウザで開く  |
+| `updater:quitAndInstall` | invoke | —                   | —                    | アップデートを適用して再起動       |
 
 ### アップデーター系（受信イベント）
 
-| チャネル | 説明 |
-|---|---|
-| `updater:update-available` | 新バージョン検出（ダウンロード開始） |
+| チャネル                    | 説明                                 |
+| --------------------------- | ------------------------------------ |
+| `updater:update-available`  | 新バージョン検出（ダウンロード開始） |
 | `updater:update-downloaded` | ダウンロード完了（インストール可能） |
-| `updater:error` | アップデートエラー |
+| `updater:error`             | アップデートエラー                   |
 
 ---
 
@@ -422,114 +422,114 @@ PRAGMA 設定：`journal_mode = WAL`、`foreign_keys = ON`
 
 ### 7.1 テーブル一覧
 
-| テーブル | 説明 |
-|---|---|
-| `videos` | 動画データ（メインテーブル） |
-| `channels` | チャンネルデータ |
-| `rss_fetch_log` | RSS 取得ログ |
-| `meta` | システムメタデータ（KV ストア） |
-| `videos_fts` | FTS5 全文検索仮想テーブル（migration 003） |
-| `schema_version` | マイグレーション管理 |
+| テーブル         | 説明                                       |
+| ---------------- | ------------------------------------------ |
+| `videos`         | 動画データ（メインテーブル）               |
+| `channels`       | チャンネルデータ                           |
+| `rss_fetch_log`  | RSS 取得ログ                               |
+| `meta`           | システムメタデータ（KV ストア）            |
+| `videos_fts`     | FTS5 全文検索仮想テーブル（migration 003） |
+| `schema_version` | マイグレーション管理                       |
 
 ### 7.2 videos テーブル
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| `id` | TEXT | PRIMARY KEY | YouTube 動画 ID |
-| `channel_id` | TEXT | NOT NULL | チャンネル ID |
-| `channel_title` | TEXT | NOT NULL | チャンネルタイトル |
-| `title` | TEXT | NOT NULL | 動画タイトル |
-| `description` | TEXT | DEFAULT '' | 動画説明 |
-| `thumbnail` | TEXT | — | サムネイル URL |
-| `status` | TEXT | NOT NULL | `'live'` / `'upcoming'` / `'ended'` |
-| `scheduled_start_time` | INTEGER | — | 予定開始時刻（Unix ms） |
-| `actual_start_time` | INTEGER | — | 実際の開始時刻（Unix ms） |
-| `concurrent_viewers` | INTEGER | — | ライブ同時視聴者数 |
-| `url` | TEXT | NOT NULL | `https://youtube.com/watch?v={id}` |
-| `first_seen_at` | INTEGER | NOT NULL | 初検出時刻（Unix ms） |
-| `last_checked_at` | INTEGER | NOT NULL | 最終確認時刻（Unix ms） |
-| `viewed_at` | INTEGER | DEFAULT NULL | 視聴済みマーク時刻（Unix ms）※migration 003 |
-| `is_favorite` | INTEGER | NOT NULL DEFAULT 0 | お気に入りフラグ（0/1）※migration 003 |
-| `ended_at` | INTEGER | DEFAULT NULL | ended 化時刻（初回のみ）※migration 003 |
-| `notify` | INTEGER | NOT NULL DEFAULT 0 | お知らせフラグ（0/1）※migration 004 |
+| カラム                 | 型      | 制約               | 説明                                        |
+| ---------------------- | ------- | ------------------ | ------------------------------------------- |
+| `id`                   | TEXT    | PRIMARY KEY        | YouTube 動画 ID                             |
+| `channel_id`           | TEXT    | NOT NULL           | チャンネル ID                               |
+| `channel_title`        | TEXT    | NOT NULL           | チャンネルタイトル                          |
+| `title`                | TEXT    | NOT NULL           | 動画タイトル                                |
+| `description`          | TEXT    | DEFAULT ''         | 動画説明                                    |
+| `thumbnail`            | TEXT    | —                  | サムネイル URL                              |
+| `status`               | TEXT    | NOT NULL           | `'live'` / `'upcoming'` / `'ended'`         |
+| `scheduled_start_time` | INTEGER | —                  | 予定開始時刻（Unix ms）                     |
+| `actual_start_time`    | INTEGER | —                  | 実際の開始時刻（Unix ms）                   |
+| `concurrent_viewers`   | INTEGER | —                  | ライブ同時視聴者数                          |
+| `url`                  | TEXT    | NOT NULL           | `https://youtube.com/watch?v={id}`          |
+| `first_seen_at`        | INTEGER | NOT NULL           | 初検出時刻（Unix ms）                       |
+| `last_checked_at`      | INTEGER | NOT NULL           | 最終確認時刻（Unix ms）                     |
+| `viewed_at`            | INTEGER | DEFAULT NULL       | 視聴済みマーク時刻（Unix ms）※migration 003 |
+| `is_favorite`          | INTEGER | NOT NULL DEFAULT 0 | お気に入りフラグ（0/1）※migration 003       |
+| `ended_at`             | INTEGER | DEFAULT NULL       | ended 化時刻（初回のみ）※migration 003      |
+| `notify`               | INTEGER | NOT NULL DEFAULT 0 | お知らせフラグ（0/1）※migration 004         |
 
 **インデックス：**
 
-| インデックス名 | 対象カラム | migration |
-|---|---|---|
-| `idx_videos_status_sched` | `(status, scheduled_start_time)` | 001 |
-| `idx_videos_channel` | `(channel_id)` | 001 |
-| `idx_videos_actual_start` | `(actual_start_time)` | 001 |
-| `idx_videos_favorite` | `(is_favorite)` | 003 |
-| `idx_videos_viewed` | `(viewed_at)` | 003 |
-| `idx_videos_ended_at` | `(ended_at)` | 003 |
-| `idx_videos_notify` | `(notify)` | 004 |
+| インデックス名            | 対象カラム                       | migration |
+| ------------------------- | -------------------------------- | --------- |
+| `idx_videos_status_sched` | `(status, scheduled_start_time)` | 001       |
+| `idx_videos_channel`      | `(channel_id)`                   | 001       |
+| `idx_videos_actual_start` | `(actual_start_time)`            | 001       |
+| `idx_videos_favorite`     | `(is_favorite)`                  | 003       |
+| `idx_videos_viewed`       | `(viewed_at)`                    | 003       |
+| `idx_videos_ended_at`     | `(ended_at)`                     | 003       |
+| `idx_videos_notify`       | `(notify)`                       | 004       |
 
 **FTS5 同期トリガー（migration 003）：**
 
-| トリガー名 | タイミング | 処理 |
-|---|---|---|
-| `videos_ai` | AFTER INSERT | `videos_fts` に挿入 |
-| `videos_ad` | AFTER DELETE | `videos_fts` から削除 |
+| トリガー名  | タイミング   | 処理                         |
+| ----------- | ------------ | ---------------------------- |
+| `videos_ai` | AFTER INSERT | `videos_fts` に挿入          |
+| `videos_ad` | AFTER DELETE | `videos_fts` から削除        |
 | `videos_au` | AFTER UPDATE | `videos_fts` から削除→再挿入 |
 
 ### 7.3 channels テーブル
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| `id` | TEXT | PRIMARY KEY | チャンネル ID |
-| `title` | TEXT | — | チャンネルタイトル |
-| `uploads_playlist_id` | TEXT | — | アップロード再生リスト ID（nullable、migration 005） |
-| `last_subscription_sync_at` | INTEGER | — | 購読リスト同期時刻（Unix ms） |
-| `is_pinned` | INTEGER | NOT NULL DEFAULT 0 | 推しフラグ（0/1）※migration 003 |
+| カラム                      | 型      | 制約               | 説明                                                 |
+| --------------------------- | ------- | ------------------ | ---------------------------------------------------- |
+| `id`                        | TEXT    | PRIMARY KEY        | チャンネル ID                                        |
+| `title`                     | TEXT    | —                  | チャンネルタイトル                                   |
+| `uploads_playlist_id`       | TEXT    | —                  | アップロード再生リスト ID（nullable、migration 005） |
+| `last_subscription_sync_at` | INTEGER | —                  | 購読リスト同期時刻（Unix ms）                        |
+| `is_pinned`                 | INTEGER | NOT NULL DEFAULT 0 | 推しフラグ（0/1）※migration 003                      |
 
 **インデックス：**
 
-| インデックス名 | 対象カラム |
-|---|---|
+| インデックス名        | 対象カラム    |
+| --------------------- | ------------- |
 | `idx_channels_pinned` | `(is_pinned)` |
 
 ### 7.4 rss_fetch_log テーブル
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | ログ ID |
-| `channel_id` | TEXT | NOT NULL | チャンネル ID |
-| `fetched_at` | INTEGER | NOT NULL | 取得試行時刻（Unix ms） |
-| `success` | INTEGER | NOT NULL | 0 = 失敗 / 1 = 成功 |
-| `http_status` | INTEGER | — | HTTP ステータスコード |
-| `error_message` | TEXT | — | エラー理由（`timeout` / `network` / `parse` / `http_404` / `http_XXX`） |
+| カラム          | 型      | 制約                      | 説明                                                                    |
+| --------------- | ------- | ------------------------- | ----------------------------------------------------------------------- |
+| `id`            | INTEGER | PRIMARY KEY AUTOINCREMENT | ログ ID                                                                 |
+| `channel_id`    | TEXT    | NOT NULL                  | チャンネル ID                                                           |
+| `fetched_at`    | INTEGER | NOT NULL                  | 取得試行時刻（Unix ms）                                                 |
+| `success`       | INTEGER | NOT NULL                  | 0 = 失敗 / 1 = 成功                                                     |
+| `http_status`   | INTEGER | —                         | HTTP ステータスコード                                                   |
+| `error_message` | TEXT    | —                         | エラー理由（`timeout` / `network` / `parse` / `http_404` / `http_XXX`） |
 
 **インデックス：**`idx_rss_log_time` on `(fetched_at)`
 
 ### 7.5 meta テーブル
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| `key` | TEXT | PRIMARY KEY | キー（例: `last_cleanup_at`、`last_full_refresh_at`） |
-| `value` | TEXT | NOT NULL | 値（文字列） |
-| `updated_at` | INTEGER | NOT NULL | 更新時刻（Unix ms） |
+| カラム       | 型      | 制約        | 説明                                                  |
+| ------------ | ------- | ----------- | ----------------------------------------------------- |
+| `key`        | TEXT    | PRIMARY KEY | キー（例: `last_cleanup_at`、`last_full_refresh_at`） |
+| `value`      | TEXT    | NOT NULL    | 値（文字列）                                          |
+| `updated_at` | INTEGER | NOT NULL    | 更新時刻（Unix ms）                                   |
 
 ### 7.6 videos_fts 仮想テーブル（FTS5）
 
-| カラム | 説明 |
-|---|---|
-| `rowid` | `videos` の rowid にマッピング |
-| `title` | 全文検索対象 |
-| `description` | 全文検索対象 |
+| カラム        | 説明                           |
+| ------------- | ------------------------------ |
+| `rowid`       | `videos` の rowid にマッピング |
+| `title`       | 全文検索対象                   |
+| `description` | 全文検索対象                   |
 
 トークナイザー：`unicode61`  
 ※アーカイブ検索は現在 LIKE 検索で実装（日本語部分一致対応のため）
 
 ### 7.7 マイグレーション履歴
 
-| バージョン | ファイル | 内容 |
-|---|---|---|
-| 001 | `001_initial.js` | `videos` / `channels` / `rss_fetch_log` / `meta` テーブル作成 |
-| 002 | `002_import_from_store.js` | 旧 `scheduleCache`（electron-store）から SQLite へのデータ移行 |
-| 003 | `003_archive_favorites.js` | `viewed_at` / `is_favorite` / `ended_at` / `is_pinned` / `videos_fts` / トリガー追加 |
-| 004 | `004_notify_flag.js` | `notify` カラム・インデックス追加 |
-| 005 | `005_channel_accumulation.js` | `channels.uploads_playlist_id` を nullable 化・チャンネル自動蓄積対応 |
+| バージョン | ファイル                      | 内容                                                                                 |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------ |
+| 001        | `001_initial.js`              | `videos` / `channels` / `rss_fetch_log` / `meta` テーブル作成                        |
+| 002        | `002_import_from_store.js`    | 旧 `scheduleCache`（electron-store）から SQLite へのデータ移行                       |
+| 003        | `003_archive_favorites.js`    | `viewed_at` / `is_favorite` / `ended_at` / `is_pinned` / `videos_fts` / トリガー追加 |
+| 004        | `004_notify_flag.js`          | `notify` カラム・インデックス追加                                                    |
+| 005        | `005_channel_accumulation.js` | `channels.uploads_playlist_id` を nullable 化・チャンネル自動蓄積対応                |
 
 ---
 
@@ -537,11 +537,11 @@ PRAGMA 設定：`journal_mode = WAL`、`foreign_keys = ON`
 
 ### 8.1 リフレッシュサイクル
 
-| 項目 | 値 |
-|---|---|
+| 項目                 | 値                                            |
+| -------------------- | --------------------------------------------- |
 | 自動リフレッシュ間隔 | 30 分（`REFRESH_INTERVAL_MS = 1,800,000 ms`） |
-| 起動時動作 | 認証済みなら即時リフレッシュ |
-| 手動リフレッシュ | 「更新」ボタン → `schedule:refresh` IPC |
+| 起動時動作           | 認証済みなら即時リフレッシュ                  |
+| 手動リフレッシュ     | 「更新」ボタン → `schedule:refresh` IPC       |
 
 ### 8.2 フェーズ別処理（SchedulerService.refresh）
 
@@ -573,55 +573,55 @@ Phase 5: maybeCleanup()（24h ごと）
 
 ### 8.3 RSS フェッチャー
 
-| 項目 | 値 |
-|---|---|
-| URL | `https://www.youtube.com/feeds/videos.xml?channel_id={id}` |
-| User-Agent | `Mozilla/5.0 (compatible; YouTubeScheduleViewer)` |
-| タイムアウト | 3,000 ms |
-| パーサー | fast-xml-parser |
-| 取得件数 | 最新 15 件 |
-| クォータ消費 | **0 ユニット** |
+| 項目         | 値                                                         |
+| ------------ | ---------------------------------------------------------- |
+| URL          | `https://www.youtube.com/feeds/videos.xml?channel_id={id}` |
+| User-Agent   | `Mozilla/5.0 (compatible; YouTubeScheduleViewer)`          |
+| タイムアウト | 3,000 ms                                                   |
+| パーサー     | fast-xml-parser                                            |
+| 取得件数     | 最新 15 件                                                 |
+| クォータ消費 | **0 ユニット**                                             |
 
 **失敗理由（error_message 値）：**
 
-| 値 | 原因 |
-|---|---|
-| `timeout` | AbortError（3 秒超過） |
-| `network` | ネットワーク接続エラー |
-| `http_404` | HTTP 404 |
-| `http_XXX` | その他 HTTP エラー |
-| `parse` | XML パース失敗 |
+| 値         | 原因                   |
+| ---------- | ---------------------- |
+| `timeout`  | AbortError（3 秒超過） |
+| `network`  | ネットワーク接続エラー |
+| `http_404` | HTTP 404               |
+| `http_XXX` | その他 HTTP エラー     |
+| `parse`    | XML パース失敗         |
 
 ### 8.4 PlaylistItems フェッチャー（フォールバック）
 
-| 項目 | 値 |
-|---|---|
+| 項目         | 値                           |
+| ------------ | ---------------------------- |
 | API メソッド | `youtube.playlistItems.list` |
-| part | `['contentDetails']` |
-| maxResults | 15 |
-| タイムアウト | 10,000 ms |
-| クォータ消費 | 1 ユニット / チャンネル |
+| part         | `['contentDetails']`         |
+| maxResults   | 15                           |
+| タイムアウト | 10,000 ms                    |
+| クォータ消費 | 1 ユニット / チャンネル      |
 
 ### 8.5 Subscriptions フェッチャー
 
-| 項目 | 値 |
-|---|---|
-| API メソッド | `youtube.subscriptions.list` |
-| part | `['snippet']` |
-| mine | `true` |
-| maxResults | 50（ページネーションで全件取得） |
+| 項目           | 値                                            |
+| -------------- | --------------------------------------------- |
+| API メソッド   | `youtube.subscriptions.list`                  |
+| part           | `['snippet']`                                 |
+| mine           | `true`                                        |
+| maxResults     | 50（ページネーションで全件取得）              |
 | キャッシュ TTL | 24 時間（`last_subscription_sync_at` で判定） |
-| クォータ消費 | 1 ユニット |
+| クォータ消費   | 1 ユニット                                    |
 
 ### 8.6 Video Details フェッチャー
 
-| 項目 | 値 |
-|---|---|
-| API メソッド | `youtube.videos.list` |
-| part | `['snippet', 'liveStreamingDetails']` |
-| バッチサイズ | 50 件 |
-| タイムアウト | 15,000 ms |
-| クォータ消費 | 1 ユニット / 50 動画 |
+| 項目         | 値                                    |
+| ------------ | ------------------------------------- |
+| API メソッド | `youtube.videos.list`                 |
+| part         | `['snippet', 'liveStreamingDetails']` |
+| バッチサイズ | 50 件                                 |
+| タイムアウト | 15,000 ms                             |
+| クォータ消費 | 1 ユニット / 50 動画                  |
 
 ### 8.7 ステータス判定ロジック（deriveStatus）
 
@@ -635,6 +635,7 @@ liveBroadcastContent = 'upcoming'
 ```
 
 定数：
+
 - `UPCOMING_GRACE_MS = 2 * 60 * 60 * 1000`（2 時間）
 - `LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000`（24 時間）
 
@@ -644,11 +645,11 @@ liveBroadcastContent = 'upcoming'
 
 ### 保持ルール
 
-| 条件 | 保持期間 |
-|---|---|
-| `is_favorite = 1` | **永久保持** |
+| 条件                               | 保持期間                                              |
+| ---------------------------------- | ----------------------------------------------------- |
+| `is_favorite = 1`                  | **永久保持**                                          |
 | `notify = 1 AND viewed_at IS NULL` | **90 日**（`NOTIFY_RETENTION_MS = 7,776,000,000 ms`） |
-| 上記以外（通常の ended） | **30 日**（`ENDED_RETENTION_MS = 2,592,000,000 ms`） |
+| 上記以外（通常の ended）           | **30 日**（`ENDED_RETENTION_MS = 2,592,000,000 ms`）  |
 
 > 「見た」ボタンで `viewed_at` をセットすると、`notify=1` でも 30 日扱いに戻る。
 
@@ -673,20 +674,20 @@ WHERE status = 'ended'
 
 ### Electron セキュリティ設定
 
-| 設定 | 値 |
-|---|---|
-| `contextIsolation` | `true` |
-| `nodeIntegration` | `false` |
-| `sandbox` | `true` |
-| `webSecurity` | `true` |
+| 設定               | 値      |
+| ------------------ | ------- |
+| `contextIsolation` | `true`  |
+| `nodeIntegration`  | `false` |
+| `sandbox`          | `true`  |
+| `webSecurity`      | `true`  |
 
 ### 認証ファイル管理
 
-| ファイル | 保存先 | 内容 | .gitignore |
-|---|---|---|---|
-| `credentials.json` | `{userData}/credentials.json` | OAuth クライアント ID/シークレット | ✅ |
-| `token.json` | `{userData}/token.json` | refresh_token のみ保存 | ✅ |
-| `.env` | プロジェクトルート | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ✅ |
+| ファイル           | 保存先                        | 内容                                       | .gitignore |
+| ------------------ | ----------------------------- | ------------------------------------------ | ---------- |
+| `credentials.json` | `{userData}/credentials.json` | OAuth クライアント ID/シークレット         | ✅         |
+| `token.json`       | `{userData}/token.json`       | refresh_token のみ保存                     | ✅         |
+| `.env`             | プロジェクトルート            | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ✅         |
 
 ### 外部 URL オープン制限
 
@@ -698,11 +699,11 @@ WHERE status = 'ended'
 
 GitHub Releases からバイナリを自動取得（electron-updater）。
 
-| フェーズ | イベント | UI 表示 |
-|---|---|---|
-| アップデート検出 | `updater:update-available` | 「ダウンロード中...」バナー |
-| ダウンロード完了 | `updater:update-downloaded` | 「再起動して更新を適用」ボタン |
-| ボタン押下 | — | `updater:quitAndInstall` IPC → 再起動 |
+| フェーズ         | イベント                    | UI 表示                               |
+| ---------------- | --------------------------- | ------------------------------------- |
+| アップデート検出 | `updater:update-available`  | 「ダウンロード中...」バナー           |
+| ダウンロード完了 | `updater:update-downloaded` | 「再起動して更新を適用」ボタン        |
+| ボタン押下       | —                           | `updater:quitAndInstall` IPC → 再起動 |
 
 ---
 
@@ -732,11 +733,11 @@ feature/xxx  →  develop  →  master（リリース時のみ）
 
 ### バージョニング
 
-| 種別 | 例 | 適用条件 |
-|---|---|---|
+| 種別  | 例            | 適用条件              |
+| ----- | ------------- | --------------------- |
 | patch | 1.7.0 → 1.7.1 | バグ修正・UI 改善のみ |
-| minor | 1.7.0 → 1.8.0 | 後方互換の新機能追加 |
-| major | 1.7.0 → 2.0.0 | 破壊的変更 |
+| minor | 1.7.0 → 1.8.0 | 後方互換の新機能追加  |
+| major | 1.7.0 → 2.0.0 | 破壊的変更            |
 
 ### CI/CD
 

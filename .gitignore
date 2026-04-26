@@ -10,3 +10,8 @@ token.json
 CLAUDE.local.md
 coverage/
 screenshot-*.png
+.agents/
+.superpowers/
+AGENTS.md
+docs/plans/
+docs/superpowers/specs/2026-04-25-settings-modal-design.md

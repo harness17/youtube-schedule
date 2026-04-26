@@ -1,4 +1,5 @@
 const UPCOMING_GRACE_MS = 2 * 60 * 60 * 1000
+const UPCOMING_FUTURE_MS = 31 * 24 * 60 * 60 * 1000
 const LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000
 
 export function createVideoRepository(db) {
@@ -37,7 +38,7 @@ export function createVideoRepository(db) {
   const listVisibleStmt = db.prepare(`
     SELECT * FROM videos
     WHERE (status = 'live' AND actual_start_time > @liveThreshold)
-       OR (status = 'upcoming' AND scheduled_start_time > @upcomingThreshold)
+       OR (status = 'upcoming' AND scheduled_start_time > @upcomingThreshold AND scheduled_start_time < @upcomingUpperThreshold)
     ORDER BY
       CASE status WHEN 'live' THEN 0 ELSE 1 END,
       scheduled_start_time ASC
@@ -86,6 +87,22 @@ export function createVideoRepository(db) {
   const toggleFavStmt = db.prepare(
     `UPDATE videos SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
   )
+  const setFavStmt = db.prepare(`
+    UPDATE videos
+    SET is_favorite = 1,
+        viewed_at = COALESCE(@viewedAt, viewed_at)
+    WHERE id = @id
+  `)
+  const getByIdForFavStmt = db.prepare(`SELECT id FROM videos WHERE id = @id`)
+  const importAsFavInsertStmt = db.prepare(`
+    INSERT OR IGNORE INTO videos (
+      id, channel_id, channel_title, title, description, thumbnail,
+      status, url, first_seen_at, last_checked_at
+    ) VALUES (
+      @id, @channelId, @channelTitle, @title, '', '',
+      'ended', @url, @now, @now
+    )
+  `)
   const toggleNotifyStmt = db.prepare(
     `UPDATE videos SET notify = CASE notify WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
   )
@@ -159,7 +176,8 @@ export function createVideoRepository(db) {
       return listVisibleStmt
         .all({
           liveThreshold: now - LIVE_MAX_DURATION_MS,
-          upcomingThreshold: now - UPCOMING_GRACE_MS
+          upcomingThreshold: now - UPCOMING_GRACE_MS,
+          upcomingUpperThreshold: now + UPCOMING_FUTURE_MS
         })
         .map(rowToVideo)
     },
@@ -197,6 +215,25 @@ export function createVideoRepository(db) {
       const r = toggleFavStmt.run({ id })
       if (r.changes === 0) return null
       return getByIdStmt.get(id)?.is_favorite === 1
+    },
+    setFavorite(id, viewedAt = null) {
+      const exists = getByIdForFavStmt.get({ id })
+      if (!exists) return null
+      setFavStmt.run({ id, viewedAt })
+      return true
+    },
+    importAsFavorite({ id, title, channelId, channelTitle, viewedAt }, now = Date.now()) {
+      const url = `https://www.youtube.com/watch?v=${id}`
+      importAsFavInsertStmt.run({
+        id,
+        channelId: channelId ?? '',
+        channelTitle: channelTitle ?? '',
+        title: title ?? '',
+        url,
+        now
+      })
+      setFavStmt.run({ id, viewedAt: viewedAt ?? null })
+      return true
     },
     toggleNotify(id) {
       const r = toggleNotifyStmt.run({ id })

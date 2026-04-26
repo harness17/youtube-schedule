@@ -20,20 +20,24 @@ SignPath.io の OSS 無料プランを使って Windows インストーラーに
 承認後、SignPath の管理画面で以下を設定する。
 
 ### Organization ID を確認する
+
 - 管理画面右上のアカウント名 → **Organization Settings**
 - `Organization ID` をメモしておく（後で GitHub Secret に登録する）
 
 ### Project を作成する
+
 - **Projects → New Project**
 - Project Slug: `youtube-schedule`
 
 ### Artifact Configuration を作成する
+
 - プロジェクト内の **Artifact Configurations → New**
 - Slug: `installer`
 - Type: `Windows Installer (MSI/NSIS)`
 - 対象ファイルのパス: `*.exe`
 
 ### Signing Policy を作成する
+
 - **Signing Policies → New**
 - Slug: `release-signing`
 - Certificate: SignPath が発行した OV 証明書を選択
@@ -45,10 +49,10 @@ SignPath.io の OSS 無料プランを使って Windows インストーラーに
 
 リポジトリの **Settings → Secrets and variables → Actions → New repository secret** から以下を追加する。
 
-| Secret 名 | 値 |
-|-----------|-----|
-| `SIGNPATH_API_TOKEN` | SignPath 管理画面の **CI User → API Token** から取得 |
-| `SIGNPATH_ORGANIZATION_ID` | 手順 2 でメモした Organization ID |
+| Secret 名                  | 値                                                   |
+| -------------------------- | ---------------------------------------------------- |
+| `SIGNPATH_API_TOKEN`       | SignPath 管理画面の **CI User → API Token** から取得 |
+| `SIGNPATH_ORGANIZATION_ID` | 手順 2 でメモした Organization ID                    |
 
 ---
 

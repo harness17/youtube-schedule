@@ -54,7 +54,9 @@ export default function ScheduleList({
 
   if (isEmpty) {
     return (
-      <div style={{ textAlign: 'center', color: darkMode ? '#7878a0' : '#6060a0', marginTop: '48px' }}>
+      <div
+        style={{ textAlign: 'center', color: darkMode ? '#7878a0' : '#6060a0', marginTop: '48px' }}
+      >
         予定された配信はありません
       </div>
     )
@@ -64,7 +66,10 @@ export default function ScheduleList({
     const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
     const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
     if (ap !== bp) return ap - bp
-    return (a.actualStartTime ?? a.scheduledStartTime ?? 0) - (b.actualStartTime ?? b.scheduledStartTime ?? 0)
+    return (
+      (a.actualStartTime ?? a.scheduledStartTime ?? 0) -
+      (b.actualStartTime ?? b.scheduledStartTime ?? 0)
+    )
   })
 
   const groups = groupByDate(upcoming)
@@ -97,7 +102,8 @@ export default function ScheduleList({
               onClick={() => scrollToSection(id)}
               className={`yt-nav-btn${isLive ? ' yt-nav-btn--live' : ''}`}
             >
-              {isLive ? '🔴 ' : ''}{label}
+              {isLive ? '🔴 ' : ''}
+              {label}
             </button>
           ))}
         </nav>
@@ -125,9 +131,7 @@ export default function ScheduleList({
 
       {sortedEntries.map(([dateLabel, groupItems]) => (
         <div key={dateLabel} id={toAnchorId(dateLabel)} style={{ marginBottom: '24px' }}>
-          <div className="yt-section-label">
-            📅 {dateLabel}
-          </div>
+          <div className="yt-section-label">📅 {dateLabel}</div>
           {groupItems.map((item) => (
             <ScheduleCard
               key={item.id}

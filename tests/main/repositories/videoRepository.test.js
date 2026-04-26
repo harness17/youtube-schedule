@@ -95,6 +95,30 @@ describe('VideoRepository', () => {
     expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b2')
   })
 
+  it('boundary: upcoming more than 31 days ahead is excluded', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(
+      sampleVideo({
+        id: 'b3',
+        status: 'upcoming',
+        scheduledStartTime: now + 32 * 24 * 3600e3
+      })
+    )
+    expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b3')
+  })
+
+  it('boundary: upcoming exactly 31 days ahead is excluded', () => {
+    const now = 1_700_000_000_000
+    repo.upsert(
+      sampleVideo({
+        id: 'b4',
+        status: 'upcoming',
+        scheduledStartTime: now + 31 * 24 * 3600e3
+      })
+    )
+    expect(repo.listVisible(now).map((v) => v.id)).not.toContain('b4')
+  })
+
   it('getByIds returns matching records only', () => {
     repo.upsert(sampleVideo({ id: 'a' }))
     repo.upsert(sampleVideo({ id: 'b' }))
@@ -316,19 +340,38 @@ describe('VideoRepository', () => {
   })
 
   it('searchByText がチャンネル名で検索できる', () => {
-    repo.upsert(sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' }))
-    repo.upsert(sampleVideo({ id: 'v2', channelTitle: '別のチャンネル', title: 'ホロ雑談', status: 'ended' }))
+    repo.upsert(
+      sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' })
+    )
+    repo.upsert(
+      sampleVideo({ id: 'v2', channelTitle: '別のチャンネル', title: 'ホロ雑談', status: 'ended' })
+    )
     // channel=true, title=false → チャンネル名のみ検索
-    const ids = repo.searchByText('ホロ', { title: false, channel: true, description: false }).map((v) => v.id)
+    const ids = repo
+      .searchByText('ホロ', { title: false, channel: true, description: false })
+      .map((v) => v.id)
     expect(ids).toEqual(['v1'])
   })
 
   it('searchByText のトグルで対象カラムを絞り込める', () => {
-    repo.upsert(sampleVideo({ id: 'v1', title: 'テストタイトル', description: 'キーワードあり', status: 'ended' }))
+    repo.upsert(
+      sampleVideo({
+        id: 'v1',
+        title: 'テストタイトル',
+        description: 'キーワードあり',
+        status: 'ended'
+      })
+    )
     // タイトルのみ → ヒットしない
-    expect(repo.searchByText('キーワード', { title: true, channel: false, description: false })).toEqual([])
+    expect(
+      repo.searchByText('キーワード', { title: true, channel: false, description: false })
+    ).toEqual([])
     // 説明文のみ → ヒットする
-    expect(repo.searchByText('キーワード', { title: false, channel: false, description: true }).map((v) => v.id)).toEqual(['v1'])
+    expect(
+      repo
+        .searchByText('キーワード', { title: false, channel: false, description: true })
+        .map((v) => v.id)
+    ).toEqual(['v1'])
   })
 
   it('searchByText がタイトルの部分一致で ended 動画を返す', () => {
@@ -341,14 +384,24 @@ describe('VideoRepository', () => {
 
   it('searchByText が説明文の部分一致で ended 動画を返す（description:true 指定時）', () => {
     repo.upsert(
-      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
+      sampleVideo({
+        id: 'v1',
+        title: '配信タイトル',
+        description: '今日は地獄コラボです',
+        status: 'ended'
+      })
     )
     expect(repo.searchByText('地獄', { description: true }).map((v) => v.id)).toEqual(['v1'])
   })
 
   it('searchByText はデフォルトで説明文を検索しない', () => {
     repo.upsert(
-      sampleVideo({ id: 'v1', title: '配信タイトル', description: '今日は地獄コラボです', status: 'ended' })
+      sampleVideo({
+        id: 'v1',
+        title: '配信タイトル',
+        description: '今日は地獄コラボです',
+        status: 'ended'
+      })
     )
     // デフォルト: title=true, channel=true, description=false
     expect(repo.searchByText('地獄')).toEqual([])
@@ -357,10 +410,18 @@ describe('VideoRepository', () => {
   it('searchByText はタイトルとチャンネル名を同時に検索する', () => {
     repo.upsert(sampleVideo({ id: 'v1', title: 'announcement stream', status: 'ended' }))
     repo.upsert(
-      sampleVideo({ id: 'v2', channelTitle: 'announcement channel', title: 'Cooking stream', status: 'ended' })
+      sampleVideo({
+        id: 'v2',
+        channelTitle: 'announcement channel',
+        title: 'Cooking stream',
+        status: 'ended'
+      })
     )
     repo.upsert(sampleVideo({ id: 'v3', title: 'Random talk', status: 'ended' }))
-    const ids = repo.searchByText('announcement').map((v) => v.id).sort()
+    const ids = repo
+      .searchByText('announcement')
+      .map((v) => v.id)
+      .sort()
     expect(ids).toEqual(['v1', 'v2'])
   })
 
@@ -400,8 +461,24 @@ describe('VideoRepository', () => {
     )
     channelRepo.togglePin('UCpinned')
 
-    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', status: 'ended', actualStartTime: now - 1000, lastCheckedAt: now }))
-    repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', status: 'ended', actualStartTime: now - 2000, lastCheckedAt: now }))
+    repo.upsert(
+      sampleVideo({
+        id: 'normal',
+        channelId: 'UCnormal',
+        status: 'ended',
+        actualStartTime: now - 1000,
+        lastCheckedAt: now
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'pinned',
+        channelId: 'UCpinned',
+        status: 'ended',
+        actualStartTime: now - 2000,
+        lastCheckedAt: now
+      })
+    )
     repo.toggleNotify('normal')
     repo.toggleNotify('pinned')
 
@@ -431,7 +508,9 @@ describe('VideoRepository', () => {
     )
     channelRepo.togglePin('UCpinned')
 
-    repo.upsert(sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 }))
+    repo.upsert(
+      sampleVideo({ id: 'normal', channelId: 'UCnormal', scheduledStartTime: now + 1000 })
+    )
     repo.upsert(sampleVideo({ id: 'pinned', channelId: 'UCpinned', scheduledStartTime: now + 500 }))
     repo.toggleFavorite('normal')
     repo.toggleFavorite('pinned')
@@ -439,5 +518,98 @@ describe('VideoRepository', () => {
     const ids = repo.listFavorites().map((v) => v.id)
     expect(ids[0]).toBe('pinned')
     expect(ids[1]).toBe('normal')
+  })
+
+  it('setFavorite: 存在する動画を is_favorite=1 にして true を返す', () => {
+    repo.upsert({
+      id: 'v_sfav',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      title: 'T',
+      description: '',
+      thumbnail: '',
+      status: 'ended',
+      scheduledStartTime: null,
+      actualStartTime: null,
+      concurrentViewers: null,
+      url: '',
+      firstSeenAt: 1,
+      lastCheckedAt: 1
+    })
+    const result = repo.setFavorite('v_sfav')
+    expect(result).toBe(true)
+    const video = repo.listFavorites().find((v) => v.id === 'v_sfav')
+    expect(video).toBeDefined()
+    expect(video.isFavorite).toBe(true)
+  })
+
+  it('setFavorite: 存在しない動画は null を返す', () => {
+    const result = repo.setFavorite('not_exist')
+    expect(result).toBeNull()
+  })
+
+  it('setFavorite: viewedAt を渡すと viewed_at に復元される', () => {
+    repo.upsert(sampleVideo({ id: 'vfa', status: 'ended' }))
+    repo.setFavorite('vfa', 1700000000000)
+    expect(repo.getById('vfa').viewedAt).toBe(1700000000000)
+  })
+
+  it('setFavorite: viewedAt=null のときは既存の viewed_at を上書きしない', () => {
+    const now = 1700000000000
+    repo.upsert(sampleVideo({ id: 'vfb', status: 'ended' }))
+    repo.markViewed('vfb', now)
+    repo.setFavorite('vfb', null)
+    expect(repo.getById('vfb').viewedAt).toBe(now)
+  })
+
+  it('setFavorite: viewed_at が未セットで viewedAt=null を渡しても null のまま', () => {
+    repo.upsert(sampleVideo({ id: 'vfc', status: 'ended' }))
+    repo.setFavorite('vfc', null)
+    expect(repo.getById('vfc').viewedAt).toBeNull()
+  })
+
+  it('importAsFavorite: DBに存在しない動画をスタブ挿入してお気に入りにする', () => {
+    const result = repo.importAsFavorite({
+      id: 'imp1',
+      title: 'インポート動画',
+      channelId: 'UCimport',
+      channelTitle: 'インポートチャンネル',
+      viewedAt: null
+    })
+    expect(result).toBe(true)
+    const video = repo.getById('imp1')
+    expect(video).not.toBeNull()
+    expect(video.isFavorite).toBe(true)
+    expect(video.title).toBe('インポート動画')
+    expect(video.channelId).toBe('UCimport')
+    expect(video.url).toBe('https://www.youtube.com/watch?v=imp1')
+    expect(video.status).toBe('ended')
+  })
+
+  it('importAsFavorite: viewedAt を渡すと復元される', () => {
+    repo.importAsFavorite({
+      id: 'imp2',
+      title: 'T',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      viewedAt: 1700000000000
+    })
+    expect(repo.getById('imp2').viewedAt).toBe(1700000000000)
+  })
+
+  it('importAsFavorite: 既存の動画は INSERT OR IGNORE でスキップし is_favorite だけ更新する', () => {
+    repo.upsert(sampleVideo({ id: 'imp3', title: '元のタイトル', status: 'ended' }))
+    repo.importAsFavorite({
+      id: 'imp3',
+      title: 'インポートタイトル',
+      channelId: 'UC1',
+      channelTitle: 'Ch',
+      viewedAt: null
+    })
+    const video = repo.getById('imp3')
+    // 既存レコードは上書きされない
+    expect(video.title).toBe('元のタイトル')
+    // お気に入りだけ立つ
+    expect(video.isFavorite).toBe(true)
   })
 })

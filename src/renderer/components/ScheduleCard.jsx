@@ -58,10 +58,10 @@ export default function ScheduleCard({
 
   // カラートークン（light / dark）
   const surfaceColor = darkMode ? '#16161e' : '#ffffff'
-  const textColor    = darkMode ? '#e8e8f0' : '#111120'
-  const subColor     = darkMode ? '#7878a0' : '#6060a0'
-  const timeColor    = darkMode ? '#a0a0c0' : '#505070'
-  const descColor    = darkMode ? '#8888a8' : '#707090'
+  const textColor = darkMode ? '#e8e8f0' : '#111120'
+  const subColor = darkMode ? '#7878a0' : '#6060a0'
+  const timeColor = darkMode ? '#a0a0c0' : '#505070'
+  const descColor = darkMode ? '#8888a8' : '#707090'
 
   // カードの枠線カラー
   const borderColor = isLive
@@ -70,13 +70,17 @@ export default function ScheduleCard({
       ? 'rgba(0,194,255,0.28)'
       : isPinned
         ? 'rgba(255,201,64,0.35)'
-        : darkMode ? '#2a2a38' : '#dddde8'
+        : darkMode
+          ? '#2a2a38'
+          : '#dddde8'
 
   const cardClassName = [
     'yt-card',
     isLive ? 'yt-card--live' : '',
     isUpcoming ? 'yt-card--upcoming' : ''
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
@@ -150,7 +154,6 @@ export default function ScheduleCard({
 
       {/* コンテンツ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-
         {/* タイトル行 */}
         <div style={{ fontWeight: '700', fontSize: '14px', color: textColor, lineHeight: 1.4 }}>
           {item.title}
@@ -229,21 +232,28 @@ export default function ScheduleCard({
               textDecorationColor: 'transparent',
               transition: 'text-decoration-color 0.12s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = subColor}
-            onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
+            onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = subColor)}
+            onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = 'transparent')}
           >
             {item.channelTitle}
           </span>
           <button
             title={isPinned ? '優先解除' : '優先に設定'}
-            onClick={(e) => { e.stopPropagation(); onTogglePin?.(item.channelId) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onTogglePin?.(item.channelId)
+            }}
             style={{
               flexShrink: 0,
-              padding: '2px 6px',
+              padding: '2px 8px',
               fontSize: '11px',
               background: isPinned
-                ? (darkMode ? 'rgba(255,201,64,0.18)' : 'rgba(212,144,10,0.12)')
-                : (darkMode ? '#1e1e2c' : '#ebebf5'),
+                ? darkMode
+                  ? 'rgba(255,201,64,0.18)'
+                  : 'rgba(212,144,10,0.12)'
+                : darkMode
+                  ? '#1e1e2c'
+                  : '#ebebf5',
               color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subColor,
               border: isPinned
                 ? `1px solid ${darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)'}`
@@ -251,10 +261,12 @@ export default function ScheduleCard({
               borderRadius: '5px',
               cursor: 'pointer',
               lineHeight: '16px',
-              transition: 'all 0.12s'
+              fontWeight: isPinned ? '600' : 'normal',
+              transition: 'all 0.12s',
+              fontFamily: 'inherit'
             }}
           >
-            📌
+            📌 {isPinned ? '優先中' : 'チャンネル優先'}
           </button>
         </div>
 
