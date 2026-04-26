@@ -145,11 +145,12 @@ export default function SettingsModal({
     const nextValue = await window.api.togglePin?.(channelId)
     if (nextValue === null || nextValue === undefined) return
 
+    // sortChannels を呼ばずに isPinned だけ更新する。
+    // モーダルを開いた時点のスナップショット順（優先中が上部）を維持するため、
+    // トグルで並び替えが発生しないようにする
     setChannels((prev) =>
-      sortChannels(
-        prev.map((channel) =>
-          channel.id === channelId ? { ...channel, isPinned: nextValue } : channel
-        )
+      prev.map((channel) =>
+        channel.id === channelId ? { ...channel, isPinned: nextValue } : channel
       )
     )
     onPinnedChannelsUpdated()

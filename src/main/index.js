@@ -1,16 +1,25 @@
+/**
+ * メインプロセスのエントリーポイント。
+ *
+ * 責務:
+ *   - アプリライフサイクル管理（起動・終了・シングルインスタンス）
+ *   - BrowserWindow 生成・自動アップデート設定
+ *   - DB 初期化・スケジューラー初期化・30 分ポーリング
+ *   - IPC ハンドラの登録（各 handlers ファイルに委譲）
+ *
+ * IPC ハンドラは責務別に分割:
+ *   src/main/ipc/authHandlers.js     — auth:check/login/logout
+ *   src/main/ipc/videoHandlers.js    — schedule:get/refresh, videos:*, channels:*, diag:*
+ *   src/main/ipc/settingsHandlers.js — settings:*, favorites:*
+ *   src/main/ipc/appHandlers.js      — app:*, shell:*, notification:*, updater:*
+ */
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain, Notification, dialog } from 'electron'
-import { join, dirname } from 'path'
+import { app, shell, BrowserWindow } from 'electron'
+import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-import {
-  getAuthenticatedClient,
-  startAuthFlow,
-  logout,
-  credentialsExist,
-  getCredentialsPath
-} from './auth.js'
+import { getAuthenticatedClient, credentialsExist } from './auth.js'
 import { google } from 'googleapis'
 import { openDatabase, closeDatabase } from './db/connection.js'
 import { runMigrations } from './db/migrate.js'
@@ -23,20 +32,15 @@ import { createRssFetcher } from './fetchers/rssFetcher.js'
 import { createSubscriptionsFetcher } from './fetchers/subscriptionsFetcher.js'
 import { createPlaylistItemsFetcher } from './fetchers/playlistItemsFetcher.js'
 import { createVideoDetailsFetcher } from './fetchers/videoDetailsFetcher.js'
-import {
-  readLegacyScheduleCache,
-  clearLegacyScheduleCache,
-  getSetting,
-  setSetting
-} from './store.js'
+import { readLegacyScheduleCache, clearLegacyScheduleCache, getSetting } from './store.js'
 import { createLogger } from './logger.js'
-import {
-  buildSettingsExport,
-  validateSettingsImport,
-  buildFavoritesExport,
-  applyFavoritesImport
-} from './services/settingsPorter.js'
+import { registerAuthHandlers } from './ipc/authHandlers.js'
+import { registerVideoHandlers } from './ipc/videoHandlers.js'
+import { registerSettingsHandlers } from './ipc/settingsHandlers.js'
+import { registerAppHandlers } from './ipc/appHandlers.js'
 
+// ===== シングルインスタンス保証 ================================================
+// 多重起動時は既存ウィンドウをフォアグラウンドに出して即終了する
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   app.quit()
@@ -51,6 +55,9 @@ if (!gotTheLock) {
   })
 }
 
+// ===== モジュールスコープの状態 =================================================
+// getter パターンで IPC ハンドラに渡す。ハンドラ登録時点ではまだ undefined の場合があるため、
+// 値ではなく関数（getter）を渡すことで常に最新の参照を取得できるようにする
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
 let videoRepo, channelRepo, rssLogRepo, metaRepo
@@ -59,6 +66,7 @@ let refreshTimer
 let dbBroken = false
 let logger
 
+// ===== ウィンドウ生成 ===========================================================
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -90,6 +98,7 @@ function createWindow() {
   }
 }
 
+// ===== 自動アップデート設定 =====================================================
 function setupAutoUpdater(mainWindow) {
   if (is.dev) return
 
@@ -99,11 +108,9 @@ function setupAutoUpdater(mainWindow) {
   autoUpdater.on('update-available', (info) => {
     mainWindow.webContents.send('updater:update-available', info)
   })
-
   autoUpdater.on('update-downloaded', (info) => {
     mainWindow.webContents.send('updater:update-downloaded', info)
   })
-
   autoUpdater.on('error', (err) => {
     mainWindow.webContents.send('updater:error', err.message)
   })
@@ -111,6 +118,7 @@ function setupAutoUpdater(mainWindow) {
   autoUpdater.checkForUpdates()
 }
 
+// ===== DB 初期化 ================================================================
 function initDatabase() {
   const dbPath = join(app.getPath('userData'), 'schedule.db')
   db = openDatabase(dbPath)
@@ -131,6 +139,7 @@ function initDatabase() {
   metaRepo = createMetaRepository(db)
 }
 
+// ===== スケジューラー初期化 =====================================================
 function initScheduler(authClient) {
   scheduler = createSchedulerService({
     videoRepo,
@@ -147,6 +156,7 @@ function initScheduler(authClient) {
   })
 }
 
+// ===== ポーリング開始 ===========================================================
 function startPolling(mainWindow) {
   if (refreshTimer) clearInterval(refreshTimer)
   const kick = async () => {
@@ -164,6 +174,57 @@ function startPolling(mainWindow) {
   refreshTimer = setInterval(kick, REFRESH_INTERVAL_MS)
 }
 
+// ===== IPC ハンドラ登録 =========================================================
+// ゲッター関数を注入することで、ハンドラが登録された時点では未初期化でも
+// 呼び出し時に常に最新の値を参照できる
+function registerAllHandlers(getMainWindow) {
+  // 認証ハンドラ
+  registerAuthHandlers({
+    onLoginSuccess: async (client) => {
+      if (!scheduler) {
+        initScheduler(client)
+        startPolling(getMainWindow())
+      }
+    }
+  })
+
+  // 動画・チャンネル・スケジュール取得ハンドラ
+  registerVideoHandlers({
+    getVideoRepo: () => videoRepo,
+    getChannelRepo: () => channelRepo,
+    getRssLogRepo: () => rssLogRepo,
+    getScheduler: () => scheduler,
+    getDbBroken: () => dbBroken,
+    getMainWindow
+  })
+
+  // 設定・インポートエクスポートハンドラ
+  registerSettingsHandlers({
+    getVideoRepo: () => videoRepo,
+    getChannelRepo: () => channelRepo,
+    getMainWindow
+  })
+
+  // アプリ基盤ハンドラ
+  registerAppHandlers({
+    getMainWindow,
+    autoUpdater,
+    isDev: is.dev,
+    onResetDatabase: async () => {
+      if (refreshTimer) clearInterval(refreshTimer)
+      closeDatabase(db)
+      const fs = await import('node:fs/promises')
+      const dbPath = join(app.getPath('userData'), 'schedule.db')
+      await fs.rm(dbPath, { force: true })
+      await fs.rm(dbPath + '-wal', { force: true })
+      await fs.rm(dbPath + '-shm', { force: true })
+      dbBroken = false
+      initDatabase()
+    }
+  })
+}
+
+// ===== アプリ起動 ================================================================
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('io.github.harness17.youtube-schedule')
 
@@ -183,27 +244,30 @@ app.whenReady().then(async () => {
   })
 
   initDatabase()
-
   createWindow()
 
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  setupAutoUpdater(mainWindow)
+  // BrowserWindow は createWindow() の直後に取得できる
+  const getMainWindow = () => BrowserWindow.getAllWindows()[0]
+
+  setupAutoUpdater(getMainWindow())
+  registerAllHandlers(getMainWindow)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  // 起動時に認証済みクライアントがあればスケジューラーを初期化
+  // 起動時に認証済みクライアントがあればスケジューラーを初期化してポーリング開始
   const exists = await credentialsExist()
   if (exists) {
     const client = await getAuthenticatedClient()
     if (client) {
       initScheduler(client)
-      startPolling(mainWindow)
+      startPolling(getMainWindow())
     }
   }
 })
 
+// ===== アプリ終了処理 ===========================================================
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -213,282 +277,4 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (refreshTimer) clearInterval(refreshTimer)
   closeDatabase(db)
-})
-
-// 認証状態確認
-ipcMain.handle('auth:check', async () => {
-  const exists = await credentialsExist()
-  if (!exists) {
-    return {
-      isAuthenticated: false,
-      error: 'CREDENTIALS_NOT_FOUND',
-      credentialsPath: getCredentialsPath()
-    }
-  }
-  const client = await getAuthenticatedClient()
-  return { isAuthenticated: !!client }
-})
-
-// ログイン
-ipcMain.handle('auth:login', async () => {
-  const exists = await credentialsExist()
-  if (!exists) {
-    return {
-      isAuthenticated: false,
-      error: 'CREDENTIALS_NOT_FOUND',
-      credentialsPath: getCredentialsPath()
-    }
-  }
-  try {
-    await startAuthFlow()
-    const client = await getAuthenticatedClient()
-    if (client && !scheduler) {
-      initScheduler(client)
-      const mainWindow = BrowserWindow.getAllWindows()[0]
-      startPolling(mainWindow)
-    }
-    return { isAuthenticated: true }
-  } catch (err) {
-    return { isAuthenticated: false, error: err.message }
-  }
-})
-
-// ログアウト
-ipcMain.handle('auth:logout', async () => {
-  await logout()
-  return { isAuthenticated: false }
-})
-
-// 配信予定取得
-ipcMain.handle('schedule:get', () => {
-  if (dbBroken) return { live: [], upcoming: [], dbBroken: true }
-  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
-  const visible = videoRepo.listVisible()
-  return {
-    live: visible.filter((v) => v.status === 'live'),
-    upcoming: visible.filter((v) => v.status === 'upcoming')
-  }
-})
-
-// 配信予定強制更新
-ipcMain.handle('schedule:refresh', async () => {
-  if (!scheduler) return { error: 'NOT_INITIALIZED' }
-  await scheduler.refresh({ forceFullRecheck: true })
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  mainWindow?.webContents.send('schedule:updated')
-})
-
-// RSS 失敗率診断
-ipcMain.handle('diag:rssFailureRate', () => {
-  if (!rssLogRepo) return 0
-  const since = Date.now() - 24 * 60 * 60 * 1000
-  return rssLogRepo.getFailureRateSince(since)
-})
-
-// データベースリセット
-ipcMain.handle('schedule:resetDatabase', async () => {
-  if (refreshTimer) clearInterval(refreshTimer)
-  closeDatabase(db)
-  const fs = await import('node:fs/promises')
-  const dbPath = join(app.getPath('userData'), 'schedule.db')
-  await fs.rm(dbPath, { force: true })
-  await fs.rm(dbPath + '-wal', { force: true })
-  await fs.rm(dbPath + '-shm', { force: true })
-  dbBroken = false
-  initDatabase()
-})
-
-// デスクトップ通知
-ipcMain.handle('notification:show', (_, { title, body }) => {
-  if (Notification.isSupported()) {
-    new Notification({ title, body }).show()
-  }
-})
-
-// 設定の取得・保存
-ipcMain.handle('settings:get', (_, key, defaultValue) => getSetting(key, defaultValue))
-ipcMain.handle('settings:set', (_, key, value) => setSetting(key, value))
-
-// アップデートを適用して再起動
-ipcMain.handle('updater:quitAndInstall', () => {
-  autoUpdater.quitAndInstall()
-})
-
-// アプリバージョンを取得
-ipcMain.handle('app:version', () => app.getVersion())
-
-// credentials.json が置かれるフォルダをエクスプローラーで開く
-ipcMain.handle('shell:openFolder', async (_, filePath) => {
-  try {
-    await shell.openPath(dirname(filePath))
-    return { success: true }
-  } catch {
-    return { success: false }
-  }
-})
-
-// 動画: アーカイブ系一覧
-ipcMain.handle('videos:listMissed', () => {
-  if (!videoRepo) return []
-  return videoRepo.listMissed()
-})
-ipcMain.handle('videos:listArchive', (_, opts) => {
-  if (!videoRepo) return []
-  return videoRepo.listArchive(opts ?? {})
-})
-ipcMain.handle('videos:listFavorites', () => {
-  if (!videoRepo) return []
-  return videoRepo.listFavorites()
-})
-ipcMain.handle('videos:searchByText', (_, query, opts) => {
-  if (!videoRepo) return []
-  return videoRepo.searchByText(query, opts ?? {})
-})
-
-// 動画: 見たマーク / クリア
-ipcMain.handle('videos:markViewed', (_, id) => {
-  if (!videoRepo) return false
-  return videoRepo.markViewed(id)
-})
-ipcMain.handle('videos:clearViewed', (_, id) => {
-  if (!videoRepo) return false
-  return videoRepo.clearViewed(id)
-})
-
-// 動画: お気に入りトグル
-ipcMain.handle('videos:toggleFavorite', (_, id) => {
-  if (!videoRepo) return null
-  return videoRepo.toggleFavorite(id)
-})
-
-// 動画: お知らせトグル
-ipcMain.handle('videos:toggleNotify', (_, id) => {
-  if (!videoRepo) return null
-  return videoRepo.toggleNotify(id)
-})
-
-// チャンネル: ピントグル / 全件取得
-ipcMain.handle('channels:togglePin', (_, id) => {
-  if (!channelRepo) return null
-  return channelRepo.togglePin(id)
-})
-ipcMain.handle('channels:listAll', () => {
-  if (!channelRepo) return []
-  return channelRepo.listAll()
-})
-
-// 外部ブラウザで URL を開く
-ipcMain.handle('shell:openExternal', async (_, url) => {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      return { success: false, error: 'Invalid URL scheme' }
-    }
-    await shell.openExternal(url)
-    return { success: true }
-  } catch {
-    return { success: false, error: 'Invalid URL' }
-  }
-})
-
-// 設定エクスポート
-ipcMain.handle('settings:export', async () => {
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  const dateStr = new Date().toISOString().slice(0, 10)
-  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: `settings-export-${dateStr}.json`,
-    filters: [{ name: 'JSON', extensions: ['json'] }]
-  })
-  if (canceled || !filePath) return { canceled: true }
-  const pinnedChannels = (channelRepo?.listAll() ?? [])
-    .filter((c) => c.isPinned)
-    .map(({ id, title }) => ({ id, title }))
-  const data = buildSettingsExport({
-    settings: { darkMode: getSetting('darkMode', false) },
-    pinnedChannels
-  })
-  const fs = await import('node:fs/promises')
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-  return { success: true }
-})
-
-// 設定インポート
-ipcMain.handle('settings:import', async () => {
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    properties: ['openFile']
-  })
-  if (canceled || filePaths.length === 0) return { canceled: true }
-  const fs = await import('node:fs/promises')
-  let data
-  try {
-    data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
-    validateSettingsImport(data)
-  } catch (err) {
-    return { error: err.message }
-  }
-  if (data.settings) {
-    if (typeof data.settings.darkMode === 'boolean') {
-      setSetting('darkMode', data.settings.darkMode)
-    }
-  }
-  if (Array.isArray(data.pinnedChannels) && channelRepo) {
-    const safeChannels = data.pinnedChannels.filter(
-      (c) => c && typeof c.id === 'string' && c.id.length > 0
-    )
-    channelRepo.replacePinnedChannels(safeChannels)
-  }
-  return {
-    success: true,
-    darkMode: typeof data.settings?.darkMode === 'boolean' ? data.settings.darkMode : null,
-    pinnedChannels: data.pinnedChannels ?? []
-  }
-})
-
-// お気に入りエクスポート
-ipcMain.handle('favorites:export', async () => {
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  const dateStr = new Date().toISOString().slice(0, 10)
-  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: `favorites-export-${dateStr}.json`,
-    filters: [{ name: 'JSON', extensions: ['json'] }]
-  })
-  if (canceled || !filePath) return { canceled: true }
-  const favorites = videoRepo?.listFavorites() ?? []
-  const data = buildFavoritesExport(favorites)
-  const fs = await import('node:fs/promises')
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-  return { success: true, count: favorites.length }
-})
-
-// お気に入りインポート
-ipcMain.handle('favorites:import', async () => {
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    properties: ['openFile']
-  })
-  if (canceled || filePaths.length === 0) return { canceled: true }
-  if (!videoRepo) return { error: 'NOT_INITIALIZED' }
-  const fs = await import('node:fs/promises')
-  try {
-    const data = JSON.parse(await fs.readFile(filePaths[0], 'utf-8'))
-    const { applied, skipped } = applyFavoritesImport(data, (entry) =>
-      videoRepo.importAsFavorite(entry)
-    )
-    return { success: true, applied, skipped }
-  } catch (err) {
-    return { error: err.message }
-  }
-})
-
-// アップデート手動確認
-ipcMain.handle('updater:checkNow', () => {
-  if (is.dev) {
-    const mainWindow = BrowserWindow.getAllWindows()[0]
-    mainWindow?.webContents.send('updater:error', '開発環境ではアップデート確認をスキップします')
-    return
-  }
-  autoUpdater.checkForUpdates()
 })
