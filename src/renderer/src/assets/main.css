@@ -1,5 +1,9 @@
 /* ===== BASE ===== */
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -9,46 +13,48 @@ body {
   font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo UI', sans-serif;
 }
 
-#root { min-height: 100vh; }
+#root {
+  min-height: 100vh;
+}
 
 /* ===== DARK / LIGHT THEME TOKENS ===== */
 :root {
-  --bg:        #f0f0f8;
-  --surface:   #ffffff;
-  --surface2:  #f4f4fb;
-  --border:    #dddde8;
-  --text:      #111120;
-  --sub:       #6060a0;
-  --btn-bg:    #ebebf5;
+  --bg: #f0f0f8;
+  --surface: #ffffff;
+  --surface2: #f4f4fb;
+  --border: #dddde8;
+  --text: #111120;
+  --sub: #6060a0;
+  --btn-bg: #ebebf5;
   --btn-color: #555570;
   --btn-hover: #e0e0f0;
-  --input-bg:  #ffffff;
+  --input-bg: #ffffff;
   --input-border: #dddde8;
 
-  --live-red:  #e8001c;
-  --upcoming:  #0099cc;
-  --pin-gold:  #d4900a;
-  --fav-star:  #cc8800;
+  --live-red: #e8001c;
+  --upcoming: #0099cc;
+  --pin-gold: #d4900a;
+  --fav-star: #cc8800;
   --notify-on: #007ab8;
 }
 
 [data-theme='dark'] {
-  --bg:        #0d0d12;
-  --surface:   #16161e;
-  --surface2:  #1e1e28;
-  --border:    #2a2a38;
-  --text:      #e8e8f0;
-  --sub:       #7878a0;
-  --btn-bg:    #1e1e2c;
+  --bg: #0d0d12;
+  --surface: #16161e;
+  --surface2: #1e1e28;
+  --border: #2a2a38;
+  --text: #e8e8f0;
+  --sub: #7878a0;
+  --btn-bg: #1e1e2c;
   --btn-color: #8888b0;
   --btn-hover: #28283a;
-  --input-bg:  #16161e;
+  --input-bg: #16161e;
   --input-border: #2a2a38;
 
-  --live-red:  #ff2244;
-  --upcoming:  #00c2ff;
-  --pin-gold:  #ffc940;
-  --fav-star:  #ffb830;
+  --live-red: #ff2244;
+  --upcoming: #00c2ff;
+  --pin-gold: #ffc940;
+  --fav-star: #ffb830;
   --notify-on: #00d4ff;
 }
 
@@ -58,10 +64,19 @@ body {
 }
 
 /* ===== SCROLLBAR ===== */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--sub); }
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sub);
+}
 
 /* ===== DISPLAY FONT ===== */
 .yt-display {
@@ -73,13 +88,17 @@ body {
 .yt-card {
   position: relative;
   overflow: hidden;
-  transition: transform 0.12s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
 }
 
 .yt-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   opacity: 0;
 }
@@ -90,8 +109,17 @@ body {
 
 /* Live カード — 上部グラデーションライン + グロー */
 @keyframes live-glow {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgba(255,34,68,0.45), 0 1px 6px rgba(0,0,0,0.15); }
-  50%       { box-shadow: 0 0 0 1.5px rgba(255,34,68,0.45), 0 3px 18px rgba(255,34,68,0.2); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1.5px rgba(255, 34, 68, 0.45),
+      0 1px 6px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(255, 34, 68, 0.45),
+      0 3px 18px rgba(255, 34, 68, 0.2);
+  }
 }
 
 .yt-card--live {
@@ -111,8 +139,15 @@ body {
 
 /* ===== LIVE PULSE DOT ===== */
 @keyframes dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.35; transform: scale(0.6); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.6);
+  }
 }
 
 .live-dot {
@@ -149,7 +184,10 @@ body {
   font-family: inherit;
   white-space: nowrap;
   line-height: 1;
-  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
 }
 
 .yt-tab:not(.yt-tab--active):hover {
@@ -160,7 +198,7 @@ body {
 .yt-tab--active {
   background: var(--surface2);
   color: var(--text);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .yt-tab-badge {
@@ -209,7 +247,10 @@ body {
   cursor: pointer;
   white-space: nowrap;
   line-height: 1.4;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
 }
 
 .yt-action-btn:hover {
@@ -218,35 +259,35 @@ body {
 }
 
 .yt-action-btn--notify {
-  background: rgba(0,194,255,0.1);
-  border-color: rgba(0,194,255,0.35);
+  background: rgba(0, 194, 255, 0.1);
+  border-color: rgba(0, 194, 255, 0.35);
   color: var(--notify-on);
 }
 [data-theme='light'] .yt-action-btn--notify {
-  background: rgba(0,122,184,0.08);
-  border-color: rgba(0,122,184,0.3);
+  background: rgba(0, 122, 184, 0.08);
+  border-color: rgba(0, 122, 184, 0.3);
   color: var(--notify-on);
 }
 
 .yt-action-btn--fav {
-  background: rgba(255,184,48,0.1);
-  border-color: rgba(255,184,48,0.4);
+  background: rgba(255, 184, 48, 0.1);
+  border-color: rgba(255, 184, 48, 0.4);
   color: var(--fav-star);
 }
 [data-theme='light'] .yt-action-btn--fav {
-  background: rgba(204,136,0,0.08);
-  border-color: rgba(204,136,0,0.3);
+  background: rgba(204, 136, 0, 0.08);
+  border-color: rgba(204, 136, 0, 0.3);
   color: var(--fav-star);
 }
 
 .yt-action-btn--viewed {
-  background: rgba(72,199,120,0.1);
-  border-color: rgba(72,199,120,0.4);
+  background: rgba(72, 199, 120, 0.1);
+  border-color: rgba(72, 199, 120, 0.4);
   color: #3db870;
 }
 [data-theme='light'] .yt-action-btn--viewed {
-  background: rgba(40,160,90,0.08);
-  border-color: rgba(40,160,90,0.3);
+  background: rgba(40, 160, 90, 0.08);
+  border-color: rgba(40, 160, 90, 0.3);
   color: #2a9a58;
 }
 
@@ -275,7 +316,9 @@ body {
   color: var(--btn-color);
 }
 
-.yt-nav-btn:hover { opacity: 0.8; }
+.yt-nav-btn:hover {
+  opacity: 0.8;
+}
 
 .yt-nav-btn--live {
   background: var(--live-red);
@@ -283,7 +326,9 @@ body {
 }
 
 /* ===== STATUS BANNERS ===== */
-.status-banners { margin-bottom: 10px; }
+.status-banners {
+  margin-bottom: 10px;
+}
 
 .banner {
   padding: 8px 12px;
@@ -306,11 +351,28 @@ body {
   font-family: inherit;
 }
 
-.banner--error   { background: rgba(255,34,68,0.1);  border: 1px solid rgba(255,34,68,0.3);  color: var(--live-red); }
-.banner--info    { background: rgba(0,194,255,0.08); border: 1px solid rgba(0,194,255,0.22); color: var(--upcoming); }
-.banner--warning { background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.25); color: #d48800; }
-[data-theme='dark'] .banner--warning { color: #ffcc55; }
-.banner--error button { background: rgba(255,34,68,0.15); color: var(--live-red); }
+.banner--error {
+  background: rgba(255, 34, 68, 0.1);
+  border: 1px solid rgba(255, 34, 68, 0.3);
+  color: var(--live-red);
+}
+.banner--info {
+  background: rgba(0, 194, 255, 0.08);
+  border: 1px solid rgba(0, 194, 255, 0.22);
+  color: var(--upcoming);
+}
+.banner--warning {
+  background: rgba(255, 165, 0, 0.08);
+  border: 1px solid rgba(255, 165, 0, 0.25);
+  color: #d48800;
+}
+[data-theme='dark'] .banner--warning {
+  color: #ffcc55;
+}
+.banner--error button {
+  background: rgba(255, 34, 68, 0.15);
+  color: var(--live-red);
+}
 
 /* ===== CHANNEL MANAGER MODAL ROW ===== */
 .yt-ch-row {
@@ -325,9 +387,9 @@ body {
 }
 
 .yt-ch-row--pinned {
-  border-color: rgba(255,201,64,0.35);
-  background: rgba(255,201,64,0.06);
+  border-color: rgba(255, 201, 64, 0.35);
+  background: rgba(255, 201, 64, 0.06);
 }
 [data-theme='light'] .yt-ch-row--pinned {
-  background: rgba(212,144,10,0.06);
+  background: rgba(212, 144, 10, 0.06);
 }
