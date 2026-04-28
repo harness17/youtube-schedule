@@ -257,11 +257,11 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 
 #### タブ構成
 
-| タブキー    | ラベル         | 内容                                                                 |
-| ----------- | -------------- | -------------------------------------------------------------------- |
-| `general`   | ⚙️ 基本        | ダークモード切り替え・アップデート確認・自動アップデート・バージョン情報・ログアウト |
-| `channels`  | 📌 チャンネル  | チャンネル一覧の検索・推し設定（SettingsModal に統合）              |
-| `data`      | 📦 データ管理  | 設定エクスポート/インポート・お気に入りエクスポート/インポート・DBリセット |
+| タブキー   | ラベル        | 内容                                                                                 |
+| ---------- | ------------- | ------------------------------------------------------------------------------------ |
+| `general`  | ⚙️ 基本       | ダークモード切り替え・アップデート確認・自動アップデート・バージョン情報・ログアウト |
+| `channels` | 📌 チャンネル | チャンネル一覧の検索・推し設定（SettingsModal に統合）                               |
+| `data`     | 📦 データ管理 | 設定エクスポート/インポート・お気に入りエクスポート/インポート・DBリセット           |
 
 #### チャンネルタブの動作フロー
 
@@ -279,11 +279,11 @@ RSS フィード ─────────┤→ Fetchers → SchedulerService
 
 #### チャンネルタブのカラースキーム
 
-| 状態           | ライト                            | ダーク                            |
-| -------------- | --------------------------------- | --------------------------------- |
-| 推し済み行     | rgba(212,144,10,0.06) 背景        | rgba(255,201,64,0.08) 背景        |
-| 「優先中」ボタン | #d4900a 色・太字                 | #ffc940 色・太字                  |
-| 「優先」ボタン | グレー背景                        | グレー背景                        |
+| 状態             | ライト                     | ダーク                     |
+| ---------------- | -------------------------- | -------------------------- |
+| 推し済み行       | rgba(212,144,10,0.06) 背景 | rgba(255,201,64,0.08) 背景 |
+| 「優先中」ボタン | #d4900a 色・太字           | #ffc940 色・太字           |
+| 「優先」ボタン   | グレー背景                 | グレー背景                 |
 
 ### 4.5 StatusBanners
 
@@ -409,26 +409,26 @@ if (remaining > 0 && remaining <= THRESHOLD) {
 
 ### 設定・エクスポート系
 
-| チャネル            | 方向   | 入力 | 出力                                                      | 説明                                     |
-| ------------------- | ------ | ---- | --------------------------------------------------------- | ---------------------------------------- |
-| `settings:get`      | invoke | `key, defaultValue` | any                                    | electron-store から取得                  |
-| `settings:set`      | invoke | `key, value`        | —                                      | electron-store に保存                    |
-| `settings:export`   | invoke | —    | `{success?, canceled?, error?}`                           | 設定 JSON を保存ダイアログでエクスポート |
-| `settings:import`   | invoke | —    | `{success?, canceled?, error?, darkMode?, pinnedChannels?}` | 設定 JSON を開くダイアログでインポート   |
-| `favorites:export`  | invoke | —    | `{success?, canceled?, error?, count?}`                   | お気に入り JSON をエクスポート           |
-| `favorites:import`  | invoke | —    | `{success?, canceled?, error?, applied?, skipped?}`       | お気に入り JSON をインポート             |
+| チャネル           | 方向   | 入力                | 出力                                                        | 説明                                     |
+| ------------------ | ------ | ------------------- | ----------------------------------------------------------- | ---------------------------------------- |
+| `settings:get`     | invoke | `key, defaultValue` | any                                                         | electron-store から取得                  |
+| `settings:set`     | invoke | `key, value`        | —                                                           | electron-store に保存                    |
+| `settings:export`  | invoke | —                   | `{success?, canceled?, error?}`                             | 設定 JSON を保存ダイアログでエクスポート |
+| `settings:import`  | invoke | —                   | `{success?, canceled?, error?, darkMode?, pinnedChannels?}` | 設定 JSON を開くダイアログでインポート   |
+| `favorites:export` | invoke | —                   | `{success?, canceled?, error?, count?}`                     | お気に入り JSON をエクスポート           |
+| `favorites:import` | invoke | —                   | `{success?, canceled?, error?, applied?, skipped?}`         | お気に入り JSON をインポート             |
 
 ### システム系
 
-| チャネル                 | 方向   | 入力                | 出力                 | 説明                               |
-| ------------------------ | ------ | ------------------- | -------------------- | ---------------------------------- |
-| `diag:rssFailureRate`    | invoke | —                   | `number`             | 過去 24h の RSS 失敗率（0〜1）     |
-| `notification:show`      | invoke | `{title, body}`     | —                    | デスクトップ通知                   |
-| `app:version`            | invoke | —                   | `string`             | アプリバージョン                   |
-| `shell:openFolder`       | invoke | `filePath`          | `{success}`          | 親フォルダをエクスプローラーで開く |
-| `shell:openExternal`     | invoke | `url`               | `{success?, error?}` | http/https のみ外部ブラウザで開く  |
-| `updater:quitAndInstall` | invoke | —                   | —                    | アップデートを適用して再起動       |
-| `updater:checkNow`       | invoke | —                   | —                    | 手動でアップデートを確認           |
+| チャネル                 | 方向   | 入力            | 出力                 | 説明                               |
+| ------------------------ | ------ | --------------- | -------------------- | ---------------------------------- |
+| `diag:rssFailureRate`    | invoke | —               | `number`             | 過去 24h の RSS 失敗率（0〜1）     |
+| `notification:show`      | invoke | `{title, body}` | —                    | デスクトップ通知                   |
+| `app:version`            | invoke | —               | `string`             | アプリバージョン                   |
+| `shell:openFolder`       | invoke | `filePath`      | `{success}`          | 親フォルダをエクスプローラーで開く |
+| `shell:openExternal`     | invoke | `url`           | `{success?, error?}` | http/https のみ外部ブラウザで開く  |
+| `updater:quitAndInstall` | invoke | —               | —                    | アップデートを適用して再起動       |
+| `updater:checkNow`       | invoke | —               | —                    | 手動でアップデートを確認           |
 
 ### アップデーター系（受信イベント）
 
@@ -440,10 +440,10 @@ if (remaining > 0 && remaining <= THRESHOLD) {
 
 ### スケジューラー系（受信イベント）
 
-| チャネル           | 説明                                 |
-| ------------------ | ------------------------------------ |
-| `schedule:updated` | 自動リフレッシュ完了通知             |
-| `schedule:error`   | リフレッシュ失敗通知（`{message}`）  |
+| チャネル           | 説明                                |
+| ------------------ | ----------------------------------- |
+| `schedule:updated` | 自動リフレッシュ完了通知            |
+| `schedule:error`   | リフレッシュ失敗通知（`{message}`） |
 
 ---
 

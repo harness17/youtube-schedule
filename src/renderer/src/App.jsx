@@ -387,25 +387,89 @@ export default function App() {
         )}
       </div>
 
-      {/* ── タブバー（ピル型） ── */}
-      <div className="yt-tabs">
-        {[
-          { key: 'schedule', label: '予定・ライブ' },
-          { key: 'missed', label: '見逃し' },
-          { key: 'archive', label: 'アーカイブ' },
-          { key: 'favorites', label: '⭐ お気に入り' }
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => handleTabChange(key)}
-            className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
-          >
-            {label}
-            {key === 'missed' && missedVideos.length > 0 && (
-              <span className="yt-tab-badge">{missedVideos.length}</span>
-            )}
-          </button>
-        ))}
+      {/* ── タブバー（ピル型）+ お気に入りセクションナビ ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          flexWrap: 'wrap',
+          marginBottom: '16px'
+        }}
+      >
+        <div className="yt-tabs" style={{ marginBottom: 0 }}>
+          {[
+            { key: 'schedule', label: '予定・ライブ' },
+            { key: 'missed', label: '見逃し' },
+            { key: 'archive', label: 'アーカイブ' },
+            { key: 'favorites', label: '⭐ お気に入り' }
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => handleTabChange(key)}
+              className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
+            >
+              {label}
+              {key === 'missed' && missedVideos.length > 0 && (
+                <span className="yt-tab-badge">{missedVideos.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        {activeTab === 'favorites' &&
+          filteredFavorites.length > 0 &&
+          (() => {
+            const hasUpcoming = filteredFavorites.some(
+              (item) =>
+                (item.status === 'upcoming' || item.status === 'live') && item.viewedAt == null
+            )
+            const hasNormal = filteredFavorites.some(
+              (item) => item.status === 'ended' && item.viewedAt == null
+            )
+            const hasViewed = filteredFavorites.some((item) => item.viewedAt != null)
+            const sectionCount = [hasUpcoming, hasNormal, hasViewed].filter(Boolean).length
+            if (sectionCount < 2) return null
+            return (
+              <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
+                {hasNormal && (
+                  <button
+                    className="yt-nav-btn"
+                    onClick={() =>
+                      document
+                        .getElementById('fav-normal')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  >
+                    📋 通常
+                  </button>
+                )}
+                {hasUpcoming && (
+                  <button
+                    className="yt-nav-btn"
+                    onClick={() =>
+                      document
+                        .getElementById('fav-upcoming')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  >
+                    📅 未配信
+                  </button>
+                )}
+                {hasViewed && (
+                  <button
+                    className="yt-nav-btn"
+                    onClick={() =>
+                      document
+                        .getElementById('fav-viewed')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  >
+                    ✅ 視聴済み
+                  </button>
+                )}
+              </div>
+            )
+          })()}
       </div>
 
       {/* ── 予定・ライブタブ ── */}
@@ -438,7 +502,9 @@ export default function App() {
           ) : filteredMissed.length === 0 ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               {(searchQuery.trim() || selectedChannel !== 'all') && missedVideos.length > 0
-                ? '検索結果がありません'
+                ? selectedChannel !== 'all' && !searchQuery.trim()
+                  ? 'このチャンネルの配信はありません'
+                  : '検索結果がありません'
                 : '見逃した配信はありません 🎉'}
             </div>
           ) : (
@@ -456,9 +522,11 @@ export default function App() {
             </div>
           ) : filteredArchive.length === 0 ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
-              {searchQuery.trim() || selectedChannel !== 'all'
-                ? '検索結果がありません'
-                : 'アーカイブがありません'}
+              {selectedChannel !== 'all' && !searchQuery.trim()
+                ? 'このチャンネルの配信はありません'
+                : searchQuery.trim() || selectedChannel !== 'all'
+                  ? '検索結果がありません'
+                  : 'アーカイブがありません'}
             </div>
           ) : (
             <>
@@ -486,7 +554,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ── お気に入りタブ（未視聴 → 視聴済みの 2 セクション） ── */}
+      {/* ── お気に入りタブ（通常 → 未配信 → 視聴済みの 3 セクション） ── */}
       {activeTab === 'favorites' && (
         <div>
           {tabLoading ? (
@@ -496,30 +564,65 @@ export default function App() {
           ) : filteredFavorites.length === 0 ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               {(searchQuery.trim() || selectedChannel !== 'all') && favoriteVideos.length > 0
-                ? '検索結果がありません'
+                ? selectedChannel !== 'all' && !searchQuery.trim()
+                  ? 'このチャンネルの配信はありません'
+                  : '検索結果がありません'
                 : 'お気に入りはまだありません'}
             </div>
           ) : (
             (() => {
-              const unviewed = filteredFavorites.filter((item) => item.viewedAt == null)
-              const viewed = filteredFavorites.filter((item) => item.viewedAt != null)
+              // 通常: 終了済みかつ未視聴
+              const normalFavs = filteredFavorites.filter(
+                (item) => item.status === 'ended' && item.viewedAt == null
+              )
+              // 未配信: upcoming/live かつ未視聴
+              const upcomingFavs = filteredFavorites.filter(
+                (item) =>
+                  (item.status === 'upcoming' || item.status === 'live') && item.viewedAt == null
+              )
+              // 視聴済み: viewedAt あり（ステータス問わず）
+              const viewedFavs = filteredFavorites.filter((item) => item.viewedAt != null)
+              const hasAbove = (i) =>
+                [normalFavs, upcomingFavs].slice(0, i).some((s) => s.length > 0)
               return (
                 <>
-                  {unviewed.map((item) =>
-                    renderTabCard(item, {
-                      showStatusBadge: true,
-                      showViewedButton: item.status === 'ended'
-                    })
+                  {normalFavs.length > 0 && (
+                    <>
+                      <div id="fav-normal" className="yt-section-label" style={{ color: subColor }}>
+                        📋 通常
+                      </div>
+                      {normalFavs.map((item) =>
+                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
+                      )}
+                    </>
                   )}
-                  {viewed.length > 0 && (
+                  {upcomingFavs.length > 0 && (
                     <>
                       <div
+                        id="fav-upcoming"
                         className="yt-section-label"
-                        style={{ color: subColor, marginTop: unviewed.length > 0 ? '16px' : 0 }}
+                        style={{ color: subColor, marginTop: hasAbove(1) ? '16px' : 0 }}
                       >
-                        ✓ 視聴済み
+                        📅 未配信
                       </div>
-                      {viewed.map((item) =>
+                      {upcomingFavs.map((item) =>
+                        renderTabCard(item, { showStatusBadge: true, showViewedButton: false })
+                      )}
+                    </>
+                  )}
+                  {viewedFavs.length > 0 && (
+                    <>
+                      <div
+                        id="fav-viewed"
+                        className="yt-section-label"
+                        style={{
+                          color: subColor,
+                          marginTop: hasAbove(2) ? '16px' : 0
+                        }}
+                      >
+                        ✅ 視聴済み
+                      </div>
+                      {viewedFavs.map((item) =>
                         renderTabCard(item, {
                           showStatusBadge: true,
                           showViewedButton: item.status === 'ended'

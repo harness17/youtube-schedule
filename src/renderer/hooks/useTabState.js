@@ -235,38 +235,53 @@ export function useTabState({ live, upcoming, updateVideo }) {
    * タブ別チャンネル一覧（フィルタードロップダウン用）。
    * アーカイブタブは DB の全チャンネルを使用。それ以外は表示中データから動的生成。
    * ピン済みを先頭に、その後アルファベット/50音順。
+   * 選択中チャンネルが現タブのデータにない場合でも allDbChannels から補完してドロップダウンに残す。
    */
   const tabChannels = useMemo(() => {
     const sortFn = (a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
       return a.title.localeCompare(b.title)
     }
+    let channels
     if (activeTab === 'archive') {
-      return allDbChannels
+      channels = allDbChannels
         .map((c) => ({ id: c.id, title: c.title, isPinned: pinnedChannelIds.has(c.id) }))
         .sort(sortFn)
+    } else {
+      let source
+      if (activeTab === 'schedule') source = [...live, ...upcoming]
+      else if (activeTab === 'missed') source = missedVideos
+      else if (activeTab === 'favorites') source = favoriteVideos
+      else source = []
+      const map = new Map()
+      for (const item of source) {
+        if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
+      }
+      channels = [...map.entries()]
+        .map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
+        .sort(sortFn)
     }
-    let source
-    if (activeTab === 'schedule') source = [...live, ...upcoming]
-    else if (activeTab === 'missed') source = missedVideos
-    else if (activeTab === 'favorites') source = favoriteVideos
-    else source = []
-    const map = new Map()
-    for (const item of source) {
-      if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
+    // タブに配信がない選択中チャンネルをセレクトBOX最上部に補完して選択状態を維持する
+    if (selectedChannel !== 'all' && !channels.some((c) => c.id === selectedChannel)) {
+      const dbCh = allDbChannels.find((c) => c.id === selectedChannel)
+      if (dbCh) {
+        channels = [
+          { id: dbCh.id, title: dbCh.title, isPinned: pinnedChannelIds.has(dbCh.id) },
+          ...channels
+        ]
+      }
     }
-    return [...map.entries()]
-      .map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
-      .sort(sortFn)
-  }, [activeTab, live, upcoming, missedVideos, favoriteVideos, pinnedChannelIds, allDbChannels])
-
-  // タブ切り替え後、選択チャンネルが新タブに存在しない場合は 'all' にリセット
-  useEffect(() => {
-    if (selectedChannel === 'all') return
-    if (!tabChannels.some((c) => c.id === selectedChannel)) {
-      setSelectedChannel('all')
-    }
-  }, [tabChannels, selectedChannel])
+    return channels
+  }, [
+    activeTab,
+    live,
+    upcoming,
+    missedVideos,
+    favoriteVideos,
+    pinnedChannelIds,
+    allDbChannels,
+    selectedChannel
+  ])
 
   /** 検索ボックスのキーワードに一致するか（schedule タブ用フロントフィルタ） */
   const matchesQuery = useCallback(
