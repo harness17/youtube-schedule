@@ -76,6 +76,7 @@ export default function App() {
     filteredMissed,
     filteredArchive,
     filteredFavorites,
+    favoriteSections,
     handleTabChange,
     handleSearchQueryChange,
     handleMarkViewed,
@@ -419,19 +420,14 @@ export default function App() {
         {activeTab === 'favorites' &&
           filteredFavorites.length > 0 &&
           (() => {
-            const hasUpcoming = filteredFavorites.some(
-              (item) =>
-                (item.status === 'upcoming' || item.status === 'live') && item.viewedAt == null
-            )
-            const hasNormal = filteredFavorites.some(
-              (item) => item.status === 'ended' && item.viewedAt == null
-            )
-            const hasViewed = filteredFavorites.some((item) => item.viewedAt != null)
-            const sectionCount = [hasUpcoming, hasNormal, hasViewed].filter(Boolean).length
+            const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
+            const sectionCount = [normalFavs, upcomingFavs, viewedFavs].filter(
+              (s) => s.length > 0
+            ).length
             if (sectionCount < 2) return null
             return (
               <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
-                {hasNormal && (
+                {normalFavs.length > 0 && (
                   <button
                     className="yt-nav-btn"
                     onClick={() =>
@@ -443,7 +439,7 @@ export default function App() {
                     📋 通常
                   </button>
                 )}
-                {hasUpcoming && (
+                {upcomingFavs.length > 0 && (
                   <button
                     className="yt-nav-btn"
                     onClick={() =>
@@ -455,7 +451,7 @@ export default function App() {
                     📅 未配信
                   </button>
                 )}
-                {hasViewed && (
+                {viewedFavs.length > 0 && (
                   <button
                     className="yt-nav-btn"
                     onClick={() =>
@@ -571,17 +567,7 @@ export default function App() {
             </div>
           ) : (
             (() => {
-              // 通常: 終了済みかつ未視聴
-              const normalFavs = filteredFavorites.filter(
-                (item) => item.status === 'ended' && item.viewedAt == null
-              )
-              // 未配信: upcoming/live かつ未視聴
-              const upcomingFavs = filteredFavorites.filter(
-                (item) =>
-                  (item.status === 'upcoming' || item.status === 'live') && item.viewedAt == null
-              )
-              // 視聴済み: viewedAt あり（ステータス問わず）
-              const viewedFavs = filteredFavorites.filter((item) => item.viewedAt != null)
+              const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
               const hasAbove = (i) =>
                 [normalFavs, upcomingFavs].slice(0, i).some((s) => s.length > 0)
               return (
