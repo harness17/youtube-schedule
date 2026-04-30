@@ -427,18 +427,6 @@ export default function App() {
             if (sectionCount < 2) return null
             return (
               <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
-                {normalFavs.length > 0 && (
-                  <button
-                    className="yt-nav-btn"
-                    onClick={() =>
-                      document
-                        .getElementById('fav-normal')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
-                  >
-                    📋 通常
-                  </button>
-                )}
                 {upcomingFavs.length > 0 && (
                   <button
                     className="yt-nav-btn"
@@ -449,6 +437,18 @@ export default function App() {
                     }
                   >
                     📅 未配信
+                  </button>
+                )}
+                {normalFavs.length > 0 && (
+                  <button
+                    className="yt-nav-btn"
+                    onClick={() =>
+                      document
+                        .getElementById('fav-normal')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  >
+                    📋 通常
                   </button>
                 )}
                 {viewedFavs.length > 0 && (
@@ -568,26 +568,17 @@ export default function App() {
           ) : (
             (() => {
               const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
+              // 表示順: 未配信 → 通常 → 視聴済み
               const hasAbove = (i) =>
-                [normalFavs, upcomingFavs].slice(0, i).some((s) => s.length > 0)
+                [upcomingFavs, normalFavs].slice(0, i).some((s) => s.length > 0)
               return (
                 <>
-                  {normalFavs.length > 0 && (
-                    <>
-                      <div id="fav-normal" className="yt-section-label" style={{ color: subColor }}>
-                        📋 通常
-                      </div>
-                      {normalFavs.map((item) =>
-                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
-                      )}
-                    </>
-                  )}
                   {upcomingFavs.length > 0 && (
                     <>
                       <div
                         id="fav-upcoming"
                         className="yt-section-label"
-                        style={{ color: subColor, marginTop: hasAbove(1) ? '16px' : 0 }}
+                        style={{ color: subColor }}
                       >
                         📅 未配信
                       </div>
@@ -596,15 +587,26 @@ export default function App() {
                       )}
                     </>
                   )}
+                  {normalFavs.length > 0 && (
+                    <>
+                      <div
+                        id="fav-normal"
+                        className="yt-section-label"
+                        style={{ color: subColor, marginTop: hasAbove(1) ? '16px' : 0 }}
+                      >
+                        📋 通常
+                      </div>
+                      {normalFavs.map((item) =>
+                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
+                      )}
+                    </>
+                  )}
                   {viewedFavs.length > 0 && (
                     <>
                       <div
                         id="fav-viewed"
                         className="yt-section-label"
-                        style={{
-                          color: subColor,
-                          marginTop: hasAbove(2) ? '16px' : 0
-                        }}
+                        style={{ color: subColor, marginTop: hasAbove(2) ? '16px' : 0 }}
                       >
                         ✅ 視聴済み
                       </div>

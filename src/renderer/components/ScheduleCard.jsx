@@ -63,6 +63,9 @@ export default function ScheduleCard({
   const timeColor = darkMode ? '#a0a0c0' : '#505070'
   const descColor = darkMode ? '#8888a8' : '#707090'
 
+  // お知らせ・お気に入りフラグがある場合はオレンジアクセントを付ける
+  const isHighlighted = item.isNotify || item.isFavorite
+
   // カードの枠線カラー
   const borderColor = isLive
     ? 'rgba(255,34,68,0.5)'
@@ -92,7 +95,11 @@ export default function ScheduleCard({
         background: surfaceColor,
         borderRadius: '10px',
         border: `1px solid ${borderColor}`,
-        borderLeft: isPinned ? `3px solid rgba(255,201,64,0.7)` : undefined,
+        borderLeft: isHighlighted
+          ? '3px solid rgba(255,130,0,0.75)'
+          : isPinned
+            ? '3px solid rgba(255,201,64,0.7)'
+            : undefined,
         marginBottom: '8px',
         opacity: isViewed ? 0.55 : 1
       }}
