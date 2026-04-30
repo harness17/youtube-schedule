@@ -63,9 +63,15 @@ export default function ScheduleList({
   }
 
   const sortedLive = [...live].sort((a, b) => {
+    // 1. お知らせ・お気に入りフラグ優先
+    const af = a.isNotify || a.isFavorite ? 0 : 1
+    const bf = b.isNotify || b.isFavorite ? 0 : 1
+    if (af !== bf) return af - bf
+    // 2. ピン済みチャンネル優先
     const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
     const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
     if (ap !== bp) return ap - bp
+    // 3. 開始時刻昇順
     return (
       (a.actualStartTime ?? a.scheduledStartTime ?? 0) -
       (b.actualStartTime ?? b.scheduledStartTime ?? 0)
@@ -76,9 +82,15 @@ export default function ScheduleList({
   const sortedEntries = getSortedGroupEntries(groups, upcoming).map(([dateLabel, items]) => [
     dateLabel,
     [...items].sort((a, b) => {
+      // 1. お知らせ・お気に入りフラグ優先
+      const af = a.isNotify || a.isFavorite ? 0 : 1
+      const bf = b.isNotify || b.isFavorite ? 0 : 1
+      if (af !== bf) return af - bf
+      // 2. ピン済みチャンネル優先
       const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
       const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
       if (ap !== bp) return ap - bp
+      // 3. 開始時刻昇順
       return (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0)
     })
   ])

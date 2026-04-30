@@ -283,18 +283,18 @@ export function useTabState({ live, upcoming, updateVideo }) {
     selectedChannel
   ])
 
-  /** 検索ボックスのキーワードに一致するか（schedule タブ用フロントフィルタ） */
-  const matchesQuery = useCallback(
-    (item) => {
-      const q = searchQuery.trim().toLowerCase()
-      if (!q) return true
-      return (
-        (item.title ?? '').toLowerCase().includes(q) ||
-        (item.channelTitle ?? '').toLowerCase().includes(q)
-      )
-    },
-    [searchQuery]
-  )
+  /**
+   * 検索ボックスのキーワードに一致するか（schedule タブ用フロントフィルタ）。
+   * q を useMemo 内で 1 度だけ計算し、返した関数はクロージャで参照する。
+   * useCallback では q がアイテムごとに毎回 trim/toLowerCase されていた。
+   */
+  const matchesQuery = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return () => true
+    return (item) =>
+      (item.title ?? '').toLowerCase().includes(q) ||
+      (item.channelTitle ?? '').toLowerCase().includes(q)
+  }, [searchQuery])
 
   /** チャンネルフィルター + キーワードフィルターを合成 */
   const filterItem = useCallback(
@@ -313,13 +313,31 @@ export function useTabState({ live, upcoming, updateVideo }) {
     [archiveVideos, filterItem]
   )
   const filteredFavorites = useMemo(
-    () =>
-      favoriteVideos
-        .filter(filterItem)
-        // 未視聴を先頭に固定（お気に入りタブ専用の並び順）
-        .sort((a, b) => (a.viewedAt != null ? 1 : 0) - (b.viewedAt != null ? 1 : 0)),
+    () => favoriteVideos.filter(filterItem),
     [favoriteVideos, filterItem]
   )
+
+  /**
+   * お気に入りを 通常(ended+未視聴) / 未配信(upcoming|live+未視聴) / 視聴済み の 3 セクションに分類。
+   * filteredFavorites を 1 回の reduce で走査してセクション配列を生成する。
+   * App.jsx での 3×filter + 3×some の 6 回走査を 1 回に削減。
+   */
+  const favoriteSections = useMemo(() => {
+    return filteredFavorites.reduce(
+      (acc, item) => {
+        if (item.viewedAt != null) {
+          acc.viewedFavs.push(item)
+        } else if (item.status === 'ended') {
+          acc.normalFavs.push(item)
+        } else {
+          // upcoming / live
+          acc.upcomingFavs.push(item)
+        }
+        return acc
+      },
+      { normalFavs: [], upcomingFavs: [], viewedFavs: [] }
+    )
+  }, [filteredFavorites])
 
   // ===== 公開インターフェース ===================================================
   return {
@@ -349,6 +367,7 @@ export function useTabState({ live, upcoming, updateVideo }) {
     filteredMissed,
     filteredArchive,
     filteredFavorites,
+    favoriteSections,
     // ハンドラ
     handleTabChange,
     handleSearchQueryChange,
