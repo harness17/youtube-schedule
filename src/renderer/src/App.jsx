@@ -54,7 +54,7 @@ export default function App() {
     handleLogout
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, isAuthenticated })
+  useNotificationCheck({ upcoming, live, isAuthenticated })
 
   // ===== タブ状態 ==============================================================
   const {
