@@ -46,15 +46,21 @@ export function createVideoRepository(db) {
   const listMissedStmt = db.prepare(`
     SELECT v.* FROM videos v
     LEFT JOIN channels c ON v.channel_id = c.id
-    WHERE v.status = 'ended'
-      AND v.notify = 1
+    WHERE v.notify = 1
       AND v.viewed_at IS NULL
       AND (
-        (v.actual_start_time IS NOT NULL AND v.actual_start_time < @now) OR
-        (v.actual_start_time IS NULL AND v.scheduled_start_time IS NOT NULL AND v.scheduled_start_time < @now)
+        v.status IN ('upcoming', 'live')
+        OR (
+          v.status = 'ended'
+          AND (
+            (v.actual_start_time IS NOT NULL AND v.actual_start_time < @now) OR
+            (v.actual_start_time IS NULL AND v.scheduled_start_time IS NOT NULL AND v.scheduled_start_time < @now)
+          )
+        )
       )
     ORDER BY
       CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
+      CASE v.status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
       COALESCE(v.actual_start_time, v.scheduled_start_time) DESC
   `)
   const listArchiveStmt = db.prepare(`

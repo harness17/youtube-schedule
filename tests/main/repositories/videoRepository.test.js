@@ -245,7 +245,7 @@ describe('VideoRepository', () => {
     expect(ids).toEqual(['a', 'c'])
   })
 
-  it('listMissed returns ended+notify videos that were never viewed', () => {
+  it('listMissed returns notify videos that were never viewed', () => {
     const now = 1_700_000_000_000
     // notify=1, not viewed → 見逃し対象
     repo.upsert(
@@ -285,11 +285,34 @@ describe('VideoRepository', () => {
         scheduledStartTime: now + 3600e3
       })
     )
+    repo.toggleNotify('future')
+    // live + notify=1 → 未配信セクション対象
+    repo.upsert(
+      sampleVideo({
+        id: 'live_notify',
+        status: 'live',
+        actualStartTime: now - 60e3,
+        scheduledStartTime: now - 3600e3
+      })
+    )
+    repo.toggleNotify('live_notify')
+    // upcoming + notify=1 でも viewed 済みなら対象外
+    repo.upsert(
+      sampleVideo({
+        id: 'future_seen',
+        status: 'upcoming',
+        scheduledStartTime: now + 7200e3
+      })
+    )
+    repo.toggleNotify('future_seen')
+    repo.markViewed('future_seen', now)
     const ids = repo.listMissed(now).map((v) => v.id)
     expect(ids).toContain('missed')
+    expect(ids).toContain('future')
+    expect(ids).toContain('live_notify')
     expect(ids).not.toContain('seen')
     expect(ids).not.toContain('no_notify')
-    expect(ids).not.toContain('future')
+    expect(ids).not.toContain('future_seen')
   })
 
   it('toggleNotify flips notify flag', () => {

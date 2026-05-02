@@ -339,6 +339,21 @@ export function useTabState({ live, upcoming, updateVideo }) {
     )
   }, [filteredFavorites])
 
+  /**
+   * 見逃しを 未配信(upcoming|live) / 見逃し(ended+未視聴) に分類。
+   * お気に入りタブと同じセクション表示に使う。
+   */
+  const missedSections = useMemo(() => {
+    return filteredMissed.reduce(
+      (acc, item) => {
+        if (item.status === 'ended') acc.endedMissed.push(item)
+        else acc.upcomingMissed.push(item)
+        return acc
+      },
+      { upcomingMissed: [], endedMissed: [] }
+    )
+  }, [filteredMissed])
+
   // ===== 公開インターフェース ===================================================
   return {
     // タブ選択
@@ -368,6 +383,7 @@ export function useTabState({ live, upcoming, updateVideo }) {
     filteredArchive,
     filteredFavorites,
     favoriteSections,
+    missedSections,
     // ハンドラ
     handleTabChange,
     handleSearchQueryChange,
