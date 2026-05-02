@@ -8,9 +8,18 @@ function formatViewers(count) {
   return `${n.toLocaleString()}人視聴中`
 }
 
-function formatTime(isoString) {
+function formatTime(isoString, includeDate = false) {
   if (!isoString) return ''
   const d = new Date(isoString)
+  if (includeDate) {
+    return d.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -39,7 +48,8 @@ export default function ScheduleCard({
   isPinned = false,
   showViewedButton = false,
   isViewed = false,
-  showStatusBadge = false
+  showStatusBadge = false,
+  showDateInTime = false
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -280,8 +290,8 @@ export default function ScheduleCard({
         {/* 時刻・カウントダウン行 */}
         <div style={{ fontSize: '12px', color: timeColor }}>
           {isLive
-            ? `配信中（${formatTime(item.actualStartTime)}〜）`
-            : `${formatTime(item.scheduledStartTime)}〜`}
+            ? `配信中（${formatTime(item.actualStartTime, showDateInTime)}〜）`
+            : `${formatTime(item.scheduledStartTime, showDateInTime)}〜`}
           {!isLive && countdown && (
             <span style={{ marginLeft: '8px', color: '#e07800', fontWeight: '700' }}>
               {countdown}
@@ -381,5 +391,6 @@ ScheduleCard.propTypes = {
   isPinned: PropTypes.bool,
   showViewedButton: PropTypes.bool,
   isViewed: PropTypes.bool,
-  showStatusBadge: PropTypes.bool
+  showStatusBadge: PropTypes.bool,
+  showDateInTime: PropTypes.bool
 }
