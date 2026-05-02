@@ -47,6 +47,16 @@ describe('ScheduleCard', () => {
     expect(screen.queryByText(/万人/)).not.toBeInTheDocument()
   })
 
+  it('showDateInTime=true のとき時刻行に日付も表示される', () => {
+    render(<ScheduleCard item={mockItem} showDateInTime={true} />)
+    expect(screen.getByText(/2026\/4\/13/)).toBeInTheDocument()
+  })
+
+  it('showDateInTime=false のとき時刻行に日付は表示されない', () => {
+    render(<ScheduleCard item={mockItem} showDateInTime={false} />)
+    expect(screen.queryByText(/2026\/4\/13/)).not.toBeInTheDocument()
+  })
+
   it('YouTube で開くボタンで openExternal が呼ばれる', () => {
     render(<ScheduleCard item={mockItem} />)
     fireEvent.click(screen.getByText('▶ 開く'))

@@ -14,6 +14,11 @@ import { useDarkMode } from '../hooks/useDarkMode.js'
 import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { useTabState } from '../hooks/useTabState.js'
+import {
+  DEFAULT_REMINDER_MINUTES,
+  REMINDER_SETTING_KEY,
+  normalizeReminderMinutes
+} from '../constants/notificationSettings.js'
 
 // main.jsx が { ErrorBoundary } を App.jsx からインポートしているため再エクスポート
 export { ErrorBoundary }
@@ -25,9 +30,13 @@ export default function App() {
   const [appVersion, setAppVersion] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
+    window.api
+      .getSetting(REMINDER_SETTING_KEY, DEFAULT_REMINDER_MINUTES)
+      .then((value) => setReminderMinutes(normalizeReminderMinutes(value)))
   }, [])
 
   // オフライン検知
@@ -54,7 +63,13 @@ export default function App() {
     handleLogout
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, isAuthenticated })
+  useNotificationCheck({ upcoming, live, isAuthenticated, reminderMinutes })
+
+  async function handleReminderMinutesChange(value) {
+    const next = normalizeReminderMinutes(value)
+    setReminderMinutes(next)
+    await window.api.setSetting(REMINDER_SETTING_KEY, next)
+  }
 
   // ===== タブ状態 ==============================================================
   const {
@@ -77,6 +92,7 @@ export default function App() {
     filteredArchive,
     filteredFavorites,
     favoriteSections,
+    missedSections,
     handleTabChange,
     handleSearchQueryChange,
     handleMarkViewed,
@@ -205,6 +221,7 @@ export default function App() {
         onTogglePin={handleTogglePin}
         showViewedButton={true}
         isViewed={item.viewedAt != null}
+        showDateInTime={true}
         {...extraProps}
       />
     )
@@ -417,6 +434,36 @@ export default function App() {
             </button>
           ))}
         </div>
+        {activeTab === 'missed' &&
+          filteredMissed.length > 0 &&
+          (() => {
+            const { upcomingMissed, endedMissed } = missedSections
+            if (upcomingMissed.length === 0 || endedMissed.length === 0) return null
+            return (
+              <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
+                <button
+                  className="yt-nav-btn"
+                  onClick={() =>
+                    document
+                      .getElementById('missed-upcoming')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                >
+                  📅 未配信
+                </button>
+                <button
+                  className="yt-nav-btn"
+                  onClick={() =>
+                    document
+                      .getElementById('missed-ended')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                >
+                  📋 見逃し
+                </button>
+              </div>
+            )
+          })()}
         {activeTab === 'favorites' &&
           filteredFavorites.length > 0 &&
           (() => {
@@ -504,7 +551,44 @@ export default function App() {
                 : '見逃した配信はありません 🎉'}
             </div>
           ) : (
-            filteredMissed.map((item) => renderTabCard(item))
+            (() => {
+              const { upcomingMissed, endedMissed } = missedSections
+              return (
+                <>
+                  {upcomingMissed.length > 0 && (
+                    <>
+                      <div
+                        id="missed-upcoming"
+                        className="yt-section-label"
+                        style={{ color: subColor }}
+                      >
+                        📅 未配信
+                      </div>
+                      {upcomingMissed.map((item) =>
+                        renderTabCard(item, { showStatusBadge: true, showViewedButton: false })
+                      )}
+                    </>
+                  )}
+                  {endedMissed.length > 0 && (
+                    <>
+                      <div
+                        id="missed-ended"
+                        className="yt-section-label"
+                        style={{
+                          color: subColor,
+                          marginTop: upcomingMissed.length > 0 ? '16px' : 0
+                        }}
+                      >
+                        📋 見逃し
+                      </div>
+                      {endedMissed.map((item) =>
+                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
+                      )}
+                    </>
+                  )}
+                </>
+              )
+            })()
           )}
         </div>
       )}
@@ -630,6 +714,8 @@ export default function App() {
         onClose={() => setShowSettings(false)}
         darkMode={darkMode}
         onDarkModeChange={(val) => setDarkMode(val)}
+        reminderMinutes={reminderMinutes}
+        onReminderMinutesChange={handleReminderMinutesChange}
         onLogout={handleLogout}
         onPinnedChannelsUpdated={loadAllDbChannels}
         onToast={setToast}
