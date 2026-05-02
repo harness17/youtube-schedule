@@ -14,6 +14,11 @@ import { useDarkMode } from '../hooks/useDarkMode.js'
 import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { useTabState } from '../hooks/useTabState.js'
+import {
+  DEFAULT_REMINDER_MINUTES,
+  REMINDER_SETTING_KEY,
+  normalizeReminderMinutes
+} from '../constants/notificationSettings.js'
 
 // main.jsx が { ErrorBoundary } を App.jsx からインポートしているため再エクスポート
 export { ErrorBoundary }
@@ -25,9 +30,13 @@ export default function App() {
   const [appVersion, setAppVersion] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
+    window.api
+      .getSetting(REMINDER_SETTING_KEY, DEFAULT_REMINDER_MINUTES)
+      .then((value) => setReminderMinutes(normalizeReminderMinutes(value)))
   }, [])
 
   // オフライン検知
@@ -54,7 +63,13 @@ export default function App() {
     handleLogout
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, live, isAuthenticated })
+  useNotificationCheck({ upcoming, live, isAuthenticated, reminderMinutes })
+
+  async function handleReminderMinutesChange(value) {
+    const next = normalizeReminderMinutes(value)
+    setReminderMinutes(next)
+    await window.api.setSetting(REMINDER_SETTING_KEY, next)
+  }
 
   // ===== タブ状態 ==============================================================
   const {
@@ -699,6 +714,8 @@ export default function App() {
         onClose={() => setShowSettings(false)}
         darkMode={darkMode}
         onDarkModeChange={(val) => setDarkMode(val)}
+        reminderMinutes={reminderMinutes}
+        onReminderMinutesChange={handleReminderMinutesChange}
         onLogout={handleLogout}
         onPinnedChannelsUpdated={loadAllDbChannels}
         onToast={setToast}

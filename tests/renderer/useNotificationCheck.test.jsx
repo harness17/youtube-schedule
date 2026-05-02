@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import PropTypes from 'prop-types'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useNotificationCheck } from '../../src/renderer/hooks/useNotificationCheck.js'
 
 const baseLive = {
@@ -12,21 +12,36 @@ const baseLive = {
   actualStartTime: Date.now()
 }
 
-function HookHost({ upcoming = [], live = [], isAuthenticated = true }) {
-  useNotificationCheck({ upcoming, live, isAuthenticated })
+const baseUpcoming = {
+  id: 'upcoming-1',
+  status: 'upcoming',
+  title: '予定配信',
+  channelTitle: 'テストチャンネル',
+  scheduledStartTime: Date.now() + 10 * 60_000,
+  actualStartTime: null,
+  isNotify: true
+}
+
+function HookHost({ upcoming = [], live = [], isAuthenticated = true, reminderMinutes = 5 }) {
+  useNotificationCheck({ upcoming, live, isAuthenticated, reminderMinutes })
   return null
 }
 
 HookHost.propTypes = {
   upcoming: PropTypes.array,
   live: PropTypes.array,
-  isAuthenticated: PropTypes.bool
+  isAuthenticated: PropTypes.bool,
+  reminderMinutes: PropTypes.number
 }
 
 beforeEach(() => {
   window.api = {
     showNotification: vi.fn()
   }
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('useNotificationCheck', () => {
@@ -64,6 +79,41 @@ describe('useNotificationCheck', () => {
   it('未認証中は live 配信が入っても通知を出さない', () => {
     const { rerender } = render(<HookHost live={[]} isAuthenticated={false} />)
     rerender(<HookHost live={[{ ...baseLive, isNotify: true }]} isAuthenticated={false} />)
+
+    expect(window.api.showNotification).not.toHaveBeenCalled()
+  })
+
+  it('設定した分数以内に入った配信前通知を出す', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-02T10:00:00Z'))
+    const upcoming = [
+      {
+        ...baseUpcoming,
+        scheduledStartTime: new Date('2026-05-02T10:10:00Z').toISOString()
+      }
+    ]
+
+    render(<HookHost upcoming={upcoming} reminderMinutes={10} />)
+    vi.advanceTimersByTime(60_000)
+
+    expect(window.api.showNotification).toHaveBeenCalledWith(
+      'もうすぐ配信開始',
+      'テストチャンネル「予定配信」が10分後に始まります'
+    )
+  })
+
+  it('設定した分数より先の配信では配信前通知を出さない', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-02T10:00:00Z'))
+    const upcoming = [
+      {
+        ...baseUpcoming,
+        scheduledStartTime: new Date('2026-05-02T10:10:00Z').toISOString()
+      }
+    ]
+
+    render(<HookHost upcoming={upcoming} reminderMinutes={5} />)
+    vi.advanceTimersByTime(60_000)
 
     expect(window.api.showNotification).not.toHaveBeenCalled()
   })

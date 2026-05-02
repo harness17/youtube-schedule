@@ -12,6 +12,8 @@ export default function SettingsModal({
   onClose,
   darkMode,
   onDarkModeChange,
+  reminderMinutes,
+  onReminderMinutesChange,
   onLogout,
   onPinnedChannelsUpdated,
   onToast,
@@ -181,6 +183,38 @@ export default function SettingsModal({
             >
               {darkMode ? 'ON' : 'OFF'}
             </button>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>通知</div>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>配信開始前の通知</div>
+              <div style={descStyle}>🔔 登録した配信の何分前に通知するかを指定します</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                value={reminderMinutes}
+                onChange={(e) => onReminderMinutesChange(e.target.value)}
+                style={{
+                  width: '72px',
+                  padding: '6px 8px',
+                  fontSize: '12px',
+                  background: bgColor,
+                  color: textColor,
+                  border: `1px solid ${inputBorder}`,
+                  borderRadius: '6px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  textAlign: 'right'
+                }}
+              />
+              <span style={{ color: subColor, fontSize: '12px' }}>分前</span>
+            </div>
           </div>
         </div>
         <div>
@@ -635,6 +669,8 @@ SettingsModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   darkMode: PropTypes.bool.isRequired,
   onDarkModeChange: PropTypes.func.isRequired,
+  reminderMinutes: PropTypes.number.isRequired,
+  onReminderMinutesChange: PropTypes.func.isRequired,
   onLogout: PropTypes.func.isRequired,
   onPinnedChannelsUpdated: PropTypes.func.isRequired,
   onToast: PropTypes.func.isRequired,
