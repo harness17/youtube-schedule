@@ -194,7 +194,7 @@ ScheduleCard onToggleFavorite(id)
 
 ```
 filteredFavorites
-  ├─ 📅 未配信  status === 'upcoming' | 'live'  && viewedAt == null
+  ├─ 📅 予定・配信中  status === 'upcoming' | 'live'  && viewedAt == null
   ├─ 📋 通常    status === 'ended'               && viewedAt == null
   └─ ✅ 視聴済み viewedAt != null（ステータス問わず）
 ```

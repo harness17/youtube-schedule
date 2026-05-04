@@ -48,6 +48,9 @@ export function useTabState({ live, upcoming, updateVideo }) {
   // ---- 検索・フィルター --------------------------------------------------------
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('all')
+  const [favoriteReorderMode, setFavoriteReorderMode] = useState(false)
+  const [favoriteOrderDirty, setFavoriteOrderDirty] = useState(false)
+  const [favoriteOrderSaving, setFavoriteOrderSaving] = useState(false)
   // 検索デバウンス用タイマー・競合リクエスト防止シーケンス
   const archiveSearchTimerRef = useRef(null)
   const archiveSearchSeqRef = useRef(0)
@@ -92,7 +95,6 @@ export function useTabState({ live, upcoming, updateVideo }) {
   // stale closure 対策。IntersectionObserver コールバックが最新の loadMoreArchive を
   // 参照できるよう render 時に同期する（useEffect の deps に含めると observer 再設定が
   // 多発するため、意図的に render サイクルで同期）
-  // eslint-disable-next-line react-hooks/refs -- stale closure 対策。render 時同期が必要なパターン
   loadMoreArchiveFnRef.current = loadMoreArchive
 
   // sentinel が表示領域に入ったら追加ロードを実行する IntersectionObserver
@@ -165,6 +167,8 @@ export function useTabState({ live, upcoming, updateVideo }) {
     } else if (tab === 'favorites') {
       setTabLoading(true)
       setFavoriteVideos((await window.api.listFavorites?.()) ?? [])
+      setFavoriteReorderMode(false)
+      setFavoriteOrderDirty(false)
       setTabLoading(false)
     }
   }
@@ -200,7 +204,42 @@ export function useTabState({ live, upcoming, updateVideo }) {
       const patchFn = (v) => (v.id === id ? { ...v, isFavorite: newVal } : v)
       setMissedVideos((prev) => prev.map(patchFn))
       setArchiveVideos((prev) => prev.map(patchFn))
-      setFavoriteVideos((prev) => prev.map(patchFn))
+      setFavoriteVideos((prev) => (newVal ? prev.map(patchFn) : prev.filter((v) => v.id !== id)))
+    }
+  }
+
+  function moveFavoriteOrder(id, direction, scopeIds = null) {
+    setFavoriteVideos((prev) => {
+      const ids = Array.isArray(scopeIds) ? scopeIds : prev.map((v) => v.id)
+      const scopedIndex = ids.indexOf(id)
+      const swapId = ids[scopedIndex + direction]
+      if (!swapId) return prev
+      const index = prev.findIndex((v) => v.id === id)
+      const nextIndex = prev.findIndex((v) => v.id === swapId)
+      if (index < 0 || nextIndex < 0) return prev
+      const next = [...prev]
+      const movedItem = next[index]
+      next[index] = next[nextIndex]
+      next[nextIndex] = movedItem
+      return next
+    })
+    setFavoriteOrderDirty(true)
+  }
+
+  async function saveFavoriteOrder() {
+    setFavoriteOrderSaving(true)
+    try {
+      const ids = favoriteVideos.map((v) => v.id)
+      const ok = await window.api.saveFavoriteOrder?.(ids)
+      if (ok) {
+        const reloaded = (await window.api.listFavorites?.()) ?? []
+        setFavoriteVideos(reloaded)
+        setFavoriteOrderDirty(false)
+        setFavoriteReorderMode(false)
+      }
+      return ok
+    } finally {
+      setFavoriteOrderSaving(false)
     }
   }
 
@@ -318,9 +357,8 @@ export function useTabState({ live, upcoming, updateVideo }) {
   )
 
   /**
-   * お気に入りを 通常(ended+未視聴) / 未配信(upcoming|live+未視聴) / 視聴済み の 3 セクションに分類。
-   * filteredFavorites を 1 回の reduce で走査してセクション配列を生成する。
-   * App.jsx での 3×filter + 3×some の 6 回走査を 1 回に削減。
+   * お気に入りを 予定・配信中(upcoming|live) / 通常(ended+未視聴) / 視聴済み に分類。
+   * 各セクション内の順番は favoriteVideos の保存済み順を維持する。
    */
   const favoriteSections = useMemo(() => {
     return filteredFavorites.reduce(
@@ -330,17 +368,16 @@ export function useTabState({ live, upcoming, updateVideo }) {
         } else if (item.status === 'ended') {
           acc.normalFavs.push(item)
         } else {
-          // upcoming / live
           acc.upcomingFavs.push(item)
         }
         return acc
       },
-      { normalFavs: [], upcomingFavs: [], viewedFavs: [] }
+      { upcomingFavs: [], normalFavs: [], viewedFavs: [] }
     )
   }, [filteredFavorites])
 
   /**
-   * 見逃しを 未配信(upcoming|live) / 見逃し(ended+未視聴) に分類。
+   * 見逃しを 予定・配信中(upcoming|live) / 見逃し(ended+未視聴) に分類。
    * お気に入りタブと同じセクション表示に使う。
    */
   const missedSections = useMemo(() => {
@@ -371,6 +408,10 @@ export function useTabState({ live, upcoming, updateVideo }) {
     searchQuery,
     selectedChannel,
     setSelectedChannel,
+    favoriteReorderMode,
+    setFavoriteReorderMode,
+    favoriteOrderDirty,
+    favoriteOrderSaving,
     // ピン済みチャンネル
     pinnedChannelIds,
     loadAllDbChannels,
@@ -390,6 +431,8 @@ export function useTabState({ live, upcoming, updateVideo }) {
     handleMarkViewed,
     handleToggleFavorite,
     handleTogglePin,
-    handleToggleNotify
+    handleToggleNotify,
+    moveFavoriteOrder,
+    saveFavoriteOrder
   }
 }

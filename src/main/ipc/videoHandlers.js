@@ -5,7 +5,7 @@
  *   schedule:get / schedule:refresh
  *   diag:rssFailureRate
  *   videos:listMissed / listArchive / listFavorites / searchByText
- *   videos:markViewed / clearViewed / toggleFavorite / toggleNotify
+ *   videos:markViewed / clearViewed / toggleFavorite / saveFavoriteOrder / toggleNotify
  *   channels:togglePin / listAll
  *
  * 依存オブジェクトは全てゲッター関数として受け取る。
@@ -77,6 +77,12 @@ export function registerVideoHandlers({
     const repo = getVideoRepo()
     if (!repo) return []
     return repo.listFavorites()
+  })
+
+  ipcMain.handle('videos:saveFavoriteOrder', (_, ids) => {
+    const repo = getVideoRepo()
+    if (!repo) return false
+    return repo.saveFavoriteOrder(ids)
   })
 
   ipcMain.handle('videos:searchByText', (_, query, opts) => {

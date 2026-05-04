@@ -74,6 +74,8 @@ export function createVideoRepository(db) {
     LEFT JOIN channels c ON v.channel_id = c.id
     WHERE v.is_favorite = 1
     ORDER BY
+      CASE WHEN v.favorite_order IS NULL THEN 1 ELSE 0 END,
+      v.favorite_order ASC,
       CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
       COALESCE(v.scheduled_start_time, v.last_checked_at) DESC
   `)
@@ -90,13 +92,32 @@ export function createVideoRepository(db) {
   `)
   const markViewedStmt = db.prepare(`UPDATE videos SET viewed_at = @now WHERE id = @id`)
   const clearViewedStmt = db.prepare(`UPDATE videos SET viewed_at = NULL WHERE id = @id`)
-  const toggleFavStmt = db.prepare(
-    `UPDATE videos SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END WHERE id = @id`
-  )
+  const toggleFavStmt = db.prepare(`
+    UPDATE videos
+    SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END,
+        favorite_order = CASE
+          WHEN is_favorite = 1 THEN NULL
+          WHEN EXISTS (SELECT 1 FROM videos WHERE is_favorite = 1 AND favorite_order IS NOT NULL)
+            THEN COALESCE(
+              favorite_order,
+              (SELECT COALESCE(MAX(favorite_order), -1) + 1 FROM videos WHERE is_favorite = 1)
+            )
+          ELSE favorite_order
+        END
+    WHERE id = @id
+  `)
   const setFavStmt = db.prepare(`
     UPDATE videos
     SET is_favorite = 1,
-        viewed_at = COALESCE(@viewedAt, viewed_at)
+        viewed_at = COALESCE(@viewedAt, viewed_at),
+        favorite_order = CASE
+          WHEN EXISTS (SELECT 1 FROM videos WHERE is_favorite = 1 AND favorite_order IS NOT NULL)
+            THEN COALESCE(
+              favorite_order,
+              (SELECT COALESCE(MAX(favorite_order), -1) + 1 FROM videos WHERE is_favorite = 1)
+            )
+          ELSE favorite_order
+        END
     WHERE id = @id
   `)
   const getByIdForFavStmt = db.prepare(`SELECT id FROM videos WHERE id = @id`)
@@ -129,6 +150,20 @@ export function createVideoRepository(db) {
         ((notify = 0 OR viewed_at IS NOT NULL) AND COALESCE(ended_at, last_checked_at) < @defaultThreshold)
       )
   `)
+  const clearFavoriteOrderStmt = db.prepare(`
+    UPDATE videos SET favorite_order = NULL WHERE is_favorite = 1
+  `)
+  const updateFavoriteOrderStmt = db.prepare(`
+    UPDATE videos SET favorite_order = @orderIndex WHERE id = @id AND is_favorite = 1
+  `)
+  const saveFavoriteOrderTx = db.transaction((ids) => {
+    clearFavoriteOrderStmt.run()
+    let orderIndex = 0
+    for (const id of ids) {
+      const result = updateFavoriteOrderStmt.run({ id, orderIndex })
+      if (result.changes > 0) orderIndex += 1
+    }
+  })
 
   function rowToVideo(row) {
     if (!row) return null
@@ -148,6 +183,7 @@ export function createVideoRepository(db) {
       lastCheckedAt: row.last_checked_at,
       endedAt: row.ended_at ?? null,
       viewedAt: row.viewed_at ?? null,
+      favoriteOrder: row.favorite_order ?? null,
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -195,6 +231,12 @@ export function createVideoRepository(db) {
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
+    },
+    saveFavoriteOrder(ids) {
+      if (!Array.isArray(ids)) return false
+      const uniqueIds = [...new Set(ids.filter((id) => typeof id === 'string' && id.trim()))]
+      saveFavoriteOrderTx(uniqueIds)
+      return true
     },
     searchByText(query, { limit = 50, title = true, channel = true, description = false } = {}) {
       const likeQuery = escapeLikeQuery(query)
