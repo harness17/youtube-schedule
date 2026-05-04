@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import PropTypes from 'prop-types'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
 import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleCard from '../components/ScheduleCard.jsx'
@@ -22,6 +26,37 @@ import {
 
 // main.jsx が { ErrorBoundary } を App.jsx からインポートしているため再エクスポート
 export { ErrorBoundary }
+
+function SortableFavoriteCard({ item, reorderMode, cardContent }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !reorderMode
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    display: 'grid',
+    gridTemplateColumns: reorderMode ? '28px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+    gap: '8px',
+    alignItems: 'center'
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      {reorderMode && (
+        <div className="yt-drag-handle" {...attributes} {...listeners}>
+          ⠿
+        </div>
+      )}
+      {cardContent}
+    </div>
+  )
+}
+SortableFavoriteCard.propTypes = {
+  item: PropTypes.shape({ id: PropTypes.string.isRequired }).isRequired,
+  reorderMode: PropTypes.bool.isRequired,
+  cardContent: PropTypes.node.isRequired
+}
 
 export default function App() {
   // ===== アプリ全体の UI 状態 ==================================================
@@ -103,9 +138,11 @@ export default function App() {
     handleToggleFavorite,
     handleTogglePin,
     handleToggleNotify,
-    moveFavoriteOrder,
+    reorderFavorites,
     saveFavoriteOrder
   } = useTabState({ live, upcoming, updateVideo })
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   // ===== 自動アップデートイベント ==============================================
   useEffect(() => {
@@ -233,50 +270,24 @@ export default function App() {
     )
   }
 
-  function renderFavoriteCard(item, index, sectionItems) {
+  function renderFavoriteSection(sectionItems, onDragEnd) {
     const sectionIds = sectionItems.map((v) => v.id)
     return (
-      <div
-        key={item.id}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: favoriteReorderMode ? '42px minmax(0, 1fr)' : 'minmax(0, 1fr)',
-          gap: '8px',
-          alignItems: 'stretch'
-        }}
-      >
-        {favoriteReorderMode && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              marginBottom: '8px'
-            }}
-          >
-            <button
-              className="yt-order-btn"
-              title="上へ"
-              disabled={index === 0}
-              onClick={() => moveFavoriteOrder(item.id, -1, sectionIds)}
-            >
-              ↑
-            </button>
-            <button
-              className="yt-order-btn"
-              title="下へ"
-              disabled={index === sectionItems.length - 1}
-              onClick={() => moveFavoriteOrder(item.id, 1, sectionIds)}
-            >
-              ↓
-            </button>
-          </div>
-        )}
-        {renderTabCard(item, {
-          showStatusBadge: item.status !== 'ended',
-          showViewedButton: item.status === 'ended'
-        })}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+          {sectionItems.map((item) => (
+            <SortableFavoriteCard
+              key={item.id}
+              item={item}
+              reorderMode={favoriteReorderMode}
+              cardContent={renderTabCard(item, {
+                showStatusBadge: item.status !== 'ended',
+                showViewedButton: item.status === 'ended'
+              })}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
     )
   }
 
@@ -759,9 +770,14 @@ export default function App() {
                       >
                         📅 予定・配信中
                       </div>
-                      {upcomingFavs.map((item, index) =>
-                        renderFavoriteCard(item, index, upcomingFavs)
-                      )}
+                      {renderFavoriteSection(upcomingFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            upcomingFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                   {normalFavs.length > 0 && (
@@ -773,7 +789,14 @@ export default function App() {
                       >
                         📋 通常
                       </div>
-                      {normalFavs.map((item, index) => renderFavoriteCard(item, index, normalFavs))}
+                      {renderFavoriteSection(normalFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            normalFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                   {viewedFavs.length > 0 && (
@@ -785,7 +808,14 @@ export default function App() {
                       >
                         ✅ 視聴済み
                       </div>
-                      {viewedFavs.map((item, index) => renderFavoriteCard(item, index, viewedFavs))}
+                      {renderFavoriteSection(viewedFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            viewedFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                 </>
