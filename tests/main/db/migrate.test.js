@@ -58,6 +58,15 @@ describe('db/migrate', () => {
     expect(cols).toEqual(expect.arrayContaining(['viewed_at', 'is_favorite', 'ended_at']))
   })
 
+  it('migration 006 adds favorite_order column to videos', () => {
+    runMigrations(db)
+    const cols = db
+      .prepare(`PRAGMA table_info(videos)`)
+      .all()
+      .map((r) => r.name)
+    expect(cols).toContain('favorite_order')
+  })
+
   it('migration 003 adds is_pinned column to channels', () => {
     runMigrations(db)
     const cols = db

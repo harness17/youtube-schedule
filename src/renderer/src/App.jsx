@@ -83,6 +83,10 @@ export default function App() {
     searchQuery,
     selectedChannel,
     setSelectedChannel,
+    favoriteReorderMode,
+    setFavoriteReorderMode,
+    favoriteOrderDirty,
+    favoriteOrderSaving,
     pinnedChannelIds,
     loadAllDbChannels,
     tabChannels,
@@ -98,7 +102,9 @@ export default function App() {
     handleMarkViewed,
     handleToggleFavorite,
     handleTogglePin,
-    handleToggleNotify
+    handleToggleNotify,
+    moveFavoriteOrder,
+    saveFavoriteOrder
   } = useTabState({ live, upcoming, updateVideo })
 
   // ===== 自動アップデートイベント ==============================================
@@ -224,6 +230,53 @@ export default function App() {
         showDateInTime={true}
         {...extraProps}
       />
+    )
+  }
+
+  function renderFavoriteCard(item, index, sectionItems) {
+    const sectionIds = sectionItems.map((v) => v.id)
+    return (
+      <div
+        key={item.id}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: favoriteReorderMode ? '42px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+          gap: '8px',
+          alignItems: 'stretch'
+        }}
+      >
+        {favoriteReorderMode && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              marginBottom: '8px'
+            }}
+          >
+            <button
+              className="yt-order-btn"
+              title="上へ"
+              disabled={index === 0}
+              onClick={() => moveFavoriteOrder(item.id, -1, sectionIds)}
+            >
+              ↑
+            </button>
+            <button
+              className="yt-order-btn"
+              title="下へ"
+              disabled={index === sectionItems.length - 1}
+              onClick={() => moveFavoriteOrder(item.id, 1, sectionIds)}
+            >
+              ↓
+            </button>
+          </div>
+        )}
+        {renderTabCard(item, {
+          showStatusBadge: item.status !== 'ended',
+          showViewedButton: item.status === 'ended'
+        })}
+      </div>
     )
   }
 
@@ -449,7 +502,7 @@ export default function App() {
                       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   }
                 >
-                  📅 未配信
+                  📅 予定・配信中
                 </button>
                 <button
                   className="yt-nav-btn"
@@ -483,7 +536,7 @@ export default function App() {
                         ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                     }
                   >
-                    📅 未配信
+                    📅 予定・配信中
                   </button>
                 )}
                 {normalFavs.length > 0 && (
@@ -562,7 +615,7 @@ export default function App() {
                         className="yt-section-label"
                         style={{ color: subColor }}
                       >
-                        📅 未配信
+                        📅 予定・配信中
                       </div>
                       {upcomingMissed.map((item) =>
                         renderTabCard(item, { showStatusBadge: true, showViewedButton: false })
@@ -634,9 +687,50 @@ export default function App() {
         </div>
       )}
 
-      {/* ── お気に入りタブ（通常 → 未配信 → 視聴済みの 3 セクション） ── */}
+      {/* ── お気に入りタブ（区分ごとに保存済みの任意順） ── */}
       {activeTab === 'favorites' && (
         <div>
+          {favoriteVideos.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '12px',
+                flexWrap: 'wrap'
+              }}
+            >
+              <button
+                className={`yt-nav-btn${favoriteReorderMode ? ' yt-nav-btn--live' : ''}`}
+                disabled={Boolean(searchQuery.trim()) || selectedChannel !== 'all'}
+                onClick={() => {
+                  setFavoriteReorderMode(!favoriteReorderMode)
+                }}
+              >
+                ↕ 並び替え
+              </button>
+              {favoriteReorderMode && (
+                <button
+                  className="yt-nav-btn yt-nav-btn--save"
+                  disabled={!favoriteOrderDirty || favoriteOrderSaving}
+                  onClick={async () => {
+                    const ok = await saveFavoriteOrder()
+                    setToast(ok ? 'お気に入りの並び順を保存しました' : '並び順の保存に失敗しました')
+                  }}
+                >
+                  {favoriteOrderSaving ? '保存中...' : '保存'}
+                </button>
+              )}
+              {(searchQuery.trim() || selectedChannel !== 'all') && (
+                <span style={{ fontSize: '12px', color: subColor }}>
+                  並び替えは絞り込みを解除すると使えます
+                </span>
+              )}
+              {favoriteReorderMode && favoriteOrderDirty && (
+                <span style={{ fontSize: '12px', color: subColor }}>未保存の変更があります</span>
+              )}
+            </div>
+          )}
           {tabLoading ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               読み込み中...
@@ -652,7 +746,6 @@ export default function App() {
           ) : (
             (() => {
               const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
-              // 表示順: 未配信 → 通常 → 視聴済み
               const hasAbove = (i) =>
                 [upcomingFavs, normalFavs].slice(0, i).some((s) => s.length > 0)
               return (
@@ -664,10 +757,10 @@ export default function App() {
                         className="yt-section-label"
                         style={{ color: subColor }}
                       >
-                        📅 未配信
+                        📅 予定・配信中
                       </div>
-                      {upcomingFavs.map((item) =>
-                        renderTabCard(item, { showStatusBadge: true, showViewedButton: false })
+                      {upcomingFavs.map((item, index) =>
+                        renderFavoriteCard(item, index, upcomingFavs)
                       )}
                     </>
                   )}
@@ -680,9 +773,7 @@ export default function App() {
                       >
                         📋 通常
                       </div>
-                      {normalFavs.map((item) =>
-                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
-                      )}
+                      {normalFavs.map((item, index) => renderFavoriteCard(item, index, normalFavs))}
                     </>
                   )}
                   {viewedFavs.length > 0 && (
@@ -694,12 +785,7 @@ export default function App() {
                       >
                         ✅ 視聴済み
                       </div>
-                      {viewedFavs.map((item) =>
-                        renderTabCard(item, {
-                          showStatusBadge: true,
-                          showViewedButton: item.status === 'ended'
-                        })
-                      )}
+                      {viewedFavs.map((item, index) => renderFavoriteCard(item, index, viewedFavs))}
                     </>
                   )}
                 </>

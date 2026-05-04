@@ -543,6 +543,45 @@ describe('VideoRepository', () => {
     expect(ids[1]).toBe('normal')
   })
 
+  it('saveFavoriteOrder: 保存した順番でお気に入りを返す', () => {
+    repo.upsert(sampleVideo({ id: 'a', scheduledStartTime: 1000 }))
+    repo.upsert(sampleVideo({ id: 'b', scheduledStartTime: 3000 }))
+    repo.upsert(sampleVideo({ id: 'c', scheduledStartTime: 2000 }))
+    repo.toggleFavorite('a')
+    repo.toggleFavorite('b')
+    repo.toggleFavorite('c')
+
+    expect(repo.saveFavoriteOrder(['c', 'a', 'b'])).toBe(true)
+
+    const favorites = repo.listFavorites()
+    expect(favorites.map((v) => v.id)).toEqual(['c', 'a', 'b'])
+    expect(favorites.map((v) => v.favoriteOrder)).toEqual([0, 1, 2])
+  })
+
+  it('saveFavoriteOrder: お気に入り以外のIDは並び順に含めない', () => {
+    repo.upsert(sampleVideo({ id: 'fav', scheduledStartTime: 1000 }))
+    repo.upsert(sampleVideo({ id: 'plain', scheduledStartTime: 2000 }))
+    repo.toggleFavorite('fav')
+
+    expect(repo.saveFavoriteOrder(['plain', 'fav'])).toBe(true)
+
+    expect(repo.listFavorites().map((v) => v.id)).toEqual(['fav'])
+    expect(repo.getById('plain').favoriteOrder).toBeNull()
+  })
+
+  it('toggleFavorite: 新しく追加したお気に入りは保存済み順の末尾に入る', () => {
+    repo.upsert(sampleVideo({ id: 'a', scheduledStartTime: 1000 }))
+    repo.upsert(sampleVideo({ id: 'b', scheduledStartTime: 2000 }))
+    repo.upsert(sampleVideo({ id: 'c', scheduledStartTime: 3000 }))
+    repo.toggleFavorite('a')
+    repo.toggleFavorite('b')
+    repo.saveFavoriteOrder(['b', 'a'])
+
+    repo.toggleFavorite('c')
+
+    expect(repo.listFavorites().map((v) => v.id)).toEqual(['b', 'a', 'c'])
+  })
+
   it('setFavorite: 存在する動画を is_favorite=1 にして true を返す', () => {
     repo.upsert({
       id: 'v_sfav',
