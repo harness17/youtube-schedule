@@ -248,4 +248,74 @@ describe('SchedulerService.refresh', () => {
     expect(mocks.videoRepo.markEnded).not.toHaveBeenCalled()
     expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: 'ORPHAN' }))
   })
+
+  it('uses RSS-only mode without fetching subscriptions or video details when authClient is null', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.listAll.mockReturnValue([
+      { id: 'UC1', title: 'Manual', uploadsPlaylistId: 'UU1' }
+    ])
+    mocks.rssFetcher.fetch.mockResolvedValue({
+      success: true,
+      videoIds: ['V1'],
+      entries: [{ id: 'V1', title: 'RSS title', channelTitle: 'Manual' }],
+      httpStatus: 200
+    })
+    const svc = createService(mocks, { authClient: null })
+    await svc.refresh()
+    expect(mocks.subsFetcher.fetch).not.toHaveBeenCalled()
+    expect(mocks.videoFetcher.fetch).not.toHaveBeenCalled()
+    expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'V1',
+        title: 'RSS title',
+        status: 'upcoming',
+        scheduledStartTime: null
+      })
+    )
+  })
+
+  it('uses RSS-only mode for stored channels even when uploadsPlaylistId is missing', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC_MANUAL_ONLY', title: 'Stored Channel' }])
+    mocks.rssFetcher.fetch.mockResolvedValue({
+      success: true,
+      videoIds: ['V1'],
+      entries: [{ id: 'V1', title: 'RSS title' }],
+      httpStatus: 200
+    })
+    const svc = createService(mocks, { authClient: null })
+    await svc.refresh()
+    expect(mocks.rssFetcher.fetch).toHaveBeenCalledWith('UC_MANUAL_ONLY')
+    expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'V1',
+        channelId: 'UC_MANUAL_ONLY',
+        channelTitle: 'Stored Channel'
+      })
+    )
+  })
+
+  it('no-auth モードで RSS entries をチャンネルあたり 10 件に絞る', async () => {
+    const mocks = createMocks()
+    // 15 件の entries を返すモック
+    const entries = Array.from({ length: 15 }, (_, i) => ({
+      id: `V${i + 1}`,
+      title: `Title ${i + 1}`,
+      description: '',
+      url: `https://www.youtube.com/watch?v=V${i + 1}`,
+      published: null,
+      channelTitle: 'C'
+    }))
+    mocks.rssFetcher.fetch.mockResolvedValue({
+      success: true,
+      videoIds: entries.map((e) => e.id),
+      entries,
+      httpStatus: 200
+    })
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C' }])
+    const svc = createService(mocks, { authClient: null })
+    await svc.refresh()
+    // upsert の呼び出し回数が 10 件以下であること
+    expect(mocks.videoRepo.upsert.mock.calls.length).toBeLessThanOrEqual(10)
+  })
 })
