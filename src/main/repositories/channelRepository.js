@@ -13,6 +13,13 @@ export function createChannelRepository(db) {
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title
   `)
+  const upsertManualStmt = db.prepare(`
+    INSERT INTO channels (id, title, uploads_playlist_id)
+    VALUES (@id, @title, @uploadsPlaylistId)
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title,
+      uploads_playlist_id = COALESCE(channels.uploads_playlist_id, excluded.uploads_playlist_id)
+  `)
   const listAllStmt = db.prepare(`
     SELECT * FROM channels
     ORDER BY is_pinned DESC, id ASC
@@ -52,6 +59,14 @@ export function createChannelRepository(db) {
     },
     upsertSeen(id, title) {
       upsertSeenStmt.run({ id, title: title ?? null })
+    },
+    addManual({ id, title, uploadsPlaylistId }) {
+      upsertManualStmt.run({
+        id,
+        title: title ?? id,
+        uploadsPlaylistId
+      })
+      return rowToChannel(getByIdStmt.get(id))
     },
     listAll() {
       return listAllStmt.all().map(rowToChannel)

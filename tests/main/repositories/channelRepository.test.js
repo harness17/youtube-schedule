@@ -120,6 +120,17 @@ describe('ChannelRepository', () => {
     expect(ch.isPinned).toBe(true)
   })
 
+  it('addManual stores an RSS-capable channel without marking subscription sync time', () => {
+    const ch = repo.addManual({
+      id: 'UC_MANUAL',
+      title: 'Manual Channel',
+      uploadsPlaylistId: 'UU_MANUAL'
+    })
+    expect(ch.title).toBe('Manual Channel')
+    expect(ch.uploadsPlaylistId).toBe('UU_MANUAL')
+    expect(repo.getLastSyncTime()).toBe(0)
+  })
+
   it('replacePinnedChannels: 指定チャンネルをピン、それ以外をアンピンする', () => {
     repo.syncSubscriptions(
       [

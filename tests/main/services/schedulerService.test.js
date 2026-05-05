@@ -295,6 +295,32 @@ describe('SchedulerService.refresh', () => {
     )
   })
 
+  it('uses RSS published time as feed sort timestamp in RSS-only mode', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C' }])
+    mocks.rssFetcher.fetch.mockResolvedValue({
+      success: true,
+      videoIds: ['V1'],
+      entries: [
+        {
+          id: 'V1',
+          title: 'RSS title',
+          published: '2026-05-05T10:00:00Z',
+          updated: '2026-05-05T11:00:00Z'
+        }
+      ],
+      httpStatus: 200
+    })
+    const svc = createService(mocks, { authClient: null })
+    await svc.refresh()
+    expect(mocks.videoRepo.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'V1',
+        firstSeenAt: new Date('2026-05-05T10:00:00Z').getTime()
+      })
+    )
+  })
+
   it('no-auth モードで RSS entries をチャンネルあたり 10 件に絞る', async () => {
     const mocks = createMocks()
     // 15 件の entries を返すモック

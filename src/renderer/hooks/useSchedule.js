@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 export function useSchedule() {
   const [live, setLive] = useState([])
   const [upcoming, setUpcoming] = useState([])
+  const [feedVideos, setFeedVideos] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dbBroken, setDbBroken] = useState(false)
@@ -11,17 +12,22 @@ export function useSchedule() {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.api.getSchedule()
-      if (result.dbBroken) {
+      const [schedResult, feedResult] = await Promise.all([
+        window.api.getSchedule(),
+        window.api.getFeed()
+      ])
+      if (schedResult.dbBroken) {
         setDbBroken(true)
         setLive([])
         setUpcoming([])
-      } else if (result.error) {
-        setError(result.error)
+        setFeedVideos([])
+      } else if (schedResult.error) {
+        setError(schedResult.error)
       } else {
         setDbBroken(false)
-        setLive(result.live ?? [])
-        setUpcoming(result.upcoming ?? [])
+        setLive(schedResult.live ?? [])
+        setUpcoming(schedResult.upcoming ?? [])
+        setFeedVideos(feedResult?.videos ?? [])
       }
     } catch (e) {
       setError(e.message ?? 'FETCH_FAILED')
@@ -52,7 +58,8 @@ export function useSchedule() {
   function updateVideo(id, patch) {
     setLive((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
     setUpcoming((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+    setFeedVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
   }
 
-  return { live, upcoming, loading, error, dbBroken, refresh, updateVideo }
+  return { live, upcoming, feedVideos, loading, error, dbBroken, refresh, updateVideo }
 }

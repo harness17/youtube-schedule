@@ -22,9 +22,9 @@ const SEARCH_LIMIT = 200
 const SEARCH_TARGETS = { title: true, channel: true, description: false }
 
 // ===== フック本体 ================================================================
-export function useTabState({ live, upcoming, updateVideo }) {
+export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedule' }) {
   // ---- タブ選択 ----------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState('schedule')
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   // ---- タブ別動画リスト --------------------------------------------------------
   const [missedVideos, setMissedVideos] = useState([])
@@ -417,6 +417,7 @@ export function useTabState({ live, upcoming, updateVideo }) {
     favoriteOrderSaving,
     // ピン済みチャンネル
     pinnedChannelIds,
+    allDbChannels,
     loadAllDbChannels,
     // タブ別チャンネル一覧（フィルタードロップダウン用）
     tabChannels,

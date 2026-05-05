@@ -62,6 +62,7 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
 let videoRepo, channelRepo, rssLogRepo, metaRepo
 let scheduler
+let currentAuthClient = null
 let refreshTimer
 let dbBroken = false
 let logger
@@ -141,6 +142,7 @@ function initDatabase() {
 
 // ===== スケジューラー初期化 =====================================================
 function initScheduler(authClient) {
+  currentAuthClient = authClient
   scheduler = createSchedulerService({
     videoRepo,
     channelRepo,
@@ -151,7 +153,7 @@ function initScheduler(authClient) {
     playlistFetcher: createPlaylistItemsFetcher(),
     videoFetcher: createVideoDetailsFetcher(),
     authClient,
-    ytFactory: (auth) => google.youtube({ version: 'v3', auth }),
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
     logger
   })
 }
@@ -181,10 +183,12 @@ function registerAllHandlers(getMainWindow) {
   // 認証ハンドラ
   registerAuthHandlers({
     onLoginSuccess: async (client) => {
-      if (!scheduler) {
-        initScheduler(client)
-        startPolling(getMainWindow())
-      }
+      initScheduler(client)
+      startPolling(getMainWindow())
+    },
+    onLogoutSuccess: async () => {
+      initScheduler(null)
+      startPolling(getMainWindow())
     }
   })
 
@@ -194,6 +198,7 @@ function registerAllHandlers(getMainWindow) {
     getChannelRepo: () => channelRepo,
     getRssLogRepo: () => rssLogRepo,
     getScheduler: () => scheduler,
+    getIsFullMode: () => Boolean(currentAuthClient),
     getDbBroken: () => dbBroken,
     getMainWindow
   })
@@ -256,15 +261,20 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  // 起動時に認証済みクライアントがあればスケジューラーを初期化してポーリング開始
+  // 起動時に認証済みならフルモード、未認証ならRSS-onlyモードで開始する。
+  // credentials.json が壊れていても起動は継続する（簡易モードに退避）。
   const exists = await credentialsExist()
+  let client = null
   if (exists) {
-    const client = await getAuthenticatedClient()
-    if (client) {
-      initScheduler(client)
-      startPolling(getMainWindow())
+    try {
+      client = await getAuthenticatedClient()
+    } catch (err) {
+      logger?.error?.('credentials.json の読み込みに失敗（簡易モードで起動）:', err.message)
+      client = null
     }
   }
+  initScheduler(client)
+  startPolling(getMainWindow())
 })
 
 // ===== アプリ終了処理 ===========================================================

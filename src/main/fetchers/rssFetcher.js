@@ -8,7 +8,7 @@ function buildUrl(channelId) {
 }
 
 export function createRssFetcher({ timeoutMs = 3000, fetchImpl = nodeFetch } = {}) {
-  const parser = new XMLParser({ ignoreAttributes: true })
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' })
 
   async function fetchOne(channelId) {
     const url = buildUrl(channelId)
@@ -59,12 +59,37 @@ export function createRssFetcher({ timeoutMs = 3000, fetchImpl = nodeFetch } = {
       return { success: false, reason: 'parse', httpStatus: res.status }
     }
 
-    const entries = feed.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : []
+    const rawEntries = feed.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : []
+    const channelTitle =
+      typeof feed.author?.name === 'string'
+        ? feed.author.name
+        : typeof feed.title === 'string'
+          ? feed.title
+          : null
+    const entries = rawEntries
+      .map((e) => {
+        const id = e['yt:videoId'] ?? e.videoId ?? null
+        if (typeof id !== 'string' || id.length === 0) return null
+        const media = e['media:group'] ?? {}
+        return {
+          id,
+          title: e.title ?? media['media:title'] ?? '',
+          description: media['media:description'] ?? '',
+          url:
+            typeof e.link?.href === 'string'
+              ? e.link.href
+              : `https://www.youtube.com/watch?v=${id}`,
+          published: e.published ?? null,
+          updated: e.updated ?? null,
+          channelTitle
+        }
+      })
+      .filter(Boolean)
     const videoIds = entries
-      .map((e) => e['yt:videoId'] ?? e.videoId ?? null)
+      .map((e) => e.id)
       .filter((id) => typeof id === 'string' && id.length > 0)
 
-    return { success: true, videoIds, httpStatus: res.status }
+    return { success: true, videoIds, entries, channelTitle, httpStatus: res.status }
   }
 
   return { fetch: fetchOne }

@@ -37,11 +37,12 @@ function toVideoRecord(v, now) {
     url: `https://www.youtube.com/watch?v=${v.id}`,
     firstSeenAt: now,
     lastCheckedAt: now,
-    source: 'rss'
+    source: 'api'
   }
 }
 
 function toRssVideoRecord(entry, channel, now) {
+  const feedTime = Date.parse(entry.published ?? entry.updated ?? '')
   return {
     id: entry.id,
     channelId: channel.id,
@@ -54,8 +55,9 @@ function toRssVideoRecord(entry, channel, now) {
     actualStartTime: null,
     concurrentViewers: null,
     url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
-    firstSeenAt: now,
-    lastCheckedAt: now
+    firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
+    lastCheckedAt: now,
+    source: 'rss'
   }
 }
 

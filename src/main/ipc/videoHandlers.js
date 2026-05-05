@@ -17,17 +17,20 @@
  *   getChannelRepo:  () => import('../repositories/channelRepository.js').ChannelRepository | undefined,
  *   getRssLogRepo:   () => object | undefined,
  *   getScheduler:    () => object | undefined,
+ *   getIsFullMode:   () => boolean,
  *   getDbBroken:     () => boolean,
  *   getMainWindow:   () => import('electron').BrowserWindow | undefined,
  * }} deps
  */
 import { ipcMain } from 'electron'
+import { normalizeManualChannelInput } from '../services/channelInput.js'
 
 export function registerVideoHandlers({
   getVideoRepo,
   getChannelRepo,
   getRssLogRepo,
   getScheduler,
+  getIsFullMode,
   getDbBroken,
   getMainWindow
 }) {
@@ -41,6 +44,15 @@ export function registerVideoHandlers({
       live: visible.filter((v) => v.status === 'live'),
       upcoming: visible.filter((v) => v.status === 'upcoming')
     }
+  })
+
+  // ---- 新着動画フィード（簡易モード専用） ----------------------------------------
+  ipcMain.handle('schedule:feed', () => {
+    if (getIsFullMode?.()) return { videos: [] }
+    if (getDbBroken()) return { videos: [], dbBroken: true }
+    const repo = getVideoRepo()
+    if (!repo) return { error: 'NOT_INITIALIZED' }
+    return { videos: repo.listFeed(50) }
   })
 
   // ---- 配信予定強制更新 --------------------------------------------------------
@@ -129,5 +141,16 @@ export function registerVideoHandlers({
     const repo = getChannelRepo()
     if (!repo) return []
     return repo.listAll()
+  })
+
+  ipcMain.handle('channels:addManual', async (_, payload) => {
+    const repo = getChannelRepo()
+    if (!repo) return { error: 'NOT_INITIALIZED' }
+    try {
+      const channel = repo.addManual(await normalizeManualChannelInput(payload))
+      return { success: true, channel }
+    } catch (err) {
+      return { error: err.message }
+    }
   })
 }

@@ -290,8 +290,10 @@ export default function ScheduleCard({
         {/* 時刻・カウントダウン行 */}
         <div style={{ fontSize: '12px', color: timeColor }}>
           {isLive
-            ? `配信中（${formatTime(item.actualStartTime, showDateInTime)}〜）`
-            : `${formatTime(item.scheduledStartTime, showDateInTime)}〜`}
+            ? `配信中（${formatTime(item.actualStartTime, showDateInTime) || '時刻未取得'}〜）`
+            : item.scheduledStartTime
+              ? `${formatTime(item.scheduledStartTime, showDateInTime)}〜`
+              : '時刻未取得'}
           {!isLive && countdown && (
             <span style={{ marginLeft: '8px', color: '#e07800', fontWeight: '700' }}>
               {countdown}

@@ -1,18 +1,20 @@
 const UPCOMING_GRACE_MS = 2 * 60 * 60 * 1000
 const UPCOMING_FUTURE_MS = 31 * 24 * 60 * 60 * 1000
 const LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000
+const RSS_ONLY_VISIBLE_MS = 24 * 60 * 60 * 1000
 
 export function createVideoRepository(db) {
   const upsertStmt = db.prepare(`
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at, ended_at
+      url, first_seen_at, last_checked_at, ended_at, source
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
       @url, @firstSeenAt, @lastCheckedAt,
-      CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END
+      CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END,
+      @source
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -26,6 +28,7 @@ export function createVideoRepository(db) {
       concurrent_viewers = excluded.concurrent_viewers,
       url = excluded.url,
       last_checked_at = excluded.last_checked_at,
+      source = excluded.source,
       ended_at = CASE
         WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
         WHEN excluded.status != 'ended' THEN NULL
@@ -39,9 +42,10 @@ export function createVideoRepository(db) {
     SELECT * FROM videos
     WHERE (status = 'live' AND actual_start_time > @liveThreshold)
        OR (status = 'upcoming' AND scheduled_start_time > @upcomingThreshold AND scheduled_start_time < @upcomingUpperThreshold)
+       OR (@includeFeedItems AND status = 'upcoming' AND scheduled_start_time IS NULL AND last_checked_at > @rssOnlyThreshold)
     ORDER BY
       CASE status WHEN 'live' THEN 0 ELSE 1 END,
-      scheduled_start_time ASC
+      COALESCE(scheduled_start_time, last_checked_at) ASC
   `)
   const listMissedStmt = db.prepare(`
     SELECT v.* FROM videos v
@@ -78,6 +82,13 @@ export function createVideoRepository(db) {
       v.favorite_order ASC,
       CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
       COALESCE(v.scheduled_start_time, v.last_checked_at) DESC
+  `)
+  const listFeedStmt = db.prepare(`
+    SELECT * FROM videos
+    WHERE status = 'upcoming'
+      AND scheduled_start_time IS NULL
+    ORDER BY first_seen_at DESC
+    LIMIT @limit
   `)
   const searchStmt = db.prepare(`
     SELECT * FROM videos
@@ -184,6 +195,7 @@ export function createVideoRepository(db) {
       endedAt: row.ended_at ?? null,
       viewedAt: row.viewed_at ?? null,
       favoriteOrder: row.favorite_order ?? null,
+      source: row.source ?? 'api',
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -198,7 +210,7 @@ export function createVideoRepository(db) {
 
   return {
     upsert(video) {
-      upsertStmt.run(video)
+      upsertStmt.run({ ...video, source: video.source ?? 'api' })
     },
     getById(id) {
       return rowToVideo(getByIdStmt.get(id))
@@ -214,12 +226,14 @@ export function createVideoRepository(db) {
     count() {
       return countStmt.get().c
     },
-    listVisible(now = Date.now()) {
+    listVisible(now = Date.now(), { includeFeedItems = false } = {}) {
       return listVisibleStmt
         .all({
           liveThreshold: now - LIVE_MAX_DURATION_MS,
           upcomingThreshold: now - UPCOMING_GRACE_MS,
-          upcomingUpperThreshold: now + UPCOMING_FUTURE_MS
+          upcomingUpperThreshold: now + UPCOMING_FUTURE_MS,
+          rssOnlyThreshold: now - RSS_ONLY_VISIBLE_MS,
+          includeFeedItems: includeFeedItems ? 1 : 0
         })
         .map(rowToVideo)
     },
@@ -231,6 +245,9 @@ export function createVideoRepository(db) {
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
+    },
+    listFeed(limit = 50) {
+      return listFeedStmt.all({ limit }).map(rowToVideo)
     },
     saveFavoriteOrder(ids) {
       if (!Array.isArray(ids)) return false
