@@ -16,14 +16,25 @@ export default function SettingsModal({
   onReminderMinutesChange,
   onLogout,
   onPinnedChannelsUpdated,
+  onChannelsUpdated,
   onToast,
-  appVersion
+  appVersion,
+  isAuthenticated,
+  credentialsMissing,
+  credentialsPath,
+  authError,
+  onLogin,
+  onImportCredentials,
+  initialTab = 'general'
 }) {
-  const [activeTab, setActiveTab] = useState('general')
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [autoDownload, setAutoDownload] = useState(true)
   const [updateChecking, setUpdateChecking] = useState(false)
   const [channelManagerQuery, setChannelManagerQuery] = useState('')
   const [channels, setChannels] = useState([])
+  const [manualChannelInput, setManualChannelInput] = useState('')
+  const [manualChannelTitle, setManualChannelTitle] = useState('')
+  const [manualChannelSaving, setManualChannelSaving] = useState(false)
 
   function sortChannels(list) {
     return [...list].sort((a, b) => {
@@ -67,14 +78,15 @@ export default function SettingsModal({
     borderRadius: '8px',
     gap: '12px'
   }
-  const btnStyle = (variant = 'primary') => ({
+  const btnStyle = (variant = 'primary', { disabled = false } = {}) => ({
     padding: '7px 14px',
     fontSize: '12px',
     border: 'none',
     borderRadius: '6px',
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
     whiteSpace: 'nowrap',
     fontFamily: 'inherit',
+    opacity: disabled ? 0.5 : 1,
     ...(variant === 'primary'
       ? { background: '#6060c0', color: 'white' }
       : variant === 'secondary'
@@ -158,9 +170,174 @@ export default function SettingsModal({
     onPinnedChannelsUpdated()
   }
 
+  async function reloadChannels() {
+    const chs = await window.api.listAllChannels?.()
+    setChannels(sortChannels(chs ?? []))
+    onChannelsUpdated?.()
+  }
+
+  async function handleAddManualChannel() {
+    setManualChannelSaving(true)
+    const result = await window.api.addManualChannel?.({
+      input: manualChannelInput,
+      title: manualChannelTitle
+    })
+    setManualChannelSaving(false)
+    if (result?.error) {
+      onToast(`チャンネル追加失敗: ${result.error}`)
+      return
+    }
+    setManualChannelInput('')
+    setManualChannelTitle('')
+    await reloadChannels()
+    onToast('チャンネルを追加しました')
+  }
+
+  async function handleImportCredentials() {
+    const result = await onImportCredentials()
+    if (result?.canceled) return
+    if (result?.error) {
+      onToast(`credentials.json の読み込み失敗: ${result.error}`)
+      return
+    }
+    onToast('credentials.json を読み込みました')
+  }
+
+  async function handleLogin() {
+    const result = await onLogin()
+    if (result?.error) {
+      onToast(`Google連携失敗: ${result.error}`)
+    }
+  }
+
   function renderGeneral() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <div style={sectionLabelStyle}>動作モード</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                {isAuthenticated ? 'フルモードで動作中' : '簡易モードで動作中'}
+              </div>
+              <div style={descStyle}>
+                簡易モードはOAuthなしで手動追加チャンネルをRSS取得します。フルモードはGoogle連携で登録チャンネルを同期します。
+              </div>
+              <button
+                onClick={() =>
+                  window.api.openExternal(
+                    'https://github.com/harness17/youtube-schedule#3-%E3%83%95%E3%83%AB%E3%83%A2%E3%83%BC%E3%83%89%E3%81%A7%E4%BD%BF%E3%81%86%E4%BB%BB%E6%84%8F'
+                  )
+                }
+                style={{
+                  marginTop: '6px',
+                  padding: 0,
+                  background: 'none',
+                  border: 'none',
+                  color: darkMode ? '#8aa8ff' : '#1a73e8',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontFamily: 'inherit',
+                  textDecoration: 'underline'
+                }}
+              >
+                簡易モード / フルモードの違いとGoogle認証の注意点を見る ↗
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {(() => {
+                // credentials.json の状態を3段階でバッジ表示。詳細エラーは別行に折り返す
+                let label, color, bg, border, dot
+                if (credentialsMissing) {
+                  label = 'credentials.json: 未配置'
+                  color = subColor
+                  bg = subBtnBg
+                  border = inputBorder
+                  dot = '○'
+                } else if (authError) {
+                  label = 'credentials.json: 読み込みエラー'
+                  color = '#cc2222'
+                  bg = darkMode ? 'rgba(200,30,30,0.12)' : '#fff0f0'
+                  border = '#f0c0c0'
+                  dot = '⚠'
+                } else {
+                  label = 'credentials.json: 読み込み済み'
+                  color = darkMode ? '#9ee6b8' : '#148a3b'
+                  bg = darkMode ? 'rgba(60,180,100,0.12)' : 'rgba(60,180,100,0.08)'
+                  border = darkMode ? 'rgba(60,180,100,0.35)' : 'rgba(60,180,100,0.25)'
+                  dot = '●'
+                }
+                return (
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      fontSize: '11px',
+                      color,
+                      background: bg,
+                      border: `1px solid ${border}`,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {dot} {label}
+                  </span>
+                )
+              })()}
+              <span
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  color: isAuthenticated ? (darkMode ? '#9ee6b8' : '#148a3b') : subColor,
+                  background: isAuthenticated
+                    ? darkMode
+                      ? 'rgba(60,180,100,0.12)'
+                      : 'rgba(60,180,100,0.08)'
+                    : subBtnBg,
+                  border: `1px solid ${
+                    isAuthenticated
+                      ? darkMode
+                        ? 'rgba(60,180,100,0.35)'
+                        : 'rgba(60,180,100,0.25)'
+                      : inputBorder
+                  }`,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isAuthenticated ? '● Google連携: 認証済み' : '○ Google連携: 未認証'}
+              </span>
+            </div>
+            {!credentialsMissing && authError && (
+              <div
+                style={{
+                  ...descStyle,
+                  color: '#cc2222',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {authError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button style={btnStyle('secondary')} onClick={handleImportCredentials}>
+                credentials.json を読み込み
+              </button>
+              <button
+                style={btnStyle('primary', { disabled: credentialsMissing || isAuthenticated })}
+                onClick={handleLogin}
+                disabled={credentialsMissing || isAuthenticated}
+              >
+                Google連携
+              </button>
+            </div>
+            {credentialsPath && (
+              <div style={descStyle}>
+                配置先: <code>{credentialsPath}</code>
+              </div>
+            )}
+          </div>
+        </div>
         <div>
           <div style={sectionLabelStyle}>テーマ</div>
           <div style={rowStyle}>
@@ -228,7 +405,7 @@ export default function SettingsModal({
               </div>
             </div>
             <button
-              style={btnStyle('primary')}
+              style={btnStyle('primary', { disabled: updateChecking })}
               onClick={handleCheckUpdate}
               disabled={updateChecking}
             >
@@ -321,7 +498,8 @@ export default function SettingsModal({
               <div style={descStyle}>再ログインが必要になります</div>
             </div>
             <button
-              style={btnStyle('danger')}
+              style={btnStyle('danger', { disabled: !isAuthenticated })}
+              disabled={!isAuthenticated}
               onClick={() => {
                 onClose()
                 onLogout()
@@ -344,6 +522,58 @@ export default function SettingsModal({
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <div style={sectionLabelStyle}>手動追加</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                Google連携なしで追加するチャンネル
+              </div>
+              <div style={descStyle}>
+                チャンネルページのURL、または @ハンドル名を入力してください。
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="https://www.youtube.com/@example または @example"
+              value={manualChannelInput}
+              onChange={(e) => setManualChannelInput(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="表示名（任意）"
+              value={manualChannelTitle}
+              onChange={(e) => setManualChannelTitle(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <button
+              style={btnStyle('primary', { disabled: manualChannelSaving })}
+              disabled={manualChannelSaving}
+              onClick={handleAddManualChannel}
+            >
+              {manualChannelSaving ? '追加中...' : '追加'}
+            </button>
+          </div>
+        </div>
         <div>
           <div style={sectionLabelStyle}>優先チャンネル</div>
           <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
@@ -673,6 +903,14 @@ SettingsModal.propTypes = {
   onReminderMinutesChange: PropTypes.func.isRequired,
   onLogout: PropTypes.func.isRequired,
   onPinnedChannelsUpdated: PropTypes.func.isRequired,
+  onChannelsUpdated: PropTypes.func,
   onToast: PropTypes.func.isRequired,
-  appVersion: PropTypes.string.isRequired
+  appVersion: PropTypes.string.isRequired,
+  isAuthenticated: PropTypes.bool.isRequired,
+  credentialsMissing: PropTypes.bool.isRequired,
+  credentialsPath: PropTypes.string,
+  authError: PropTypes.string,
+  onLogin: PropTypes.func.isRequired,
+  onImportCredentials: PropTypes.func.isRequired,
+  initialTab: PropTypes.oneOf(['general', 'channels', 'data'])
 }

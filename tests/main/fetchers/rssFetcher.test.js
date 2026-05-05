@@ -7,8 +7,9 @@ const RSS_HOST = 'https://www.youtube.com'
 const RSS_PATH = '/feeds/videos.xml'
 
 const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
-  <entry><yt:videoId>VID1</yt:videoId><title>t1</title></entry>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <author><name>Channel A</name></author>
+  <entry><yt:videoId>VID1</yt:videoId><title>t1</title><link href="https://www.youtube.com/watch?v=VID1" /><media:group><media:description>d1</media:description></media:group></entry>
   <entry><yt:videoId>VID2</yt:videoId><title>t2</title></entry>
 </feed>`
 
@@ -22,6 +23,15 @@ describe('RssFetcher', () => {
     const res = await fetcher.fetch('UC1')
     expect(res.success).toBe(true)
     expect(res.videoIds).toEqual(['VID1', 'VID2'])
+    expect(res.channelTitle).toBe('Channel A')
+    expect(res.entries[0]).toEqual(
+      expect.objectContaining({
+        id: 'VID1',
+        title: 't1',
+        description: 'd1',
+        channelTitle: 'Channel A'
+      })
+    )
     expect(res.httpStatus).toBe(200)
   })
 

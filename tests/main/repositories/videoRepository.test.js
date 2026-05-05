@@ -71,6 +71,73 @@ describe('VideoRepository', () => {
     expect(ids).not.toContain('en1')
   })
 
+  it('listVisible includes recent unscheduled feed items only when requested', () => {
+    const now = Date.now()
+    repo.upsert(
+      sampleVideo({
+        id: 'feed1',
+        status: 'upcoming',
+        scheduledStartTime: null,
+        actualStartTime: null,
+        lastCheckedAt: now - 60_000
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'feed_old',
+        status: 'upcoming',
+        scheduledStartTime: null,
+        actualStartTime: null,
+        lastCheckedAt: now - 25 * 3600e3
+      })
+    )
+
+    expect(repo.listVisible(now).map((v) => v.id)).not.toContain('feed1')
+    const simpleModeIds = repo.listVisible(now, { includeFeedItems: true }).map((v) => v.id)
+    expect(simpleModeIds).toContain('feed1')
+    expect(simpleModeIds).not.toContain('feed_old')
+  })
+
+  it('listFeed returns unscheduled upcoming videos by first_seen_at desc', () => {
+    const now = Date.now()
+    repo.upsert(
+      sampleVideo({
+        id: 'rss1',
+        status: 'upcoming',
+        scheduledStartTime: null,
+        firstSeenAt: now - 2000,
+        lastCheckedAt: now - 2000
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'rss2',
+        status: 'upcoming',
+        scheduledStartTime: null,
+        firstSeenAt: now - 1000,
+        lastCheckedAt: now - 1000
+      })
+    )
+    repo.upsert(sampleVideo({ id: 'api1', scheduledStartTime: now + 3600e3 }))
+    expect(repo.listFeed(50).map((v) => v.id)).toEqual(['rss2', 'rss1'])
+  })
+
+  it('listFeed respects limit', () => {
+    const now = Date.now()
+    for (let i = 0; i < 5; i++) {
+      repo.upsert(
+        sampleVideo({
+          id: `rss${i}`,
+          status: 'upcoming',
+          scheduledStartTime: null,
+          firstSeenAt: now - i * 1000,
+          lastCheckedAt: now
+        })
+      )
+    }
+    expect(repo.listFeed(3)).toHaveLength(3)
+  })
+
   it('boundary: upcoming exactly 2h in the past is excluded', () => {
     const now = 1_700_000_000_000
     repo.upsert(

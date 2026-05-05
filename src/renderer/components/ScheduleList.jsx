@@ -4,6 +4,7 @@ import ScheduleCard from './ScheduleCard.jsx'
 const TZ = 'Asia/Tokyo'
 
 function getDateKey(isoString) {
+  if (!isoString) return '時刻未取得'
   const d = new Date(isoString)
   return d.toLocaleDateString('ja-JP', {
     timeZone: TZ,
@@ -78,22 +79,36 @@ export default function ScheduleList({
     )
   })
 
-  const groups = groupByDate(upcoming)
-  const sortedEntries = getSortedGroupEntries(groups, upcoming).map(([dateLabel, items]) => [
-    dateLabel,
-    [...items].sort((a, b) => {
-      // 1. お知らせ・お気に入りフラグ優先
-      const af = a.isNotify || a.isFavorite ? 0 : 1
-      const bf = b.isNotify || b.isFavorite ? 0 : 1
-      if (af !== bf) return af - bf
-      // 2. ピン済みチャンネル優先
-      const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
-      const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
-      if (ap !== bp) return ap - bp
-      // 3. 開始時刻昇順
-      return (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0)
-    })
-  ])
+  const scheduledUpcoming = upcoming.filter((item) => item.scheduledStartTime)
+  const feedItems = upcoming.filter((item) => !item.scheduledStartTime)
+  const sortedFeedItems = [...feedItems].sort((a, b) => {
+    const af = a.isNotify || a.isFavorite ? 0 : 1
+    const bf = b.isNotify || b.isFavorite ? 0 : 1
+    if (af !== bf) return af - bf
+    const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
+    const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
+    if (ap !== bp) return ap - bp
+    return (b.lastCheckedAt ?? 0) - (a.lastCheckedAt ?? 0)
+  })
+
+  const groups = groupByDate(scheduledUpcoming)
+  const sortedEntries = getSortedGroupEntries(groups, scheduledUpcoming).map(
+    ([dateLabel, items]) => [
+      dateLabel,
+      [...items].sort((a, b) => {
+        // 1. お知らせ・お気に入りフラグ優先
+        const af = a.isNotify || a.isFavorite ? 0 : 1
+        const bf = b.isNotify || b.isFavorite ? 0 : 1
+        if (af !== bf) return af - bf
+        // 2. ピン済みチャンネル優先
+        const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
+        const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
+        if (ap !== bp) return ap - bp
+        // 3. 開始時刻昇順
+        return (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0)
+      })
+    ]
+  )
 
   const navItems = [
     ...(live.length > 0 ? [{ label: 'ライブ配信中', id: 'section-live', isLive: true }] : []),
@@ -101,7 +116,10 @@ export default function ScheduleList({
       label: dateLabel,
       id: toAnchorId(dateLabel),
       isLive: false
-    }))
+    })),
+    ...(sortedFeedItems.length > 0
+      ? [{ label: '時刻未取得', id: 'section-feed', isLive: false }]
+      : [])
   ]
 
   return (
@@ -158,6 +176,24 @@ export default function ScheduleList({
           ))}
         </div>
       ))}
+
+      {sortedFeedItems.length > 0 && (
+        <div id="section-feed" style={{ marginBottom: '24px' }}>
+          <div className="yt-section-label">📡 時刻未取得</div>
+          {sortedFeedItems.map((item) => (
+            <ScheduleCard
+              key={item.id}
+              item={item}
+              darkMode={darkMode}
+              watched={item.isNotify}
+              isPinned={pinnedChannelIds.has(item.channelId)}
+              onToggleWatch={onToggleWatch}
+              onToggleFavorite={onToggleFavorite}
+              onTogglePin={onTogglePin}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

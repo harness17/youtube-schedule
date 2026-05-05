@@ -13,6 +13,10 @@ function chunk(arr, size) {
   return out
 }
 
+function isRssCapableChannel(channel) {
+  return typeof channel.id === 'string' && channel.id.startsWith('UC')
+}
+
 function toVideoRecord(v, now) {
   const ld = v.liveStreamingDetails || {}
   return {
@@ -32,7 +36,28 @@ function toVideoRecord(v, now) {
     concurrentViewers: ld.concurrentViewers ? Number(ld.concurrentViewers) : null,
     url: `https://www.youtube.com/watch?v=${v.id}`,
     firstSeenAt: now,
-    lastCheckedAt: now
+    lastCheckedAt: now,
+    source: 'api'
+  }
+}
+
+function toRssVideoRecord(entry, channel, now) {
+  const feedTime = Date.parse(entry.published ?? entry.updated ?? '')
+  return {
+    id: entry.id,
+    channelId: channel.id,
+    channelTitle: entry.channelTitle ?? channel.title ?? channel.id,
+    title: entry.title || '(タイトル未取得)',
+    description: entry.description ?? '',
+    thumbnail: `https://i.ytimg.com/vi/${entry.id}/hqdefault.jpg`,
+    status: 'upcoming',
+    scheduledStartTime: null,
+    actualStartTime: null,
+    concurrentViewers: null,
+    url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
+    firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
+    lastCheckedAt: now,
+    source: 'rss'
   }
 }
 
@@ -62,16 +87,22 @@ export function createSchedulerService({
   let inFlight = null
 
   async function resolveChannels(yt, now) {
+    if (!authClient) {
+      const manual = channelRepo.listAll().filter(isRssCapableChannel)
+      logger.info('scheduler.resolveChannels.rssOnly', { count: manual.length })
+      return manual
+    }
+
     const lastSync = channelRepo.getLastSyncTime()
     if (lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
-      const cached = channelRepo.listAll().filter((c) => c.uploadsPlaylistId)
+      const cached = channelRepo.listAll().filter(isRssCapableChannel)
       logger.info('scheduler.resolveChannels.cached', { count: cached.length })
       return cached
     }
     return logger.withTiming('scheduler.resolveChannels', async () => {
       const fresh = await subsFetcher.fetch(yt)
       channelRepo.syncSubscriptions(fresh, now)
-      return fresh
+      return channelRepo.listAll().filter(isRssCapableChannel)
     })
   }
 
@@ -80,6 +111,7 @@ export function createSchedulerService({
       'scheduler.collectVideoIds',
       async () => {
         const collected = new Set()
+        const rssEntries = new Map()
         let rssSuccess = 0
         let rssFailure = 0
         let fallbackAttempts = 0
@@ -96,9 +128,17 @@ export function createSchedulerService({
               })
               if (res.success) {
                 rssSuccess++
-                for (const id of res.videoIds) collected.add(id)
+                const limited = (res.entries ?? []).slice(0, 10)
+                for (const entry of limited) {
+                  collected.add(entry.id)
+                  rssEntries.set(entry.id, { ...entry, channel: ch })
+                }
+                for (const id of res.videoIds) {
+                  if (!rssEntries.has(id)) collected.add(id)
+                }
               } else {
                 rssFailure++
+                if (!authClient || !ch.uploadsPlaylistId) return
                 fallbackAttempts++
                 logger.warn('scheduler.rss.fallback', {
                   channelId: ch.id,
@@ -118,7 +158,7 @@ export function createSchedulerService({
           rssFailure,
           fallbackAttempts
         })
-        return [...collected]
+        return { videoIds: [...collected], rssEntries }
       },
       { channels: channels.length }
     )
@@ -130,7 +170,7 @@ export function createSchedulerService({
 
     const channels = await resolveChannels(yt, now)
     const channelIds = new Set(channels.map((c) => c.id))
-    const videoIds = await collectVideoIds(yt, channels, now)
+    const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
 
     const known = videoRepo.getByIds(videoIds)
     const knownIds = new Set(known.map((v) => v.id))
@@ -147,12 +187,23 @@ export function createSchedulerService({
     const newIds = videoIds.filter((id) => !knownIds.has(id))
     const target = Array.from(new Set([...newIds, ...recheckIds]))
 
-    const details = await logger.withTiming(
-      'scheduler.videoDetails',
-      () => videoFetcher.fetch(yt, target),
-      { target: target.length, newIds: newIds.length, recheckIds: recheckIds.length }
-    )
+    const details = authClient
+      ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {
+          target: target.length,
+          newIds: newIds.length,
+          recheckIds: recheckIds.length
+        })
+      : []
     const fetchedIds = new Set(details.map((v) => v.id))
+    if (!authClient) {
+      for (const entry of rssEntries.values()) {
+        videoRepo.upsert(toRssVideoRecord(entry, entry.channel, now))
+      }
+      metaRepo.set('last_full_refresh_at', String(now), now)
+      maybeCleanup(now)
+      return
+    }
+
     for (const v of details) {
       if (!channelIds.has(v.snippet?.channelId)) continue
       videoRepo.upsert(toVideoRecord(v, now))

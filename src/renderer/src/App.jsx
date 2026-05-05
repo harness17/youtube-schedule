@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import PropTypes from 'prop-types'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
-import AuthScreen from '../components/AuthScreen.jsx'
 import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
 import SettingsModal from '../components/SettingsModal.jsx'
 import Toast from '../components/Toast.jsx'
 import BackToTop from '../components/BackToTop.jsx'
-import CredentialsSetupScreen from '../components/CredentialsSetupScreen.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
+import SimpleModeEmptyScreen from '../components/SimpleModeEmptyScreen.jsx'
+import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
 import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
@@ -23,12 +27,44 @@ import {
 // main.jsx が { ErrorBoundary } を App.jsx からインポートしているため再エクスポート
 export { ErrorBoundary }
 
+function SortableFavoriteCard({ item, reorderMode, cardContent }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !reorderMode
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    display: 'grid',
+    gridTemplateColumns: reorderMode ? '28px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+    gap: '8px',
+    alignItems: 'center'
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      {reorderMode && (
+        <div className="yt-drag-handle" {...attributes} {...listeners}>
+          ⠿
+        </div>
+      )}
+      {cardContent}
+    </div>
+  )
+}
+SortableFavoriteCard.propTypes = {
+  item: PropTypes.shape({ id: PropTypes.string.isRequired }).isRequired,
+  reorderMode: PropTypes.bool.isRequired,
+  cardContent: PropTypes.node.isRequired
+}
+
 export default function App() {
   // ===== アプリ全体の UI 状態 ==================================================
   const [toast, setToast] = useState(null)
   const [updateStatus, setUpdateStatus] = useState(null)
   const [appVersion, setAppVersion] = useState('')
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState('general')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
 
@@ -52,23 +88,31 @@ export default function App() {
   }, [])
 
   // ===== コアフック ===========================================================
-  const { live, upcoming, loading, error, dbBroken, refresh, updateVideo } = useSchedule()
+  const { live, upcoming, feedVideos, loading, error, dbBroken, refresh, updateVideo } =
+    useSchedule()
   const {
     isAuthenticated,
     authLoading,
     loginSuccess,
     credentialsMissing,
     credentialsPath,
+    authError,
     handleLogin,
-    handleLogout
+    handleLogout,
+    handleImportCredentials
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, live, isAuthenticated, reminderMinutes })
+  useNotificationCheck({ upcoming, live, isAuthenticated: true, reminderMinutes })
 
   async function handleReminderMinutesChange(value) {
     const next = normalizeReminderMinutes(value)
     setReminderMinutes(next)
     await window.api.setSetting(REMINDER_SETTING_KEY, next)
+  }
+
+  function openSettings(tab = 'general') {
+    setSettingsInitialTab(tab)
+    setShowSettings(true)
   }
 
   // ===== タブ状態 ==============================================================
@@ -88,6 +132,7 @@ export default function App() {
     favoriteOrderDirty,
     favoriteOrderSaving,
     pinnedChannelIds,
+    allDbChannels,
     loadAllDbChannels,
     tabChannels,
     filteredLive,
@@ -103,9 +148,28 @@ export default function App() {
     handleToggleFavorite,
     handleTogglePin,
     handleToggleNotify,
-    moveFavoriteOrder,
+    reorderFavorites,
     saveFavoriteOrder
-  } = useTabState({ live, upcoming, updateVideo })
+  } = useTabState({
+    live,
+    upcoming,
+    updateVideo,
+    initialTab: isAuthenticated ? 'schedule' : 'feed'
+  })
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  // ===== モード切り替え時の activeTab リセット =================================
+  useEffect(() => {
+    if (authLoading) return
+    if (isAuthenticated && activeTab === 'feed') {
+      handleTabChange('schedule')
+    } else if (!isAuthenticated && ['schedule', 'missed', 'archive'].includes(activeTab)) {
+      handleTabChange('feed')
+    }
+    // handleTabChange はタブごとのロードを含むため、モード境界だけで実行する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, authLoading])
 
   // ===== 自動アップデートイベント ==============================================
   useEffect(() => {
@@ -125,10 +189,9 @@ export default function App() {
   }, [refresh])
 
   useEffect(() => {
-    if (!isAuthenticated) return
     const id = setInterval(() => refreshRef.current(), 10 * 60 * 1000)
     return () => clearInterval(id)
-  }, [isAuthenticated])
+  }, [])
 
   // ===== API クォータ超過トースト ==============================================
   useEffect(() => {
@@ -192,14 +255,6 @@ export default function App() {
     )
   }
 
-  if (credentialsMissing) {
-    return <CredentialsSetupScreen credentialsPath={credentialsPath} />
-  }
-
-  if (!isAuthenticated) {
-    return <AuthScreen onLogin={handleLogin} loading={authLoading} />
-  }
-
   // ===== テーマカラー ==========================================================
   const textColor = darkMode ? '#e8e8f0' : '#111120'
   const subColor = darkMode ? '#7878a0' : '#6060a0'
@@ -233,50 +288,24 @@ export default function App() {
     )
   }
 
-  function renderFavoriteCard(item, index, sectionItems) {
+  function renderFavoriteSection(sectionItems, onDragEnd) {
     const sectionIds = sectionItems.map((v) => v.id)
     return (
-      <div
-        key={item.id}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: favoriteReorderMode ? '42px minmax(0, 1fr)' : 'minmax(0, 1fr)',
-          gap: '8px',
-          alignItems: 'stretch'
-        }}
-      >
-        {favoriteReorderMode && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              marginBottom: '8px'
-            }}
-          >
-            <button
-              className="yt-order-btn"
-              title="上へ"
-              disabled={index === 0}
-              onClick={() => moveFavoriteOrder(item.id, -1, sectionIds)}
-            >
-              ↑
-            </button>
-            <button
-              className="yt-order-btn"
-              title="下へ"
-              disabled={index === sectionItems.length - 1}
-              onClick={() => moveFavoriteOrder(item.id, 1, sectionIds)}
-            >
-              ↓
-            </button>
-          </div>
-        )}
-        {renderTabCard(item, {
-          showStatusBadge: item.status !== 'ended',
-          showViewedButton: item.status === 'ended'
-        })}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+          {sectionItems.map((item) => (
+            <SortableFavoriteCard
+              key={item.id}
+              item={item}
+              reorderMode={favoriteReorderMode}
+              cardContent={renderTabCard(item, {
+                showStatusBadge: item.status !== 'ended',
+                showViewedButton: item.status === 'ended'
+              })}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
     )
   }
 
@@ -323,6 +352,30 @@ export default function App() {
             </span>
           )}
         </h1>
+        <span
+          onClick={!isAuthenticated ? () => openSettings('general') : undefined}
+          style={{
+            padding: '4px 8px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            color: isAuthenticated ? (darkMode ? '#9ee6b8' : '#148a3b') : subColor,
+            background: isAuthenticated
+              ? darkMode
+                ? 'rgba(60,180,100,0.16)'
+                : 'rgba(60,180,100,0.1)'
+              : subBtnBg,
+            border: `1px solid ${
+              isAuthenticated
+                ? darkMode
+                  ? 'rgba(60,180,100,0.35)'
+                  : 'rgba(60,180,100,0.25)'
+                : inputBorder
+            }`,
+            cursor: !isAuthenticated ? 'pointer' : 'default'
+          }}
+        >
+          {isAuthenticated ? 'フルモード' : '簡易モード'}
+        </span>
         <button
           onClick={refresh}
           disabled={loading}
@@ -342,7 +395,7 @@ export default function App() {
           {loading ? '更新中...' : '↺ 更新'}
         </button>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={() => openSettings('general')}
           title="設定"
           style={{
             padding: '7px 10px',
@@ -470,22 +523,29 @@ export default function App() {
       >
         <div className="yt-tabs" style={{ marginBottom: 0 }}>
           {[
-            { key: 'schedule', label: '予定・ライブ' },
-            { key: 'missed', label: '見逃し' },
-            { key: 'archive', label: 'アーカイブ' },
-            { key: 'favorites', label: '⭐ お気に入り' }
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => handleTabChange(key)}
-              className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
-            >
-              {label}
-              {key === 'missed' && missedVideos.length > 0 && (
-                <span className="yt-tab-badge">{missedVideos.length}</span>
-              )}
-            </button>
-          ))}
+            { key: 'feed', label: '新着動画', mode: 'simple' },
+            { key: 'schedule', label: '予定・ライブ', mode: 'full' },
+            { key: 'missed', label: '見逃し', mode: 'full' },
+            { key: 'archive', label: 'アーカイブ', mode: 'full' },
+            { key: 'favorites', label: '⭐ お気に入り', mode: 'both' }
+          ]
+            .filter(
+              (tab) =>
+                tab.mode === 'both' ||
+                (isAuthenticated ? tab.mode === 'full' : tab.mode === 'simple')
+            )
+            .map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handleTabChange(key)}
+                className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
+              >
+                {label}
+                {key === 'missed' && missedVideos.length > 0 && (
+                  <span className="yt-tab-badge">{missedVideos.length}</span>
+                )}
+              </button>
+            ))}
         </div>
         {activeTab === 'missed' &&
           filteredMissed.length > 0 &&
@@ -567,6 +627,33 @@ export default function App() {
             )
           })()}
       </div>
+
+      {/* ── 新着動画タブ（簡易モード） ── */}
+      {activeTab === 'feed' && (
+        <>
+          {allDbChannels.length > 0 && (
+            <SimpleModeBanner darkMode={darkMode} onOpenSettings={() => openSettings('general')} />
+          )}
+          {loading ? (
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
+              読み込み中...
+            </div>
+          ) : allDbChannels.length === 0 ? (
+            <SimpleModeEmptyScreen
+              darkMode={darkMode}
+              onOpenSettings={() => openSettings('channels')}
+            />
+          ) : feedVideos.length === 0 ? (
+            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
+              新着動画はまだありません
+            </div>
+          ) : (
+            feedVideos.map((item) =>
+              renderTabCard(item, { showStatusBadge: false, showViewedButton: false })
+            )
+          )}
+        </>
+      )}
 
       {/* ── 予定・ライブタブ ── */}
       {activeTab === 'schedule' && (
@@ -759,9 +846,14 @@ export default function App() {
                       >
                         📅 予定・配信中
                       </div>
-                      {upcomingFavs.map((item, index) =>
-                        renderFavoriteCard(item, index, upcomingFavs)
-                      )}
+                      {renderFavoriteSection(upcomingFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            upcomingFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                   {normalFavs.length > 0 && (
@@ -773,7 +865,14 @@ export default function App() {
                       >
                         📋 通常
                       </div>
-                      {normalFavs.map((item, index) => renderFavoriteCard(item, index, normalFavs))}
+                      {renderFavoriteSection(normalFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            normalFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                   {viewedFavs.length > 0 && (
@@ -785,7 +884,14 @@ export default function App() {
                       >
                         ✅ 視聴済み
                       </div>
-                      {viewedFavs.map((item, index) => renderFavoriteCard(item, index, viewedFavs))}
+                      {renderFavoriteSection(viewedFavs, ({ active, over }) => {
+                        if (over && active.id !== over.id)
+                          reorderFavorites(
+                            active.id,
+                            over.id,
+                            viewedFavs.map((v) => v.id)
+                          )
+                      })}
                     </>
                   )}
                 </>
@@ -795,18 +901,31 @@ export default function App() {
         </div>
       )}
 
-      <SettingsModal
-        open={showSettings}
-        onClose={() => setShowSettings(false)}
-        darkMode={darkMode}
-        onDarkModeChange={(val) => setDarkMode(val)}
-        reminderMinutes={reminderMinutes}
-        onReminderMinutesChange={handleReminderMinutesChange}
-        onLogout={handleLogout}
-        onPinnedChannelsUpdated={loadAllDbChannels}
-        onToast={setToast}
-        appVersion={appVersion}
-      />
+      {showSettings && (
+        <SettingsModal
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+          initialTab={settingsInitialTab}
+          darkMode={darkMode}
+          onDarkModeChange={(val) => setDarkMode(val)}
+          reminderMinutes={reminderMinutes}
+          onReminderMinutesChange={handleReminderMinutesChange}
+          onLogout={handleLogout}
+          onPinnedChannelsUpdated={loadAllDbChannels}
+          onToast={setToast}
+          appVersion={appVersion}
+          isAuthenticated={isAuthenticated}
+          credentialsMissing={credentialsMissing}
+          credentialsPath={credentialsPath}
+          authError={authError}
+          onLogin={handleLogin}
+          onImportCredentials={handleImportCredentials}
+          onChannelsUpdated={() => {
+            loadAllDbChannels()
+            refresh()
+          }}
+        />
+      )}
       {toast && <Toast message={toast} onClose={handleToastClose} />}
       <BackToTop />
     </div>

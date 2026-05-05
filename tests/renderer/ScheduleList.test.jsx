@@ -54,6 +54,13 @@ describe('ScheduleList', () => {
     expect(screen.getByText('配信v2')).toBeInTheDocument()
   })
 
+  it('時刻未取得のフィード項目を1月1日ではなく専用セクションに表示する', () => {
+    render(<ScheduleList live={[]} upcoming={[makeItem('feed1', 'upcoming', null)]} />)
+    expect(screen.getByText('📡 時刻未取得')).toBeInTheDocument()
+    expect(screen.queryByText(/1月1日/)).not.toBeInTheDocument()
+    expect(screen.getByText('配信feed1')).toBeInTheDocument()
+  })
+
   it('live のみでも問題なく表示される', () => {
     render(<ScheduleList live={liveItems} upcoming={[]} />)
     expect(screen.getByText('配信lv1')).toBeInTheDocument()

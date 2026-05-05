@@ -4,6 +4,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import http from 'http'
 import { URL } from 'url'
+import { validateOAuthCredentials } from './services/credentialsValidator.js'
 
 const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 const PORT = 3456
@@ -163,6 +164,7 @@ const ERROR_HTML = `<!DOCTYPE html>
 
 async function loadKeys() {
   const raw = JSON.parse(await fs.readFile(CREDENTIALS_PATH, 'utf-8'))
+  validateOAuthCredentials(raw)
   return raw.installed || raw.web
 }
 
@@ -198,6 +200,20 @@ export async function credentialsExist() {
 
 export function getCredentialsPath() {
   return CREDENTIALS_PATH
+}
+
+export async function importCredentialsFromFile(sourcePath) {
+  let data
+  try {
+    data = JSON.parse(await fs.readFile(sourcePath, 'utf-8'))
+    validateOAuthCredentials(data)
+  } catch (err) {
+    throw new Error(err.message || 'credentials.json を読み込めませんでした')
+  }
+
+  await fs.mkdir(path.dirname(CREDENTIALS_PATH), { recursive: true })
+  await fs.writeFile(CREDENTIALS_PATH, JSON.stringify(data, null, 2), 'utf-8')
+  return { credentialsPath: CREDENTIALS_PATH }
 }
 
 export async function getAuthenticatedClient() {

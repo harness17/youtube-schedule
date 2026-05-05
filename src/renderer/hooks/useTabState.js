@@ -11,6 +11,7 @@
  * @param {{ live: object[], upcoming: object[], updateVideo: (id, patch) => void }} deps
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { arrayMove } from '@dnd-kit/sortable'
 
 // ===== 定数 =====================================================================
 // アーカイブ 1 ページあたりの取得件数。ネットワーク負荷とスクロール体験のバランスで 50 に設定
@@ -21,9 +22,9 @@ const SEARCH_LIMIT = 200
 const SEARCH_TARGETS = { title: true, channel: true, description: false }
 
 // ===== フック本体 ================================================================
-export function useTabState({ live, upcoming, updateVideo }) {
+export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedule' }) {
   // ---- タブ選択 ----------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState('schedule')
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   // ---- タブ別動画リスト --------------------------------------------------------
   const [missedVideos, setMissedVideos] = useState([])
@@ -208,20 +209,22 @@ export function useTabState({ live, upcoming, updateVideo }) {
     }
   }
 
-  function moveFavoriteOrder(id, direction, scopeIds = null) {
+  function reorderFavorites(activeId, overId, scopeIds = null) {
     setFavoriteVideos((prev) => {
       const ids = Array.isArray(scopeIds) ? scopeIds : prev.map((v) => v.id)
-      const scopedIndex = ids.indexOf(id)
-      const swapId = ids[scopedIndex + direction]
-      if (!swapId) return prev
-      const index = prev.findIndex((v) => v.id === id)
-      const nextIndex = prev.findIndex((v) => v.id === swapId)
-      if (index < 0 || nextIndex < 0) return prev
-      const next = [...prev]
-      const movedItem = next[index]
-      next[index] = next[nextIndex]
-      next[nextIndex] = movedItem
-      return next
+      const oldIndex = ids.indexOf(activeId)
+      const newIndex = ids.indexOf(overId)
+      if (oldIndex < 0 || newIndex < 0) return prev
+      const newScopeIds = arrayMove(ids, oldIndex, newIndex)
+      const scopedIndices = prev.reduce((acc, v, i) => {
+        if (ids.includes(v.id)) acc.push(i)
+        return acc
+      }, [])
+      const result = [...prev]
+      newScopeIds.forEach((id, i) => {
+        result[scopedIndices[i]] = prev.find((v) => v.id === id)
+      })
+      return result
     })
     setFavoriteOrderDirty(true)
   }
@@ -414,6 +417,7 @@ export function useTabState({ live, upcoming, updateVideo }) {
     favoriteOrderSaving,
     // ピン済みチャンネル
     pinnedChannelIds,
+    allDbChannels,
     loadAllDbChannels,
     // タブ別チャンネル一覧（フィルタードロップダウン用）
     tabChannels,
@@ -432,7 +436,7 @@ export function useTabState({ live, upcoming, updateVideo }) {
     handleToggleFavorite,
     handleTogglePin,
     handleToggleNotify,
-    moveFavoriteOrder,
+    reorderFavorites,
     saveFavoriteOrder
   }
 }
