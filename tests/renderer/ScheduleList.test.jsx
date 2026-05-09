@@ -107,4 +107,37 @@ describe('ScheduleList', () => {
     const cards = screen.getAllByText(/配信(early|late|plain)/)
     expect(cards.map((card) => card.textContent)).toEqual(['配信early', '配信late', '配信plain'])
   })
+
+  it('ピックアップモードではお気に入り・通知・優先チャンネルの配信だけを表示する', () => {
+    const items = [
+      { ...makeItem('fav', 'upcoming', '2026-04-13T09:00:00+09:00'), isFavorite: true },
+      { ...makeItem('notify', 'upcoming', '2026-04-13T10:00:00+09:00'), isNotify: true },
+      {
+        ...makeItem('pinned', 'upcoming', '2026-04-13T11:00:00+09:00'),
+        channelId: 'UC_PIN'
+      },
+      makeItem('plain', 'upcoming', '2026-04-13T12:00:00+09:00')
+    ]
+
+    render(
+      <ScheduleList
+        live={[]}
+        upcoming={items}
+        pinnedChannelIds={new Set(['UC_PIN'])}
+        pickupOnly={true}
+      />
+    )
+
+    expect(screen.getByText('配信fav')).toBeInTheDocument()
+    expect(screen.getByText('配信notify')).toBeInTheDocument()
+    expect(screen.getByText('配信pinned')).toBeInTheDocument()
+    expect(screen.queryByText('配信plain')).not.toBeInTheDocument()
+  })
+
+  it('ピックアップ対象がないとき専用の空メッセージを表示する', () => {
+    render(<ScheduleList live={[]} upcoming={[makeItem('plain', 'upcoming', null)]} pickupOnly />)
+
+    expect(screen.getByText('ピックアップ対象の予定・ライブはありません')).toBeInTheDocument()
+    expect(screen.queryByText('予定された配信はありません')).not.toBeInTheDocument()
+  })
 })

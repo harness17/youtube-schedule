@@ -35,7 +35,7 @@
     <path d="M51 79h5M63 79h5M75 79h5M51 88h5M63 88h5M75 88h5" stroke="#7a4a22" stroke-width="4" stroke-linecap="round" />
     <circle cx="64" cy="75" r="16" fill="url(#red)" />
     <path d="M59 66v18l15-9-15-9Z" fill="#fff7e6" />
-    <path d="M48 23c2-10 8-15 16-15s14 5 16 15" fill="none" stroke="#f4d186" stroke-width="5" stroke-linecap="round" />
-    <circle cx="64" cy="8" r="5" fill="#ff4b3e" />
+    <path d="M48 29c2-9 8-14 16-14s14 5 16 14" fill="none" stroke="#f4d186" stroke-width="5" stroke-linecap="round" />
+    <circle cx="64" cy="15" r="5" fill="#ff4b3e" />
   </g>
 </svg>

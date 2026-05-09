@@ -63,31 +63,44 @@ function compareByPriorityThenTime(a, b, pinnedChannelIds, { descending = false 
   return String(a.id).localeCompare(String(b.id))
 }
 
+function isPickupItem(item, pinnedChannelIds) {
+  return Boolean(item.isFavorite || item.isNotify || pinnedChannelIds.has(item.channelId))
+}
+
 export default function ScheduleList({
   live = [],
   upcoming = [],
   darkMode = false,
   pinnedChannelIds = new Set(),
+  pickupOnly = false,
   onToggleWatch,
   onToggleFavorite,
   onTogglePin
 }) {
-  const isEmpty = live.length === 0 && upcoming.length === 0
+  const displayLive = pickupOnly
+    ? live.filter((item) => isPickupItem(item, pinnedChannelIds))
+    : live
+  const displayUpcoming = pickupOnly
+    ? upcoming.filter((item) => isPickupItem(item, pinnedChannelIds))
+    : upcoming
+  const isEmpty = displayLive.length === 0 && displayUpcoming.length === 0
 
   if (isEmpty) {
     return (
       <div
         style={{ textAlign: 'center', color: darkMode ? '#7878a0' : '#6060a0', marginTop: '48px' }}
       >
-        予定された配信はありません
+        {pickupOnly ? 'ピックアップ対象の予定・ライブはありません' : '予定された配信はありません'}
       </div>
     )
   }
 
-  const sortedLive = [...live].sort((a, b) => compareByPriorityThenTime(a, b, pinnedChannelIds))
+  const sortedLive = [...displayLive].sort((a, b) =>
+    compareByPriorityThenTime(a, b, pinnedChannelIds)
+  )
 
-  const scheduledUpcoming = upcoming.filter((item) => item.scheduledStartTime)
-  const feedItems = upcoming.filter((item) => !item.scheduledStartTime)
+  const scheduledUpcoming = displayUpcoming.filter((item) => item.scheduledStartTime)
+  const feedItems = displayUpcoming.filter((item) => !item.scheduledStartTime)
   const sortedFeedItems = [...feedItems].sort((a, b) => {
     return compareByPriorityThenTime(a, b, pinnedChannelIds, { descending: true })
   })
@@ -101,7 +114,9 @@ export default function ScheduleList({
   )
 
   const navItems = [
-    ...(live.length > 0 ? [{ label: 'ライブ配信中', id: 'section-live', isLive: true }] : []),
+    ...(displayLive.length > 0
+      ? [{ label: 'ライブ配信中', id: 'section-live', isLive: true }]
+      : []),
     ...sortedEntries.map(([dateLabel]) => ({
       label: dateLabel,
       id: toAnchorId(dateLabel),
@@ -129,7 +144,7 @@ export default function ScheduleList({
         </nav>
       )}
 
-      {live.length > 0 && (
+      {displayLive.length > 0 && (
         <div id="section-live" style={{ marginBottom: '24px' }}>
           <div className="yt-section-label" style={{ color: darkMode ? '#ff4466' : '#e8001c' }}>
             🔴 ライブ配信中
@@ -193,6 +208,7 @@ ScheduleList.propTypes = {
   upcoming: PropTypes.array,
   darkMode: PropTypes.bool,
   pinnedChannelIds: PropTypes.instanceOf(Set),
+  pickupOnly: PropTypes.bool,
   onToggleWatch: PropTypes.func,
   onToggleFavorite: PropTypes.func,
   onTogglePin: PropTypes.func

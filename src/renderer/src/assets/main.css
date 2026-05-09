@@ -361,6 +361,12 @@ body {
   color: #2a9a58;
 }
 
+.yt-nav-btn--pickup {
+  background: rgba(255, 184, 48, 0.16);
+  color: var(--fav-star);
+  border: 1px solid rgba(255, 184, 48, 0.38);
+}
+
 [data-theme='dark'] .yt-nav-btn--save {
   color: #48c778;
 }

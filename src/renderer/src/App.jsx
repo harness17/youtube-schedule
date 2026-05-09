@@ -68,6 +68,7 @@ export default function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState('general')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
+  const [pickupMode, setPickupMode] = useState(false)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
@@ -553,6 +554,16 @@ export default function App() {
               </button>
             ))}
         </div>
+        {activeTab === 'schedule' && (
+          <button
+            className={`yt-nav-btn${pickupMode ? ' yt-nav-btn--pickup' : ''}`}
+            title="お気に入り・お知らせ・優先チャンネルだけを表示"
+            onClick={() => setPickupMode((value) => !value)}
+            style={{ marginTop: '4px' }}
+          >
+            {pickupMode ? 'ピックアップ中' : 'ピックアップ'}
+          </button>
+        )}
         {activeTab === 'missed' &&
           filteredMissed.length > 0 &&
           (() => {
@@ -674,6 +685,7 @@ export default function App() {
             upcoming={filteredUpcoming}
             darkMode={darkMode}
             pinnedChannelIds={pinnedChannelIds}
+            pickupOnly={pickupMode}
             onToggleWatch={handleToggleNotify}
             onToggleFavorite={handleToggleFavorite}
             onTogglePin={handleTogglePin}
