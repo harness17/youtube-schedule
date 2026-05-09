@@ -82,30 +82,63 @@ describe('ScheduleList', () => {
     expect(cards[0].textContent).toBe('配信vb')
   })
 
-  it('通知・お気に入りで優先されたライブ配信も配信時間順に表示される', () => {
+  it('ライブ配信を優先ブロックごとに分け、それぞれの内部を配信時間順に表示する', () => {
     const live = [
-      { ...makeItem('late', 'live', '2026-04-13T11:00:00+09:00'), isNotify: true },
-      { ...makeItem('early', 'live', '2026-04-13T09:00:00+09:00'), isFavorite: true },
-      { ...makeItem('plain', 'live', '2026-04-13T08:00:00+09:00') }
+      { ...makeItem('plainEarly', 'live', '2026-04-13T08:00:00+09:00') },
+      { ...makeItem('pinnedLate', 'live', '2026-04-13T11:00:00+09:00'), channelId: 'UC_PIN' },
+      { ...makeItem('notifyLate', 'live', '2026-04-13T10:00:00+09:00'), isNotify: true },
+      { ...makeItem('favEarly', 'live', '2026-04-13T09:00:00+09:00'), isFavorite: true },
+      { ...makeItem('plainLate', 'live', '2026-04-13T12:00:00+09:00') },
+      {
+        ...makeItem('pinnedEarly', 'live', '2026-04-13T07:00:00+09:00'),
+        channelId: 'UC_PIN'
+      }
     ]
 
-    render(<ScheduleList live={live} upcoming={[]} />)
+    render(<ScheduleList live={live} upcoming={[]} pinnedChannelIds={new Set(['UC_PIN'])} />)
 
-    const cards = screen.getAllByText(/配信(early|late|plain)/)
-    expect(cards.map((card) => card.textContent)).toEqual(['配信early', '配信late', '配信plain'])
+    const cards = screen.getAllByText(
+      /配信(favEarly|notifyLate|pinnedEarly|pinnedLate|plainEarly|plainLate)/
+    )
+    expect(cards.map((card) => card.textContent)).toEqual([
+      '配信favEarly',
+      '配信notifyLate',
+      '配信pinnedEarly',
+      '配信pinnedLate',
+      '配信plainEarly',
+      '配信plainLate'
+    ])
   })
 
-  it('通知・お気に入りで優先された同日配信予定も配信時間順に表示される', () => {
+  it('同日配信予定を優先ブロックごとに分け、それぞれの内部を配信時間順に表示する', () => {
     const upcoming = [
-      { ...makeItem('late', 'upcoming', '2026-04-13T11:00:00+09:00'), isNotify: true },
-      { ...makeItem('early', 'upcoming', '2026-04-13T09:00:00+09:00'), isFavorite: true },
-      { ...makeItem('plain', 'upcoming', '2026-04-13T08:00:00+09:00') }
+      { ...makeItem('plainEarly', 'upcoming', '2026-04-13T08:00:00+09:00') },
+      {
+        ...makeItem('pinnedLate', 'upcoming', '2026-04-13T11:00:00+09:00'),
+        channelId: 'UC_PIN'
+      },
+      { ...makeItem('notifyLate', 'upcoming', '2026-04-13T10:00:00+09:00'), isNotify: true },
+      { ...makeItem('favEarly', 'upcoming', '2026-04-13T09:00:00+09:00'), isFavorite: true },
+      { ...makeItem('plainLate', 'upcoming', '2026-04-13T12:00:00+09:00') },
+      {
+        ...makeItem('pinnedEarly', 'upcoming', '2026-04-13T07:00:00+09:00'),
+        channelId: 'UC_PIN'
+      }
     ]
 
-    render(<ScheduleList live={[]} upcoming={upcoming} />)
+    render(<ScheduleList live={[]} upcoming={upcoming} pinnedChannelIds={new Set(['UC_PIN'])} />)
 
-    const cards = screen.getAllByText(/配信(early|late|plain)/)
-    expect(cards.map((card) => card.textContent)).toEqual(['配信early', '配信late', '配信plain'])
+    const cards = screen.getAllByText(
+      /配信(favEarly|notifyLate|pinnedEarly|pinnedLate|plainEarly|plainLate)/
+    )
+    expect(cards.map((card) => card.textContent)).toEqual([
+      '配信favEarly',
+      '配信notifyLate',
+      '配信pinnedEarly',
+      '配信pinnedLate',
+      '配信plainEarly',
+      '配信plainLate'
+    ])
   })
 
   it('ピックアップモードではお気に入り・通知・優先チャンネルの配信だけを表示する', () => {
