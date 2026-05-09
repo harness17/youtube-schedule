@@ -70,6 +70,15 @@ export function createVideoRepository(db) {
   const listArchiveStmt = db.prepare(`
     SELECT * FROM videos
     WHERE status = 'ended'
+      AND (@channelId IS NULL OR channel_id = @channelId)
+      AND (
+        @query = ''
+        OR (
+          (@searchTitle   AND title        LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchDesc    AND description  LIKE '%' || @query || '%' ESCAPE '!')
+        )
+      )
     ORDER BY COALESCE(ended_at, last_checked_at) DESC
     LIMIT @limit OFFSET @offset
   `)
@@ -240,8 +249,27 @@ export function createVideoRepository(db) {
     listMissed(now = Date.now()) {
       return listMissedStmt.all({ now }).map(rowToVideo)
     },
-    listArchive({ limit = 50, offset = 0 } = {}) {
-      return listArchiveStmt.all({ limit, offset }).map(rowToVideo)
+    listArchive({
+      limit = 50,
+      offset = 0,
+      query = '',
+      channelId = null,
+      title = true,
+      channel = true,
+      description = false
+    } = {}) {
+      const likeQuery = escapeLikeQuery(query)
+      return listArchiveStmt
+        .all({
+          limit,
+          offset,
+          query: likeQuery,
+          channelId: channelId && channelId !== 'all' ? channelId : null,
+          searchTitle: title ? 1 : 0,
+          searchChannel: channel ? 1 : 0,
+          searchDesc: description ? 1 : 0
+        })
+        .map(rowToVideo)
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)

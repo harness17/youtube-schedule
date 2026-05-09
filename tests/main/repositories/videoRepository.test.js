@@ -429,6 +429,73 @@ describe('VideoRepository', () => {
     expect(next.map((v) => v.id)).toEqual(['e2', 'e3'])
   })
 
+  it('listArchive はチャンネル絞り込みをDB全件に対してページングする', () => {
+    const base = 1_700_000_000_000
+    for (let i = 0; i < 6; i += 1) {
+      repo.upsert(
+        sampleVideo({
+          id: `other${i}`,
+          channelId: 'UCother',
+          status: 'ended',
+          lastCheckedAt: base - i * 1000
+        })
+      )
+    }
+    for (let i = 0; i < 3; i += 1) {
+      repo.upsert(
+        sampleVideo({
+          id: `target${i}`,
+          channelId: 'UCtarget',
+          status: 'ended',
+          lastCheckedAt: base - (10 + i) * 1000
+        })
+      )
+    }
+
+    const firstPage = repo.listArchive({ channelId: 'UCtarget', limit: 2, offset: 0 })
+    const secondPage = repo.listArchive({ channelId: 'UCtarget', limit: 2, offset: 2 })
+
+    expect(firstPage.map((v) => v.id)).toEqual(['target0', 'target1'])
+    expect(secondPage.map((v) => v.id)).toEqual(['target2'])
+  })
+
+  it('listArchive はキーワード検索とチャンネル絞り込みを組み合わせてページングする', () => {
+    const base = 1_700_000_000_000
+    repo.upsert(
+      sampleVideo({
+        id: 'target_new',
+        channelId: 'UCtarget',
+        title: '耐久歌枠',
+        status: 'ended',
+        lastCheckedAt: base
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'other_channel',
+        channelId: 'UCother',
+        title: '耐久歌枠',
+        status: 'ended',
+        lastCheckedAt: base - 1000
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'target_old',
+        channelId: 'UCtarget',
+        title: '耐久雑談',
+        status: 'ended',
+        lastCheckedAt: base - 2000
+      })
+    )
+
+    const ids = repo
+      .listArchive({ query: '耐久', channelId: 'UCtarget', limit: 1, offset: 1 })
+      .map((v) => v.id)
+
+    expect(ids).toEqual(['target_old'])
+  })
+
   it('searchByText がチャンネル名で検索できる', () => {
     repo.upsert(
       sampleVideo({ id: 'v1', channelTitle: 'ホロライブ公式', title: '雑談', status: 'ended' })

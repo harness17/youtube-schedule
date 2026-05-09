@@ -13,6 +13,7 @@ import BackToTop from '../components/BackToTop.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
 import SimpleModeEmptyScreen from '../components/SimpleModeEmptyScreen.jsx'
 import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
+import youtomLogo from './assets/youtom-logo.svg'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
 import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
@@ -67,6 +68,7 @@ export default function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState('general')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
+  const [pickupMode, setPickupMode] = useState(false)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
@@ -333,25 +335,30 @@ export default function App() {
           flexWrap: 'wrap'
         }}
       >
-        <h1
-          className="yt-display"
-          style={{ fontSize: '26px', flex: 1, color: textColor, margin: 0, lineHeight: 1 }}
-        >
-          YouTube Schedule{' '}
-          {appVersion && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 'normal',
-                color: subColor,
-                fontFamily: 'inherit',
-                letterSpacing: 0
-              }}
-            >
-              v{appVersion}
-            </span>
-          )}
-        </h1>
+        <div className="yt-brand" style={{ flex: 1 }}>
+          <img src={youtomLogo} alt="" className="yt-brand-logo" />
+          <div>
+            <h1 className="yt-display yt-brand-title" style={{ color: textColor }}>
+              Youtom
+              {appVersion && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 'normal',
+                    color: subColor,
+                    fontFamily: 'inherit',
+                    letterSpacing: 0
+                  }}
+                >
+                  v{appVersion}
+                </span>
+              )}
+            </h1>
+            <div className="yt-brand-subtitle" style={{ color: subColor }}>
+              YouTube 配信予定ビューア
+            </div>
+          </div>
+        </div>
         <span
           onClick={!isAuthenticated ? () => openSettings('general') : undefined}
           style={{
@@ -547,6 +554,16 @@ export default function App() {
               </button>
             ))}
         </div>
+        {activeTab === 'schedule' && (
+          <button
+            className={`yt-nav-btn${pickupMode ? ' yt-nav-btn--pickup' : ''}`}
+            title="お気に入り・お知らせ・優先チャンネルだけを表示"
+            onClick={() => setPickupMode((value) => !value)}
+            style={{ marginTop: '4px' }}
+          >
+            {pickupMode ? 'ピックアップ中' : 'ピックアップ'}
+          </button>
+        )}
         {activeTab === 'missed' &&
           filteredMissed.length > 0 &&
           (() => {
@@ -668,6 +685,7 @@ export default function App() {
             upcoming={filteredUpcoming}
             darkMode={darkMode}
             pinnedChannelIds={pinnedChannelIds}
+            pickupOnly={pickupMode}
             onToggleWatch={handleToggleNotify}
             onToggleFavorite={handleToggleFavorite}
             onTogglePin={handleTogglePin}
@@ -757,7 +775,7 @@ export default function App() {
                   読み込み中...
                 </div>
               )}
-              {!archiveHasMore && filteredArchive.length > 0 && !searchQuery.trim() && (
+              {!archiveHasMore && filteredArchive.length > 0 && (
                 <div
                   style={{
                     textAlign: 'center',

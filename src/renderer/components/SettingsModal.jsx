@@ -447,7 +447,8 @@ export default function SettingsModal({
           <div style={sectionLabelStyle}>バージョン情報</div>
           <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
             {[
-              ['アプリ名', 'YouTube Schedule'],
+              ['アプリ名', 'Youtom'],
+              ['説明', 'YouTube 配信予定ビューア'],
               ['バージョン', `v${appVersion}`]
             ].map(([label, value]) => (
               <div

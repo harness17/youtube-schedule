@@ -84,6 +84,37 @@ body {
   letter-spacing: 1.5px;
 }
 
+/* ===== BRAND ===== */
+.yt-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.yt-brand-logo {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.18);
+}
+
+.yt-brand-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 30px;
+  line-height: 0.9;
+}
+
+.yt-brand-subtitle {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 /* ===== CARD ===== */
 .yt-card {
   position: relative;
@@ -328,6 +359,12 @@ body {
 .yt-nav-btn--save {
   background: rgba(40, 160, 90, 0.12);
   color: #2a9a58;
+}
+
+.yt-nav-btn--pickup {
+  background: rgba(255, 184, 48, 0.16);
+  color: var(--fav-star);
+  border: 1px solid rgba(255, 184, 48, 0.38);
 }
 
 [data-theme='dark'] .yt-nav-btn--save {

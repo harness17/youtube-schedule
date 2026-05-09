@@ -2,7 +2,7 @@
 !macro customInstall
   ; 配置ガイドを SETUP_GUIDE.txt として作成
   FileOpen $0 "$INSTDIR\SETUP_GUIDE.txt" w
-  FileWrite $0 "YouTube Schedule - セットアップガイド$\r$\n"
+  FileWrite $0 "Youtom - セットアップガイド$\r$\n"
   FileWrite $0 "=============================================$\r$\n$\r$\n"
   FileWrite $0 "【必須】アプリを起動する前に credentials.json を以下のパスに配置してください：$\r$\n$\r$\n"
   FileWrite $0 "  $APPDATA\youtube-schedule\credentials.json$\r$\n$\r$\n"
