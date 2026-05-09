@@ -48,17 +48,18 @@ function getStartTime(item) {
   return Number.isNaN(time) ? 0 : time
 }
 
+function getSortBlock(item, pinnedChannelIds) {
+  if (item.isNotify || item.isFavorite) return 0
+  if (pinnedChannelIds.has(item.channelId)) return 1
+  return 2
+}
+
 function compareByPriorityThenTime(a, b, pinnedChannelIds, { descending = false } = {}) {
-  const af = a.isNotify || a.isFavorite ? 0 : 1
-  const bf = b.isNotify || b.isFavorite ? 0 : 1
-  if (af !== bf) return af - bf
+  const blockDiff = getSortBlock(a, pinnedChannelIds) - getSortBlock(b, pinnedChannelIds)
+  if (blockDiff !== 0) return blockDiff
 
   const timeDiff = getStartTime(a) - getStartTime(b)
   if (timeDiff !== 0) return descending ? -timeDiff : timeDiff
-
-  const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
-  const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
-  if (ap !== bp) return ap - bp
 
   return String(a.id).localeCompare(String(b.id))
 }
