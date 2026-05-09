@@ -42,6 +42,27 @@ function scrollToSection(id) {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function getStartTime(item) {
+  const raw = item.actualStartTime ?? item.scheduledStartTime ?? item.lastCheckedAt ?? 0
+  const time = raw instanceof Date ? raw.getTime() : new Date(raw).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function compareByPriorityThenTime(a, b, pinnedChannelIds, { descending = false } = {}) {
+  const af = a.isNotify || a.isFavorite ? 0 : 1
+  const bf = b.isNotify || b.isFavorite ? 0 : 1
+  if (af !== bf) return af - bf
+
+  const timeDiff = getStartTime(a) - getStartTime(b)
+  if (timeDiff !== 0) return descending ? -timeDiff : timeDiff
+
+  const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
+  const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
+  if (ap !== bp) return ap - bp
+
+  return String(a.id).localeCompare(String(b.id))
+}
+
 export default function ScheduleList({
   live = [],
   upcoming = [],
@@ -63,50 +84,19 @@ export default function ScheduleList({
     )
   }
 
-  const sortedLive = [...live].sort((a, b) => {
-    // 1. お知らせ・お気に入りフラグ優先
-    const af = a.isNotify || a.isFavorite ? 0 : 1
-    const bf = b.isNotify || b.isFavorite ? 0 : 1
-    if (af !== bf) return af - bf
-    // 2. ピン済みチャンネル優先
-    const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
-    const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
-    if (ap !== bp) return ap - bp
-    // 3. 開始時刻昇順
-    return (
-      (a.actualStartTime ?? a.scheduledStartTime ?? 0) -
-      (b.actualStartTime ?? b.scheduledStartTime ?? 0)
-    )
-  })
+  const sortedLive = [...live].sort((a, b) => compareByPriorityThenTime(a, b, pinnedChannelIds))
 
   const scheduledUpcoming = upcoming.filter((item) => item.scheduledStartTime)
   const feedItems = upcoming.filter((item) => !item.scheduledStartTime)
   const sortedFeedItems = [...feedItems].sort((a, b) => {
-    const af = a.isNotify || a.isFavorite ? 0 : 1
-    const bf = b.isNotify || b.isFavorite ? 0 : 1
-    if (af !== bf) return af - bf
-    const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
-    const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
-    if (ap !== bp) return ap - bp
-    return (b.lastCheckedAt ?? 0) - (a.lastCheckedAt ?? 0)
+    return compareByPriorityThenTime(a, b, pinnedChannelIds, { descending: true })
   })
 
   const groups = groupByDate(scheduledUpcoming)
   const sortedEntries = getSortedGroupEntries(groups, scheduledUpcoming).map(
     ([dateLabel, items]) => [
       dateLabel,
-      [...items].sort((a, b) => {
-        // 1. お知らせ・お気に入りフラグ優先
-        const af = a.isNotify || a.isFavorite ? 0 : 1
-        const bf = b.isNotify || b.isFavorite ? 0 : 1
-        if (af !== bf) return af - bf
-        // 2. ピン済みチャンネル優先
-        const ap = pinnedChannelIds.has(a.channelId) ? 0 : 1
-        const bp = pinnedChannelIds.has(b.channelId) ? 0 : 1
-        if (ap !== bp) return ap - bp
-        // 3. 開始時刻昇順
-        return (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0)
-      })
+      [...items].sort((a, b) => compareByPriorityThenTime(a, b, pinnedChannelIds))
     ]
   )
 

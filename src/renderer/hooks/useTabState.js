@@ -16,9 +16,7 @@ import { arrayMove } from '@dnd-kit/sortable'
 // ===== 定数 =====================================================================
 // アーカイブ 1 ページあたりの取得件数。ネットワーク負荷とスクロール体験のバランスで 50 に設定
 const ARCHIVE_LIMIT = 50
-// 全文検索の最大件数。検索ヒット数に上限を設けてメモリ使用を抑える
-const SEARCH_LIMIT = 200
-// searchByText に渡すターゲットフラグ。description は情報量が多く FTS が遅くなるため除外
+// アーカイブ検索に渡すターゲットフラグ。description は情報量が多いため除外
 const SEARCH_TARGETS = { title: true, channel: true, description: false }
 
 // ===== フック本体 ================================================================
@@ -79,13 +77,23 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     window.api.listMissed?.().then((data) => setMissedVideos(data ?? []))
   }, [loadAllDbChannels])
 
+  function buildArchiveOptions({ limit = ARCHIVE_LIMIT, offset = 0, query = searchQuery } = {}) {
+    return {
+      ...SEARCH_TARGETS,
+      limit,
+      offset,
+      query: query.trim(),
+      channelId: selectedChannel === 'all' ? null : selectedChannel
+    }
+  }
+
   // ===== アーカイブ追加ロード ===================================================
   async function loadMoreArchive() {
     if (archiveLoadingMoreRef.current) return
     archiveLoadingMoreRef.current = true
     setArchiveLoadingMore(true)
     const offset = archiveOffsetRef.current
-    const data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset })) ?? []
+    const data = (await window.api.listArchive?.(buildArchiveOptions({ offset }))) ?? []
     archiveOffsetRef.current = offset + data.length
     setArchiveVideos((prev) => [...prev, ...data])
     setArchiveHasMore(data.length === ARCHIVE_LIMIT)
@@ -120,22 +128,19 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       // seq で競合リクエストを排除。古いリクエストの結果が後から来ても無視する
       const seq = ++archiveSearchSeqRef.current
       setTabLoading(true)
-      let data, hasMore
-      if (query.trim()) {
-        data =
-          (await window.api.searchByText?.(query, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
-        hasMore = false
-      } else {
-        data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
-        hasMore = data.length === ARCHIVE_LIMIT
-      }
+      const data = (await window.api.listArchive?.(buildArchiveOptions({ offset: 0, query }))) ?? []
       if (seq !== archiveSearchSeqRef.current) return
-      archiveOffsetRef.current = query.trim() ? 0 : data.length
+      archiveOffsetRef.current = data.length
       setArchiveVideos(data)
-      setArchiveHasMore(hasMore)
+      setArchiveHasMore(data.length === ARCHIVE_LIMIT)
       setTabLoading(false)
     }, 300)
   }
+
+  useEffect(() => {
+    if (activeTab === 'archive') runArchiveSearch(searchQuery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannel])
 
   // ===== タブ切り替え ==========================================================
   async function handleTabChange(tab) {
@@ -149,21 +154,12 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       archiveOffsetRef.current = 0
       setArchiveHasMore(false)
       setTabLoading(true)
-      // searchQuery は useState の最新値を参照できないため、入力値を引数から取らずに
-      // 現時点では空クエリとして初期ロードする。検索は handleSearchQueryChange で別途実行
       const q = searchQuery.trim()
-      let data, hasMore
-      if (q) {
-        data =
-          (await window.api.searchByText?.(q, { ...SEARCH_TARGETS, limit: SEARCH_LIMIT })) ?? []
-        hasMore = false
-      } else {
-        data = (await window.api.listArchive?.({ limit: ARCHIVE_LIMIT, offset: 0 })) ?? []
-        hasMore = data.length === ARCHIVE_LIMIT
-      }
-      archiveOffsetRef.current = q ? 0 : data.length
+      const data =
+        (await window.api.listArchive?.(buildArchiveOptions({ offset: 0, query: q }))) ?? []
+      archiveOffsetRef.current = data.length
       setArchiveVideos(data)
-      setArchiveHasMore(hasMore)
+      setArchiveHasMore(data.length === ARCHIVE_LIMIT)
       setTabLoading(false)
     } else if (tab === 'favorites') {
       setTabLoading(true)

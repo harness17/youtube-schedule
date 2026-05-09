@@ -40,7 +40,7 @@ const SUCCESS_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>認証完了 — YouTube Schedule Viewer</title>
+  <title>認証完了 — Youtom</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -107,7 +107,7 @@ const SUCCESS_HTML = `<!DOCTYPE html>
     <p>Google アカウントとの連携が完了しました。<br />このタブを閉じてアプリに戻ってください。</p>
     <div class="brand">
       <div class="dot"></div>
-      YouTube Schedule Viewer
+      Youtom
     </div>
   </div>
 </body>
@@ -117,7 +117,7 @@ const ERROR_HTML = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>認証エラー — YouTube Schedule Viewer</title>
+  <title>認証エラー — Youtom</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {

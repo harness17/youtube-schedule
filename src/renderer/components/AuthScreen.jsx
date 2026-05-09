@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types'
+import youtomLogo from '../src/assets/youtom-logo.svg'
 
 export default function AuthScreen({ onLogin, loading }) {
   return (
@@ -12,8 +13,17 @@ export default function AuthScreen({ onLogin, loading }) {
         gap: '24px'
       }}
     >
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>YouTube 配信予定</h1>
-      <p style={{ color: '#666' }}>Google アカウントでログインして配信予定を確認</p>
+      <img
+        src={youtomLogo}
+        alt=""
+        style={{ width: '72px', height: '72px', borderRadius: '16px' }}
+      />
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>Youtom</h1>
+        <p style={{ color: '#666', margin: '8px 0 0' }}>
+          Google アカウントでログインして配信予定を確認
+        </p>
+      </div>
       <button
         onClick={onLogin}
         disabled={loading}

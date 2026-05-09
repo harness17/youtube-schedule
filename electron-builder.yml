@@ -1,5 +1,5 @@
 appId: io.github.harness17.youtube-schedule
-productName: YouTube Schedule
+productName: Youtom
 directories:
   buildResources: build
 files:

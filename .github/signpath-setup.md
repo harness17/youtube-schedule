@@ -1,17 +1,22 @@
-# SignPath.io コード署名 — セットアップ手順
+# SignPath.io コード署名 — 将来の再申請メモ
 
-SignPath.io の OSS 無料プランを使って Windows インストーラーにコード署名する手順です。  
-署名済みになると SmartScreen の「Windows によって PC が保護されました」警告が出なくなります。
+現在、このプロジェクトは SignPath Foundation の OSS コード署名を使用していません。
+
+2026-05-09 時点で SignPath Foundation に申請しましたが、外部の利用実績・第三者言及・継続的なユーザー反応などの信頼シグナル不足を理由に未承認となりました。このファイルは、プロジェクトの認知が増えて再申請できる状態になったときのための作業メモです。
+
+署名済みになると SmartScreen の「Windows によって PC が保護されました」警告が出にくくなります。ただし、OV 証明書では評判スコアが蓄積するまで警告が残る場合があります。
 
 ---
 
 ## 1. OSSプランを申請する
 
+再申請前に、GitHub stars / forks / contributors、外部記事・動画・SNS・フォーラムでの言及、Issue / Discussion などのユーザー反応が増えていることを確認する。
+
 1. https://about.signpath.io/product/open-source にアクセス
 2. 「Apply for free」をクリックして申請フォームを送信
    - GitHub リポジトリ URL: `https://github.com/harness17/youtube-schedule`
-   - OSS ライセンスがある公開リポジトリであれば審査通過しやすい
-3. 数日以内にメールで承認通知が届く
+   - OSS ライセンスだけでは不十分。外部から確認できる信頼シグナルも必要
+3. 審査結果を待つ
 
 ---
 

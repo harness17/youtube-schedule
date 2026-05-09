@@ -81,4 +81,30 @@ describe('ScheduleList', () => {
     // 「配信vb」がピン済み UC2 なので先頭になるはず
     expect(cards[0].textContent).toBe('配信vb')
   })
+
+  it('通知・お気に入りで優先されたライブ配信も配信時間順に表示される', () => {
+    const live = [
+      { ...makeItem('late', 'live', '2026-04-13T11:00:00+09:00'), isNotify: true },
+      { ...makeItem('early', 'live', '2026-04-13T09:00:00+09:00'), isFavorite: true },
+      { ...makeItem('plain', 'live', '2026-04-13T08:00:00+09:00') }
+    ]
+
+    render(<ScheduleList live={live} upcoming={[]} />)
+
+    const cards = screen.getAllByText(/配信(early|late|plain)/)
+    expect(cards.map((card) => card.textContent)).toEqual(['配信early', '配信late', '配信plain'])
+  })
+
+  it('通知・お気に入りで優先された同日配信予定も配信時間順に表示される', () => {
+    const upcoming = [
+      { ...makeItem('late', 'upcoming', '2026-04-13T11:00:00+09:00'), isNotify: true },
+      { ...makeItem('early', 'upcoming', '2026-04-13T09:00:00+09:00'), isFavorite: true },
+      { ...makeItem('plain', 'upcoming', '2026-04-13T08:00:00+09:00') }
+    ]
+
+    render(<ScheduleList live={[]} upcoming={upcoming} />)
+
+    const cards = screen.getAllByText(/配信(early|late|plain)/)
+    expect(cards.map((card) => card.textContent)).toEqual(['配信early', '配信late', '配信plain'])
+  })
 })
