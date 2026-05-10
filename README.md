@@ -246,3 +246,9 @@ npm run build:win      # Windows 向けパッケージング
 - API クォータを節約するため、RSS フィードを優先して使用します
 - 簡易モードでは YouTube Data API を使わず、RSS フィードだけで動作します
 - `credentials.json` と `token.json` は絶対にリポジトリにコミットしないでください
+
+## 関連記事
+
+Youtom（youtube-schedule）の開発から派生した Zenn の技術記事です。
+
+- [YouTube Data APIのクォータ枯渇をRSSで99%削減した話](https://zenn.dev/harness17/articles/youtube-data-api-rss-quota-reduction) (2026-05-10)
