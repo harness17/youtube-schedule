@@ -178,3 +178,20 @@ npm run dev   # predev で electron-rebuild が自動実行される
 - **master** — 安定版のみ。develop からマージしてリリース
 
 master への直接コミット禁止。
+
+## 共同開発ハーネス（Codex × Claude Code）
+
+このリポジトリは Codex と Claude Code が共同で開発する。役割分担・merge ゲート・指摘ラベルは以下のルールに従う。
+
+@.claude/rules/cross-agent-review.md
+@.claude/rules/handoff-protocol.md
+
+**Claude Code が作業を開始するときの流れ：**
+
+1. ユーザーの依頼を聞いたら、タスク振り分け基準（cross-agent-review.md）で Codex に振るか自分で握るか判断
+2. Codex に振るなら `/codex-handoff` スキルで依頼セクションを `CLAUDE_CODE_HANDOFF.md` に追記
+3. 自分で実装する場合は通常のフローで進め、レビューを Codex に依頼
+4. Codex の作業完了後は `/cross-review` スキルでレビュー
+5. Merge 判断はユーザー指示を待つ
+
+**最新の引き継ぎ：** `CLAUDE_CODE_HANDOFF.md` を参照する。
