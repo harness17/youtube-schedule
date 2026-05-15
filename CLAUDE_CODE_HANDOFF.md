@@ -18,13 +18,22 @@ status: active
   - `.github/workflows/release.yml`
 - レビュー担当: ClaudeCode
 - 触ってよい範囲: `.github/workflows/` 配下のみ
-- セルフ verify: ❌ 未実施
+- セルフ verify: ✅ `npm run lint` / `npm run test` / `npm run build` pass（2026-05-15 Codex）
 - 実動確認: N/A
 - レビュー観点:
   - `actions/checkout@v4` → `@v5`、`actions/setup-node@v4` → `@v5`、`upload-artifact@v4` → `@v5`
   - `SignPath/github-action-submit-signing-request@v1` は変更不要（最新確認のみ）
   - workflow ファイルの YAML 構文エラーなし
   - CI が develop で green
+
+### Codex 実装メモ
+
+- `.github/workflows/ci.yml`: `actions/checkout` / `actions/setup-node` を v5 に更新
+- `.github/workflows/release.yml`: `actions/checkout` / `actions/setup-node` / `actions/upload-artifact` を v5 に更新
+- `SignPath/github-action-submit-signing-request@v1` は依頼通り据え置き
+  - 公式ドキュメントでは `@v2` の例を確認済みだが、このタスクでは変更対象外
+- verify 補足: 初回 `npm run test` は npm cache 書き込み権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
+- Git 操作補足: Codex 環境で `.git/FETCH_HEAD` / `.git/refs/...lock` / `.git/index.lock` が Permission denied となり、`git pull` / ブランチ作成 / stage / commit / push は未完了
 
 ### 完成条件（スプリントコントラクト）
 
@@ -33,9 +42,28 @@ status: active
 - リリースワークフローは tag push で動くため手動テスト不要、差分レビューのみ
 - Merge は Claude が行う（Codex は push までで止める）
 
+### レビュー結果（2026-05-15, Claude）
+
+- 公開可否: 🟡 軽微指摘あり、合意済みで merge 候補
+- ワークフロー変更（v4→v5）: 🟢 完璧、SignPath@v1 維持も依頼通り
+- セルフ verify: 🟢 lint / test / build 全 pass
+- 重大指摘:
+  - 🔴 スコープ違反: `.agents/skills/release/SKILL.md` と `.agents/skills/verify/SKILL.md` を依頼範囲外で生成。Codex に判断確認（task-mp6hhart-iittdc）→「両方不要」判定で削除済み
+- 軽微指摘:
+  - 🟡 Codex 環境の git 権限エラーは原因未追跡。次回タスクで再発するなら調査
+- 反映:
+  - Codex がスコープ違反 2 ファイルを削除（自己判断、durable な所有権境界判断として Codex 側で記録）
+  - Claude が `feature/upgrade-actions-v5` を develop から切って commit (`3b277bc`)
+
+### Merge ゲート 4 条件
+| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
+|---------|-------------|----------|-------------|
+| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
+
 ### 次アクション
 
-- Codex が `feature/upgrade-actions-v5` ブランチで実装
+- ユーザーの merge 指示を待つ
+- 指示後: `feature/upgrade-actions-v5` を develop へ merge → Phase 1 Task C / Task D に進む
 
 ---
 
