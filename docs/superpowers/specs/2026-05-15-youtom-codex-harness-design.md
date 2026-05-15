@@ -243,25 +243,28 @@ DB マイグレーション or UI 変更を伴う場合、Phase ① の前に Cl
 | 2b | アーカイブ統計ビュー | 中（新タブ追加） | Codex 実装 / Claude UI 検証 | v1.15.0 内 |
 | 2c | メン限完全対応 | 大（DB + 手動 ID 登録 + API 検証） | Claude 主導 + Codex 分担 | v1.16.0 |
 
-### 4.2 Task 2a — アーカイブ絞り込み・ソート強化
+### 4.2 Task 2a — アーカイブ絞り込み・ソート強化（確定版 2026-05-15）
 
 完成条件：
-- アーカイブタブ上部にフィルタバー追加
+- アーカイブタブの検索ボックス下に**折り畳み式フィルタバー**を追加
+  - 「絞り込み ▼」ボタンで開閉、デフォルト閉、アクティブなフィルタ数をバッジ表示
   - チャンネル絞り込み（複数選択ドロップダウン）
-  - 期間絞り込み（プリセット：7日 / 30日 / 90日 / カスタム範囲）
-  - 配信タイプ絞り込み（プレミア / 通常ライブ / 配信予定だったが流れた）
-- ソート切替（新しい順 / 古い順 / チャンネル名 / 再生時間）
+  - 期間絞り込み（プリセット：7日 / 30日 / 90日 / カスタム範囲）。`ended_at` 基準
+  - 配信タイプ絞り込み（2 種）：ライブ配信済み / 流れた配信
+- ソート切替（新しい順 / 古い順 / チャンネル名 / 再生時間）。SQL `ORDER BY` 側で実装
 - 既存の FTS5 検索ボックスと併用可能
-- フィルタ状態は `electron-store` に保存（再起動後も復元）
+- フィルタ・ソート状態は `electron-store` に保存（再起動後も復元）
 - 既存テスト + 新フィルタ用テスト追加
 
-設計判断：
-- 配信タイプは既存 `videos` テーブルから派生可能か検証 → 不可なら migration 005 で `video_type` カラム追加
-- 再生時間は YouTube API の `contentDetails.duration` 取得が必要 → クォータ消費するので「アーカイブ時に一度だけ取得」する方針
+確定した設計判断：
+- **配信タイプ**：プレミア公開は現スキーマで判別不可のため対象外。「ライブ配信済み」=`actual_start_time IS NOT NULL`、「流れた配信」=`actual_start_time IS NULL AND scheduled_start_time IS NOT NULL` で派生。migration 不要
+- **再生時間**：migration 008 で `videos.duration`（秒, INTEGER NULL）を追加。`videoDetailsFetcher` の `part` に `contentDetails` を追加（`videos.list` は part を増やしてもクォータ 1 ユニット/回のまま、追加コスト 0）。`toVideoRecord` で ISO 8601 duration（`PT1H2M3S`）を秒へパース。既存アーカイブのバックフィルはしない（`duration=NULL` はソート末尾）
+- **ソート方式**：`listArchive` は limit/offset ページングのため SQL `ORDER BY` 側でソート（クライアント側ソート不可）
 
 担当分割：
-- Codex: フィルタ UI コンポーネント・ソートロジック・テスト
-- Claude: migration 必要性の判断・`contentDetails` 取得タイミング設計・Playwright 検証
+- Claude: migration 008、`videoDetailsFetcher` の part 追加、`toVideoRecord` の ISO8601 パース、`listArchive` SQL 書き換え（DB 契約の中核）
+- Codex: `ArchiveFilterBar` コンポーネント・`useTabState` 配線・`store.js`・テスト・Playwright 前のセルフ verify
+- Claude: Playwright 動作確認
 
 ### 4.3 Task 2b — アーカイブ統計ビュー
 
