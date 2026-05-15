@@ -8,13 +8,13 @@ export function createVideoRepository(db) {
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at, ended_at, source
+      url, first_seen_at, last_checked_at, ended_at, duration, source
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
       @url, @firstSeenAt, @lastCheckedAt,
       CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END,
-      @source
+      @duration, @source
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -28,6 +28,7 @@ export function createVideoRepository(db) {
       concurrent_viewers = excluded.concurrent_viewers,
       url = excluded.url,
       last_checked_at = excluded.last_checked_at,
+      duration = COALESCE(excluded.duration, videos.duration),
       source = excluded.source,
       ended_at = CASE
         WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
@@ -205,6 +206,7 @@ export function createVideoRepository(db) {
       viewedAt: row.viewed_at ?? null,
       favoriteOrder: row.favorite_order ?? null,
       source: row.source ?? 'api',
+      duration: row.duration ?? null,
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -219,7 +221,7 @@ export function createVideoRepository(db) {
 
   return {
     upsert(video) {
-      upsertStmt.run({ ...video, source: video.source ?? 'api' })
+      upsertStmt.run({ ...video, duration: video.duration ?? null, source: video.source ?? 'api' })
     },
     getById(id) {
       return rowToVideo(getByIdStmt.get(id))

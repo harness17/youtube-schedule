@@ -1,4 +1,5 @@
 import { deriveStatus } from './videoStatus.js'
+import { parseDuration } from '../lib/parseDuration.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
@@ -37,6 +38,7 @@ function toVideoRecord(v, now) {
     url: `https://www.youtube.com/watch?v=${v.id}`,
     firstSeenAt: now,
     lastCheckedAt: now,
+    duration: parseDuration(v.contentDetails?.duration),
     source: 'api'
   }
 }
@@ -57,6 +59,7 @@ function toRssVideoRecord(entry, channel, now) {
     url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
     firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
     lastCheckedAt: now,
+    duration: null,
     source: 'rss'
   }
 }

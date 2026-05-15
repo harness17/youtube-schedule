@@ -7,7 +7,7 @@ export function createVideoDetailsFetcher({ timeoutMs = 15000 } = {}) {
         const batch = videoIds.slice(i, i + 50)
         const res = await Promise.race([
           yt.videos.list({
-            part: ['snippet', 'liveStreamingDetails'],
+            part: ['snippet', 'liveStreamingDetails', 'contentDetails'],
             id: batch.join(',')
           }),
           new Promise((_, reject) =>
