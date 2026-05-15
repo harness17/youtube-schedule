@@ -8,6 +8,57 @@ status: active
 
 ---
 
+## 2026-05-15 — Phase 2a Task 6-9 依頼（Claude → Codex）
+
+- 対象: feature/archive-filter-sort（既存ブランチ、Claude が Task 1-5 を実装済み）
+- 作成者: ClaudeCode
+- 主題: アーカイブ絞り込み・ソート UI（フロントエンド）
+- レビュー担当: ClaudeCode
+- 実装プラン: `docs/superpowers/plans/2026-05-15-phase2a-archive-filter-sort.md` の **Task 6・7・8・9**
+- 触ってよい範囲:
+  - `src/renderer/components/ArchiveFilterBar.jsx`（新規）
+  - `src/renderer/hooks/useTabState.js`
+  - `src/renderer/src/App.jsx`
+  - `src/main/ipc/settingsHandlers.js`（必要なら）
+  - `src/preload/index.js`（必要なら）
+  - `tests/renderer/ArchiveFilterBar.test.jsx`（新規）
+- 触ってはいけない範囲: `src/main/db/`, `src/main/repositories/`, `src/main/fetchers/`, `src/main/services/`（Task 1-5 で Claude が実装済み、契約は確定）
+- セルフ verify: ❌ 未実施
+- 実動確認: N/A（Claude が後で Playwright 実施）
+
+### 前提（Claude 実装済みのバックエンド契約）
+
+- `videos.duration`（秒, INTEGER NULL）カラム追加済み
+- `listArchive` は次のパラメータを受ける: `channelIds`(string[]), `videoType`('all'|'live-done'|'didnt-air'), `periodStart`(number|null), `periodEnd`(number|null), `sort`('newest'|'oldest'|'channel'|'duration')、加えて既存の `query`/`limit`/`offset`/`title`/`channel`/`description`
+- `videos:listArchive` IPC と `window.api.listArchive` は opts を素通しする
+
+### レビュー観点
+
+- プラン Task 6-9 の完成条件を満たしているか
+- filters オブジェクトの形（`channelIds`/`videoType`/`period`/`customStart`/`customEnd`）と sort 値がプラン通りか
+- 既存テスト 238 件を壊していないか
+- Prettier 設定（singleQuote / no semi / printWidth 100）準拠
+
+### 完成条件（スプリントコントラクト）
+
+- 折り畳み式 `ArchiveFilterBar` がアーカイブタブに表示される
+- チャンネル複数選択 / 期間 / 配信タイプ / ソートが動作する
+- フィルタ状態が electron-store に永続化される
+- `npm run lint && npm run test && npm run build` がすべて pass
+- Merge は Claude が行う
+
+### Git について
+
+- Codex 環境では `.git/*.lock` で Permission denied が出る既知問題あり
+- **Codex は git commit/push しなくてよい**。ファイル編集とセルフ verify まで実施し、コミットは Claude が代行する
+- 依頼範囲外のファイル（`.agents/skills/` のミラー等）を作らないこと
+
+### 次アクション
+
+- Codex が Task 6-9 を実装 → セルフ verify → Claude がレビュー & コミット
+
+---
+
 ## 2026-05-15 — Phase 1 クロージング（Claude）
 
 - 対象: develop
