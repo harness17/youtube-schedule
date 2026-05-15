@@ -8,6 +8,68 @@ status: active
 
 ---
 
+## 2026-05-15 — Phase 2a UX 修正依頼（Claude → Codex）
+
+- 対象: feature/archive-filter-sort
+- 作成者: ClaudeCode
+- 主題: ユーザーフィードバックによる ArchiveFilterBar の UX 修正
+- レビュー担当: ClaudeCode
+- 触ってよい範囲:
+  - `src/renderer/components/ArchiveFilterBar.jsx`
+  - `tests/renderer/ArchiveFilterBar.test.jsx`
+  - `src/renderer/hooks/useTabState.js`
+  - `src/renderer/src/App.jsx`
+- 触ってはいけない範囲: `src/main/`（Claude が listArchive 修正済み、契約確定）
+
+### 修正内容
+
+**1. 配信タイプフィルタを完全削除**
+
+- `ArchiveFilterBar.jsx` から「配信タイプ」select を削除
+- `useTabState.js` の `DEFAULT_ARCHIVE_FILTERS` から `videoType` キーを削除
+- `buildArchiveOptions` から `videoType` を削除（listArchive はもう videoType を受け取らない。バックエンドで「流れた配信」を常時除外済み）
+- `App.jsx` の `archiveHasActiveFilters` から `videoType !== 'all'` 判定を削除
+- `ArchiveFilterBar.test.jsx` の videoType 関連テストを削除
+- filters オブジェクトは `{ channelIds, period, customStart, customEnd }` に縮小
+- アクティブフィルタ数 = `channelIds.length > 0 ? 1 : 0` + `period !== 'all' ? 1 : 0`
+
+**2. チャンネル絞り込みを折り畳みポップオーバー化**
+
+現状はフィルタバー展開時に全チャンネルのチェックボックスがベタ並び → 項目が多すぎる。以下に変更：
+
+- 「チャンネル」ボタン（選択数があればバッジ表示）をフィルタバー内に置く
+- クリックでポップオーバーパネルが開く（ボタン直下に absolute 配置、`position: relative` な親で囲む）
+- ポップオーバー内：上部に検索 input（チャンネル名の部分一致でリスト絞り込み）＋ 下にスクロール可能なチェックボックスリスト
+- 選択中チャンネルは、フィルタバー上（ポップオーバー外）に削除可能なチップ（× ボタン付き）で表示
+- ポップオーバーは外側クリックまたは「チャンネル」ボタン再クリックで閉じる（外側クリック検知は `useEffect` + document の mousedown リスナ、または簡易に再クリックトグル＋パネル内 stopPropagation でよい）
+- 検索 input は `aria-label="チャンネル検索"`、トグルボタンは `aria-label` か role でテスト可能にする
+
+### レビュー観点
+
+- filters オブジェクトから videoType が完全に消えているか（grep で残骸確認）
+- ポップオーバーが開閉し、検索で絞り込め、チップで選択解除できるか
+- 既存テストを壊していないか
+- Prettier 準拠（singleQuote / no semi / printWidth 100）
+
+### 完成条件（スプリントコントラクト）
+
+- 配信タイプ select が UI から消えている
+- チャンネル絞り込みがポップオーバー＋検索＋チップで操作できる
+- `npm run lint && npm run test && npm run build` がすべて pass
+- ArchiveFilterBar のテストが新 UI に追従して pass
+- Merge は Claude が行う
+
+### Git について
+
+- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
+- 依頼範囲外のファイルを作らない
+
+### 次アクション
+
+- Codex が修正 → セルフ verify → Claude がレビュー & コミット
+
+---
+
 ## 2026-05-15 — Phase 2a Task 6-9 依頼（Claude → Codex）
 
 - 対象: feature/archive-filter-sort（既存ブランチ、Claude が Task 1-5 を実装済み）
