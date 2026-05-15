@@ -18,6 +18,13 @@ import { arrayMove } from '@dnd-kit/sortable'
 const ARCHIVE_LIMIT = 50
 // アーカイブ検索に渡すターゲットフラグ。description は情報量が多いため除外
 const SEARCH_TARGETS = { title: true, channel: true, description: false }
+const DEFAULT_ARCHIVE_FILTERS = {
+  channelIds: [],
+  videoType: 'all',
+  period: 'all',
+  customStart: null,
+  customEnd: null
+}
 
 // ===== フック本体 ================================================================
 export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedule' }) {
@@ -47,12 +54,15 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   // ---- 検索・フィルター --------------------------------------------------------
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedChannel, setSelectedChannel] = useState('all')
+  const [archiveFilters, setArchiveFilters] = useState(DEFAULT_ARCHIVE_FILTERS)
+  const [archiveSort, setArchiveSort] = useState('newest')
   const [favoriteReorderMode, setFavoriteReorderMode] = useState(false)
   const [favoriteOrderDirty, setFavoriteOrderDirty] = useState(false)
   const [favoriteOrderSaving, setFavoriteOrderSaving] = useState(false)
   // 検索デバウンス用タイマー・競合リクエスト防止シーケンス
   const archiveSearchTimerRef = useRef(null)
   const archiveSearchSeqRef = useRef(0)
+  const archiveSettingsLoadedRef = useRef(false)
 
   // ---- ピン済みチャンネル ------------------------------------------------------
   const [pinnedChannelIds, setPinnedChannelIds] = useState(new Set())
@@ -77,13 +87,59 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     window.api.listMissed?.().then((data) => setMissedVideos(data ?? []))
   }, [loadAllDbChannels])
 
+  // 起動時に保存済みフィルタを復元
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const saved = await window.api.getSetting?.('archiveFilters', null)
+      if (cancelled) return
+      if (saved?.filters) {
+        const nextFilters = {
+          ...DEFAULT_ARCHIVE_FILTERS,
+          ...saved.filters,
+          channelIds: Array.isArray(saved.filters.channelIds) ? saved.filters.channelIds : []
+        }
+        setArchiveFilters(nextFilters)
+      }
+      if (saved?.sort) setArchiveSort(saved.sort)
+      archiveSettingsLoadedRef.current = true
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // フィルタ/ソート変更時に保存
+  useEffect(() => {
+    if (!archiveSettingsLoadedRef.current) return
+    window.api.setSetting?.('archiveFilters', { filters: archiveFilters, sort: archiveSort })
+  }, [archiveFilters, archiveSort])
+
+  // フィルタの period 種別を { periodStart, periodEnd } の epoch ms へ変換する
+  function resolvePeriod(filters) {
+    const dayMs = 24 * 60 * 60 * 1000
+    if (filters.period === 'custom') {
+      return { periodStart: filters.customStart, periodEnd: filters.customEnd }
+    }
+    const presets = { '7d': 7, '30d': 30, '90d': 90 }
+    const days = presets[filters.period]
+    if (!days) return { periodStart: null, periodEnd: null }
+    return { periodStart: Date.now() - days * dayMs, periodEnd: null }
+  }
+
   function buildArchiveOptions({ limit = ARCHIVE_LIMIT, offset = 0, query = searchQuery } = {}) {
+    const { periodStart, periodEnd } = resolvePeriod(archiveFilters)
     return {
       ...SEARCH_TARGETS,
       limit,
       offset,
       query: query.trim(),
-      channelId: selectedChannel === 'all' ? null : selectedChannel
+      channelIds: archiveFilters.channelIds,
+      videoType: archiveFilters.videoType,
+      periodStart,
+      periodEnd,
+      sort: archiveSort,
+      channelId: null
     }
   }
 
@@ -141,6 +197,11 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     if (activeTab === 'archive') runArchiveSearch(searchQuery)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannel])
+
+  useEffect(() => {
+    if (activeTab === 'archive') runArchiveSearch(searchQuery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveFilters, archiveSort])
 
   // ===== タブ切り替え ==========================================================
   async function handleTabChange(tab) {
@@ -346,10 +407,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   const filteredLive = useMemo(() => live.filter(filterItem), [live, filterItem])
   const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
   const filteredMissed = useMemo(() => missedVideos.filter(filterItem), [missedVideos, filterItem])
-  const filteredArchive = useMemo(
-    () => archiveVideos.filter(filterItem),
-    [archiveVideos, filterItem]
-  )
+  const filteredArchive = useMemo(() => archiveVideos, [archiveVideos])
   const filteredFavorites = useMemo(
     () => favoriteVideos.filter(filterItem),
     [favoriteVideos, filterItem]
@@ -407,6 +465,10 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     searchQuery,
     selectedChannel,
     setSelectedChannel,
+    archiveFilters,
+    setArchiveFilters,
+    archiveSort,
+    setArchiveSort,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,
