@@ -68,21 +68,6 @@ export function createVideoRepository(db) {
       CASE v.status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
       COALESCE(v.actual_start_time, v.scheduled_start_time) DESC
   `)
-  const listArchiveStmt = db.prepare(`
-    SELECT * FROM videos
-    WHERE status = 'ended'
-      AND (@channelId IS NULL OR channel_id = @channelId)
-      AND (
-        @query = ''
-        OR (
-          (@searchTitle   AND title        LIKE '%' || @query || '%' ESCAPE '!')
-          OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
-          OR (@searchDesc    AND description  LIKE '%' || @query || '%' ESCAPE '!')
-        )
-      )
-    ORDER BY COALESCE(ended_at, last_checked_at) DESC
-    LIMIT @limit OFFSET @offset
-  `)
   const listFavoritesStmt = db.prepare(`
     SELECT v.* FROM videos v
     LEFT JOIN channels c ON v.channel_id = c.id
@@ -256,22 +241,83 @@ export function createVideoRepository(db) {
       offset = 0,
       query = '',
       channelId = null,
+      channelIds = null,
+      videoType = 'all',
+      periodStart = null,
+      periodEnd = null,
+      sort = 'newest',
       title = true,
       channel = true,
       description = false
     } = {}) {
       const likeQuery = escapeLikeQuery(query)
-      return listArchiveStmt
-        .all({
-          limit,
-          offset,
-          query: likeQuery,
-          channelId: channelId && channelId !== 'all' ? channelId : null,
-          searchTitle: title ? 1 : 0,
-          searchChannel: channel ? 1 : 0,
-          searchDesc: description ? 1 : 0
+      const params = {
+        limit,
+        offset,
+        query: likeQuery,
+        searchTitle: title ? 1 : 0,
+        searchChannel: channel ? 1 : 0,
+        searchDesc: description ? 1 : 0
+      }
+      const where = [`status = 'ended'`]
+
+      // チャンネル絞り込み: channelIds（複数）を優先、無ければ channelId（単一・後方互換）
+      const ids =
+        Array.isArray(channelIds) && channelIds.length > 0
+          ? channelIds
+          : channelId && channelId !== 'all'
+            ? [channelId]
+            : []
+      if (ids.length > 0) {
+        const placeholders = ids.map((_, i) => `@ch${i}`).join(', ')
+        where.push(`channel_id IN (${placeholders})`)
+        ids.forEach((id, i) => {
+          params[`ch${i}`] = id
         })
-        .map(rowToVideo)
+      }
+
+      // 配信タイプ
+      if (videoType === 'live-done') {
+        where.push(`actual_start_time IS NOT NULL`)
+      } else if (videoType === 'didnt-air') {
+        where.push(`actual_start_time IS NULL AND scheduled_start_time IS NOT NULL`)
+      }
+
+      // 期間（ended_at 基準、欠損時は last_checked_at にフォールバック）
+      if (typeof periodStart === 'number') {
+        where.push(`COALESCE(ended_at, last_checked_at) >= @periodStart`)
+        params.periodStart = periodStart
+      }
+      if (typeof periodEnd === 'number') {
+        where.push(`COALESCE(ended_at, last_checked_at) <= @periodEnd`)
+        params.periodEnd = periodEnd
+      }
+
+      // テキスト検索
+      where.push(`(
+        @query = ''
+        OR (
+          (@searchTitle AND title LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchDesc AND description LIKE '%' || @query || '%' ESCAPE '!')
+        )
+      )`)
+
+      const orderBy =
+        {
+          newest: `COALESCE(ended_at, last_checked_at) DESC`,
+          oldest: `COALESCE(ended_at, last_checked_at) ASC`,
+          channel: `channel_title COLLATE NOCASE ASC, COALESCE(ended_at, last_checked_at) DESC`,
+          duration: `duration IS NULL, duration DESC`
+        }[sort] ?? `COALESCE(ended_at, last_checked_at) DESC`
+
+      const sql = `
+        SELECT * FROM videos
+        WHERE ${where.join(' AND ')}
+        ORDER BY ${orderBy}
+        LIMIT @limit OFFSET @offset
+      `
+      return db.prepare(sql).all(params).map(rowToVideo)
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
