@@ -7,6 +7,7 @@ export function useSchedule() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dbBroken, setDbBroken] = useState(false)
+  const [initialLoaded, setInitialLoaded] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,6 +34,7 @@ export function useSchedule() {
       setError(e.message ?? 'FETCH_FAILED')
     } finally {
       setLoading(false)
+      setInitialLoaded(true)
     }
   }, [])
 
@@ -61,5 +63,15 @@ export function useSchedule() {
     setFeedVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
   }
 
-  return { live, upcoming, feedVideos, loading, error, dbBroken, refresh, updateVideo }
+  return {
+    live,
+    upcoming,
+    feedVideos,
+    loading,
+    error,
+    dbBroken,
+    initialLoaded,
+    refresh,
+    updateVideo
+  }
 }

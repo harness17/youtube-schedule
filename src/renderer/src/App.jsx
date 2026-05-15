@@ -90,8 +90,17 @@ export default function App() {
   }, [])
 
   // ===== コアフック ===========================================================
-  const { live, upcoming, feedVideos, loading, error, dbBroken, refresh, updateVideo } =
-    useSchedule()
+  const {
+    live,
+    upcoming,
+    feedVideos,
+    loading,
+    error,
+    dbBroken,
+    initialLoaded,
+    refresh,
+    updateVideo
+  } = useSchedule()
   const {
     isAuthenticated,
     authLoading,
@@ -104,7 +113,13 @@ export default function App() {
     handleImportCredentials
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, live, isAuthenticated: true, reminderMinutes })
+  useNotificationCheck({
+    upcoming,
+    live,
+    isAuthenticated: true,
+    initialLoaded,
+    reminderMinutes
+  })
 
   async function handleReminderMinutesChange(value) {
     const next = normalizeReminderMinutes(value)
