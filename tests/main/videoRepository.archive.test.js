@@ -45,18 +45,15 @@ describe('listArchive filters and sort', () => {
     expect(rows.map((r) => r.id).sort()).toEqual(['a', 'c'])
   })
 
-  it('filters by video type live-done (actual_start_time present)', () => {
-    insertEndedVideo(repo, { id: 'aired', actualStartTime: 5000 })
-    insertEndedVideo(repo, { id: 'notaired', actualStartTime: null, scheduledStartTime: 5000 })
-    const rows = repo.listArchive({ videoType: 'live-done' })
-    expect(rows.map((r) => r.id)).toEqual(['aired'])
-  })
-
-  it('filters by video type didnt-air', () => {
-    insertEndedVideo(repo, { id: 'aired', actualStartTime: 5000 })
-    insertEndedVideo(repo, { id: 'notaired', actualStartTime: null, scheduledStartTime: 5000 })
-    const rows = repo.listArchive({ videoType: 'didnt-air' })
-    expect(rows.map((r) => r.id)).toEqual(['notaired'])
+  it('always excludes cancelled scheduled streams but keeps aired streams and normal uploads', () => {
+    // 配信されたライブ（actual あり）→ 残す
+    insertEndedVideo(repo, { id: 'aired', actualStartTime: 5000, scheduledStartTime: 4000 })
+    // 流れた配信（予約枠あり・未配信）→ 除外
+    insertEndedVideo(repo, { id: 'cancelled', actualStartTime: null, scheduledStartTime: 5000 })
+    // 通常アップロード（actual も scheduled も無し）→ 残す
+    insertEndedVideo(repo, { id: 'upload', actualStartTime: null, scheduledStartTime: null })
+    const rows = repo.listArchive({})
+    expect(rows.map((r) => r.id).sort()).toEqual(['aired', 'upload'])
   })
 
   it('filters by period (ended_at within range)', () => {

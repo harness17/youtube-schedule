@@ -421,7 +421,14 @@ describe('VideoRepository', () => {
   it('listArchive returns ended videos sorted by ended_at desc with paging', () => {
     const base = 1_700_000_000_000
     for (let i = 0; i < 5; i += 1) {
-      repo.upsert(sampleVideo({ id: `e${i}`, status: 'ended', lastCheckedAt: base - i * 1000 }))
+      repo.upsert(
+        sampleVideo({
+          id: `e${i}`,
+          status: 'ended',
+          scheduledStartTime: null,
+          lastCheckedAt: base - i * 1000
+        })
+      )
     }
     const page = repo.listArchive({ limit: 2, offset: 0 })
     expect(page.map((v) => v.id)).toEqual(['e0', 'e1'])
@@ -437,6 +444,7 @@ describe('VideoRepository', () => {
           id: `other${i}`,
           channelId: 'UCother',
           status: 'ended',
+          scheduledStartTime: null,
           lastCheckedAt: base - i * 1000
         })
       )
@@ -447,6 +455,7 @@ describe('VideoRepository', () => {
           id: `target${i}`,
           channelId: 'UCtarget',
           status: 'ended',
+          scheduledStartTime: null,
           lastCheckedAt: base - (10 + i) * 1000
         })
       )
@@ -467,6 +476,7 @@ describe('VideoRepository', () => {
         channelId: 'UCtarget',
         title: '耐久歌枠',
         status: 'ended',
+        scheduledStartTime: null,
         lastCheckedAt: base
       })
     )
@@ -476,6 +486,7 @@ describe('VideoRepository', () => {
         channelId: 'UCother',
         title: '耐久歌枠',
         status: 'ended',
+        scheduledStartTime: null,
         lastCheckedAt: base - 1000
       })
     )
@@ -485,6 +496,7 @@ describe('VideoRepository', () => {
         channelId: 'UCtarget',
         title: '耐久雑談',
         status: 'ended',
+        scheduledStartTime: null,
         lastCheckedAt: base - 2000
       })
     )
@@ -646,8 +658,22 @@ describe('VideoRepository', () => {
 
   it('listArchive は ended_at 降順で返す（優先ソートなし）', () => {
     const now = 1_700_000_000_000
-    repo.upsert(sampleVideo({ id: 'older', status: 'ended', lastCheckedAt: now - 2000 }))
-    repo.upsert(sampleVideo({ id: 'newer', status: 'ended', lastCheckedAt: now - 1000 }))
+    repo.upsert(
+      sampleVideo({
+        id: 'older',
+        status: 'ended',
+        scheduledStartTime: null,
+        lastCheckedAt: now - 2000
+      })
+    )
+    repo.upsert(
+      sampleVideo({
+        id: 'newer',
+        status: 'ended',
+        scheduledStartTime: null,
+        lastCheckedAt: now - 1000
+      })
+    )
 
     const ids = repo.listArchive().map((v) => v.id)
     expect(ids[0]).toBe('newer')

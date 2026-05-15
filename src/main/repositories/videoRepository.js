@@ -242,7 +242,6 @@ export function createVideoRepository(db) {
       query = '',
       channelId = null,
       channelIds = null,
-      videoType = 'all',
       periodStart = null,
       periodEnd = null,
       sort = 'newest',
@@ -276,12 +275,9 @@ export function createVideoRepository(db) {
         })
       }
 
-      // 配信タイプ
-      if (videoType === 'live-done') {
-        where.push(`actual_start_time IS NOT NULL`)
-      } else if (videoType === 'didnt-air') {
-        where.push(`actual_start_time IS NULL AND scheduled_start_time IS NOT NULL`)
-      }
+      // 流れた配信（予約枠はあったが配信されなかったもの）は常に除外する。
+      // 通常のアップロード動画（actual も scheduled も無い）は除外しない。
+      where.push(`NOT (actual_start_time IS NULL AND scheduled_start_time IS NOT NULL)`)
 
       // 期間（ended_at 基準、欠損時は last_checked_at にフォールバック）
       if (typeof periodStart === 'number') {
