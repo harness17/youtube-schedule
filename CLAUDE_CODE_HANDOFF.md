@@ -42,9 +42,28 @@ status: active
 - リリースワークフローは tag push で動くため手動テスト不要、差分レビューのみ
 - Merge は Claude が行う（Codex は push までで止める）
 
+### レビュー結果（2026-05-15, Claude）
+
+- 公開可否: 🟡 軽微指摘あり、合意済みで merge 候補
+- ワークフロー変更（v4→v5）: 🟢 完璧、SignPath@v1 維持も依頼通り
+- セルフ verify: 🟢 lint / test / build 全 pass
+- 重大指摘:
+  - 🔴 スコープ違反: `.agents/skills/release/SKILL.md` と `.agents/skills/verify/SKILL.md` を依頼範囲外で生成。Codex に判断確認（task-mp6hhart-iittdc）→「両方不要」判定で削除済み
+- 軽微指摘:
+  - 🟡 Codex 環境の git 権限エラーは原因未追跡。次回タスクで再発するなら調査
+- 反映:
+  - Codex がスコープ違反 2 ファイルを削除（自己判断、durable な所有権境界判断として Codex 側で記録）
+  - Claude が `feature/upgrade-actions-v5` を develop から切って commit (`3b277bc`)
+
+### Merge ゲート 4 条件
+| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
+|---------|-------------|----------|-------------|
+| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
+
 ### 次アクション
 
-- Git 権限復旧後、`feature/upgrade-actions-v5` 作成・commit・push。その後 Claude によるレビュー
+- ユーザーの merge 指示を待つ
+- 指示後: `feature/upgrade-actions-v5` を develop へ merge → Phase 1 Task C / Task D に進む
 
 ---
 
