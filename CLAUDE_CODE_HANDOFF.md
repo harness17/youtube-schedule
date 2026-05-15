@@ -8,6 +8,41 @@ status: active
 
 ---
 
+## 2026-05-15 — Phase 1 クロージング（Claude）
+
+- 対象: develop
+- 作成者: ClaudeCode
+- 主題: Phase 1（v1.14.2 軽量化パス）の完了報告
+
+### 完了タスク
+
+| Task | 結果 | 関連 commit |
+|------|------|-----------|
+| A: GitHub Actions v5 移行 | ✅ Codex 実装、Claude merge | `3b277bc` → merged in `f6d8f9a` |
+| C: useEffect 警告解消 | ✅ no-op（既に解消済み、lint clean） | — |
+| D: `feature/membership` 処理 | ✅ ローカル削除、origin 保持（Phase 2c 参照用） | — |
+| 追加: 通知暴発修正（ユーザー直 commit） | ✅ | `21bcb1f` |
+
+### リリース判断
+
+- v1.14.2 は単独リリースせず、**Phase 2a（アーカイブ絞り込み・ソート）と束ねて v1.15.0 でリリース**することにユーザー決定
+- 通知暴発修正は影響あるが、Phase 2a 完了まで develop に積んだ状態で待機
+
+### Phase 1 で得たハーネス運用学習
+
+- Codex CLI / broker のバージョン整合性: CLI 上げたら broker も再起動必須（`broker.json` 削除）
+- Codex 環境では `.git/*.lock` で Permission denied が出る → **commit は Claude が代行**する非対称分担で運用
+- スコープ違反（依頼外ファイル生成）は Codex 自己判断ループで解消できた（`task-mp6hhart-iittdc`）
+- merge ゲート 4 条件はワークフロー的に機能した
+
+### 次アクション
+
+- Phase 2a（アーカイブ絞り込み・ソート強化）の設計に進む
+- Claude が migration 必要性・`contentDetails.duration` 取得タイミング・UI 設計を判断
+- 実装は Codex に分割依頼予定
+
+---
+
 ## 2026-05-15 — Phase 1 Task A 依頼（Claude → Codex）
 
 - 対象: feature/upgrade-actions-v5
