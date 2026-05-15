@@ -8,6 +8,37 @@ status: active
 
 ---
 
+## 2026-05-15 — Phase 1 Task A 依頼（Claude → Codex）
+
+- 対象: feature/upgrade-actions-v5
+- 作成者: ClaudeCode
+- 主題: GitHub Actions の Node 20 deprecation 対応（v4 → v5 系移行）
+- 変更ファイル:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/release.yml`
+- レビュー担当: ClaudeCode
+- 触ってよい範囲: `.github/workflows/` 配下のみ
+- セルフ verify: ❌ 未実施
+- 実動確認: N/A
+- レビュー観点:
+  - `actions/checkout@v4` → `@v5`、`actions/setup-node@v4` → `@v5`、`upload-artifact@v4` → `@v5`
+  - `SignPath/github-action-submit-signing-request@v1` は変更不要（最新確認のみ）
+  - workflow ファイルの YAML 構文エラーなし
+  - CI が develop で green
+
+### 完成条件（スプリントコントラクト）
+
+- `.github/workflows/ci.yml` と `release.yml` の `actions/checkout` / `actions/setup-node` / `upload-artifact` がすべて v5 系
+- workflow_dispatch でも push でも CI が green
+- リリースワークフローは tag push で動くため手動テスト不要、差分レビューのみ
+- Merge は Claude が行う（Codex は push までで止める）
+
+### 次アクション
+
+- Codex が `feature/upgrade-actions-v5` ブランチで実装
+
+---
+
 ## 2026-05-15 — Phase 0 完了通知（Claude 作成）
 
 - 対象: develop
