@@ -23,9 +23,9 @@ jobs:
       # Node.js 24 で動作するよう明示指定（2026年6月以降は強制適用）
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -40,7 +40,7 @@ jobs:
       # SignPath がアーティファクトを取得するために GitHub Actions artifact としてアップロード
       - name: Upload unsigned installer as artifact
         id: upload-unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: unsigned-installer
           path: dist/*-setup.exe

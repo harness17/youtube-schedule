@@ -18,13 +18,22 @@ status: active
   - `.github/workflows/release.yml`
 - レビュー担当: ClaudeCode
 - 触ってよい範囲: `.github/workflows/` 配下のみ
-- セルフ verify: ❌ 未実施
+- セルフ verify: ✅ `npm run lint` / `npm run test` / `npm run build` pass（2026-05-15 Codex）
 - 実動確認: N/A
 - レビュー観点:
   - `actions/checkout@v4` → `@v5`、`actions/setup-node@v4` → `@v5`、`upload-artifact@v4` → `@v5`
   - `SignPath/github-action-submit-signing-request@v1` は変更不要（最新確認のみ）
   - workflow ファイルの YAML 構文エラーなし
   - CI が develop で green
+
+### Codex 実装メモ
+
+- `.github/workflows/ci.yml`: `actions/checkout` / `actions/setup-node` を v5 に更新
+- `.github/workflows/release.yml`: `actions/checkout` / `actions/setup-node` / `actions/upload-artifact` を v5 に更新
+- `SignPath/github-action-submit-signing-request@v1` は依頼通り据え置き
+  - 公式ドキュメントでは `@v2` の例を確認済みだが、このタスクでは変更対象外
+- verify 補足: 初回 `npm run test` は npm cache 書き込み権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
+- Git 操作補足: Codex 環境で `.git/FETCH_HEAD` / `.git/refs/...lock` / `.git/index.lock` が Permission denied となり、`git pull` / ブランチ作成 / stage / commit / push は未完了
 
 ### 完成条件（スプリントコントラクト）
 
@@ -35,7 +44,7 @@ status: active
 
 ### 次アクション
 
-- Codex が `feature/upgrade-actions-v5` ブランチで実装
+- Git 権限復旧後、`feature/upgrade-actions-v5` 作成・commit・push。その後 Claude によるレビュー
 
 ---
 
