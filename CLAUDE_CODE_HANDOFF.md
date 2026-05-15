@@ -23,7 +23,7 @@ status: active
   - `src/preload/index.js`（必要なら）
   - `tests/renderer/ArchiveFilterBar.test.jsx`（新規）
 - 触ってはいけない範囲: `src/main/db/`, `src/main/repositories/`, `src/main/fetchers/`, `src/main/services/`（Task 1-5 で Claude が実装済み、契約は確定）
-- セルフ verify: ❌ 未実施
+- セルフ verify: ✅ `npm run lint` / `npm run test` / `npm run build` pass（2026-05-15 Codex）
 - 実動確認: N/A（Claude が後で Playwright 実施）
 
 ### 前提（Claude 実装済みのバックエンド契約）
@@ -39,6 +39,14 @@ status: active
 - 既存テスト 238 件を壊していないか
 - Prettier 設定（singleQuote / no semi / printWidth 100）準拠
 
+### Codex 実装メモ
+
+- `ArchiveFilterBar` と renderer テストを追加（折り畳み、active filter count、sort/type 変更を確認）
+- `useTabState` に `archiveFilters` / `archiveSort`、period → epoch 変換、archive 再取得、electron-store 永続化を追加
+- `settings:get` / `settings:set` と preload は汎用公開済みのため変更なし
+- `App.jsx` に ArchiveFilterBar を配線し、アーカイブタブでは既存の単一チャンネルドロップダウンを非表示化
+- verify 補足: 初回 `npm run test -- ArchiveFilterBar` は既知の npm cache 権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
+
 ### 完成条件（スプリントコントラクト）
 
 - 折り畳み式 `ArchiveFilterBar` がアーカイブタブに表示される
@@ -47,15 +55,24 @@ status: active
 - `npm run lint && npm run test && npm run build` がすべて pass
 - Merge は Claude が行う
 
-### Git について
+### レビュー結果（2026-05-15, Claude）
 
-- Codex 環境では `.git/*.lock` で Permission denied が出る既知問題あり
-- **Codex は git commit/push しなくてよい**。ファイル編集とセルフ verify まで実施し、コミットは Claude が代行する
-- 依頼範囲外のファイル（`.agents/skills/` のミラー等）を作らないこと
+- 公開可否: 🟢 重大指摘なし
+- 動作・契約・テスト・スタイル・スコープ すべて 🟢
+- lint clean / 243 テスト pass / build 成功
+- 良い追加（プラン超え、いずれも妥当として承認）:
+  - `archiveSettingsLoadedRef` ガードで load 完了前の save がデフォルト値で上書きする race を修正
+  - `filteredArchive` を `archiveVideos` に変更し、サーバー側フィルタへ移行後の client 側二重フィルタを除去
+- 軽微指摘: なし
+
+### Merge ゲート 4 条件
+| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
+|---------|-------------|----------|-------------|
+| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
 
 ### 次アクション
 
-- Codex が Task 6-9 を実装 → セルフ verify → Claude がレビュー & コミット
+- Claude が Playwright で実動確認 → ユーザー merge 指示後に develop へ merge
 
 ---
 
