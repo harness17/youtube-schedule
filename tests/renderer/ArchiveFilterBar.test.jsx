@@ -113,13 +113,15 @@ describe('ArchiveFilterBar', () => {
 
   it('shows the reset button when a filter is active and calls onReset', () => {
     const { onReset } = setup({ filters: { ...baseFilters, period: '30d' } })
+    fireEvent.click(screen.getByRole('button', { name: /絞り込み/ }))
     const resetButton = screen.getByRole('button', { name: 'リセット' })
     fireEvent.click(resetButton)
     expect(onReset).toHaveBeenCalled()
   })
 
-  it('shows the reset button when sort is not the default', () => {
+  it('shows the reset button in the expanded panel when sort is not the default', () => {
     setup({ sort: 'duration' })
+    fireEvent.click(screen.getByRole('button', { name: /絞り込み/ }))
     expect(screen.getByRole('button', { name: 'リセット' })).toBeInTheDocument()
   })
 })

@@ -72,41 +72,57 @@ export function ArchiveFilterBar({
   return (
     <div
       style={{
-        marginBottom: '14px',
-        padding: expanded ? '10px 12px' : 0,
-        border: expanded ? '1px solid var(--border)' : 'none',
-        borderRadius: '8px',
-        background: expanded ? 'var(--surface)' : 'transparent'
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        flexShrink: 0
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          type="button"
-          className="yt-nav-btn"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-        >
-          絞り込み{' '}
-          {activeFilterCount > 0 && <span className="yt-tab-badge">{activeFilterCount}</span>}{' '}
-          {expanded ? '▲' : '▼'}
-        </button>
-        {(activeFilterCount > 0 || sort !== 'newest') && (
-          <button type="button" className="yt-nav-btn" onClick={onReset}>
-            リセット
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        className="yt-nav-btn"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        絞り込み{' '}
+        {activeFilterCount > 0 && <span className="yt-tab-badge">{activeFilterCount}</span>}{' '}
+        {expanded ? '▲' : '▼'}
+      </button>
 
       {expanded && (
         <div
           style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            zIndex: 20,
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: '10px',
-            marginTop: '10px',
-            alignItems: 'start'
+            alignItems: 'start',
+            width: 'min(560px, calc(100vw - 48px))',
+            padding: '10px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            background: 'var(--surface)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)'
           }}
         >
+          {(activeFilterCount > 0 || sort !== 'newest') && (
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}
+            >
+              <button type="button" className="yt-nav-btn" onClick={onReset}>
+                リセット
+              </button>
+            </div>
+          )}
+
           <label style={{ display: 'grid', gap: '4px', fontSize: '12px', color: 'var(--sub)' }}>
             並び替え
             <select
