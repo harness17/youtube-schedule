@@ -149,6 +149,7 @@ export default function App() {
     setArchiveFilters,
     archiveSort,
     setArchiveSort,
+    resetArchiveFilters,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,
@@ -547,6 +548,7 @@ export default function App() {
           sort={archiveSort}
           onChangeFilters={setArchiveFilters}
           onChangeSort={setArchiveSort}
+          onReset={resetArchiveFilters}
         />
       )}
 

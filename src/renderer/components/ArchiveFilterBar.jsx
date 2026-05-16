@@ -23,7 +23,14 @@ function toEndOfDayEpoch(value) {
   return Number.isNaN(date.getTime()) ? null : date.getTime()
 }
 
-export function ArchiveFilterBar({ channels, filters, sort, onChangeFilters, onChangeSort }) {
+export function ArchiveFilterBar({
+  channels,
+  filters,
+  sort,
+  onChangeFilters,
+  onChangeSort,
+  onReset
+}) {
   const [expanded, setExpanded] = useState(false)
   const [channelPopoverOpen, setChannelPopoverOpen] = useState(false)
   const [channelSearch, setChannelSearch] = useState('')
@@ -72,16 +79,23 @@ export function ArchiveFilterBar({ channels, filters, sort, onChangeFilters, onC
         background: expanded ? 'var(--surface)' : 'transparent'
       }}
     >
-      <button
-        type="button"
-        className="yt-nav-btn"
-        onClick={() => setExpanded((value) => !value)}
-        aria-expanded={expanded}
-      >
-        絞り込み{' '}
-        {activeFilterCount > 0 && <span className="yt-tab-badge">{activeFilterCount}</span>}{' '}
-        {expanded ? '▲' : '▼'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          type="button"
+          className="yt-nav-btn"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+        >
+          絞り込み{' '}
+          {activeFilterCount > 0 && <span className="yt-tab-badge">{activeFilterCount}</span>}{' '}
+          {expanded ? '▲' : '▼'}
+        </button>
+        {(activeFilterCount > 0 || sort !== 'newest') && (
+          <button type="button" className="yt-nav-btn" onClick={onReset}>
+            リセット
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div
@@ -316,5 +330,6 @@ ArchiveFilterBar.propTypes = {
   }).isRequired,
   sort: PropTypes.oneOf(['newest', 'oldest', 'channel', 'duration']).isRequired,
   onChangeFilters: PropTypes.func.isRequired,
-  onChangeSort: PropTypes.func.isRequired
+  onChangeSort: PropTypes.func.isRequired,
+  onReset: PropTypes.func.isRequired
 }
