@@ -12,6 +12,7 @@ export function useNotificationCheck({
   upcoming,
   live = [],
   isAuthenticated,
+  initialLoaded = false,
   reminderMinutes = DEFAULT_REMINDER_MINUTES
 }) {
   const upcomingRef = useRef(upcoming)
@@ -35,6 +36,11 @@ export function useNotificationCheck({
       return
     }
 
+    // 初回ロードが完了するまでは baseline を確立しない。
+    // 空配列の初期状態を baseline にしてしまうと、その直後に DB から
+    // 復元された live が「新規開始」と誤判定され通知が暴発する。
+    if (!initialLoaded) return
+
     const currentLiveIds = new Set(live.map((item) => item.id))
     if (!liveBaselineSyncedRef.current) {
       knownLiveIdsRef.current = currentLiveIds
@@ -54,7 +60,7 @@ export function useNotificationCheck({
     }
 
     knownLiveIdsRef.current = currentLiveIds
-  }, [live, isAuthenticated])
+  }, [live, isAuthenticated, initialLoaded])
 
   useEffect(() => {
     if (!isAuthenticated) return

@@ -22,8 +22,14 @@ const baseUpcoming = {
   isNotify: true
 }
 
-function HookHost({ upcoming = [], live = [], isAuthenticated = true, reminderMinutes = 5 }) {
-  useNotificationCheck({ upcoming, live, isAuthenticated, reminderMinutes })
+function HookHost({
+  upcoming = [],
+  live = [],
+  isAuthenticated = true,
+  initialLoaded = true,
+  reminderMinutes = 5
+}) {
+  useNotificationCheck({ upcoming, live, isAuthenticated, initialLoaded, reminderMinutes })
   return null
 }
 
@@ -31,6 +37,7 @@ HookHost.propTypes = {
   upcoming: PropTypes.array,
   live: PropTypes.array,
   isAuthenticated: PropTypes.bool,
+  initialLoaded: PropTypes.bool,
   reminderMinutes: PropTypes.number
 }
 
@@ -74,6 +81,16 @@ describe('useNotificationCheck', () => {
     rerender(<HookHost live={[{ ...item, concurrentViewers: 1200 }]} />)
 
     expect(window.api.showNotification).toHaveBeenCalledTimes(1)
+  })
+
+  it('initialLoaded=false の間に live がロードされても起動時通知を出さない', () => {
+    const item = { ...baseLive, isNotify: true }
+    // 起動直後: useSchedule の初期 live=[] かつ initialLoaded=false
+    const { rerender } = render(<HookHost live={[]} initialLoaded={false} />)
+    // ロード完了で DB に残っていた live がそのまま入ってくる
+    rerender(<HookHost live={[item]} initialLoaded={true} />)
+
+    expect(window.api.showNotification).not.toHaveBeenCalled()
   })
 
   it('未認証中は live 配信が入っても通知を出さない', () => {

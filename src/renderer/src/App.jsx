@@ -13,6 +13,7 @@ import BackToTop from '../components/BackToTop.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
 import SimpleModeEmptyScreen from '../components/SimpleModeEmptyScreen.jsx'
 import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
+import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
@@ -90,8 +91,17 @@ export default function App() {
   }, [])
 
   // ===== コアフック ===========================================================
-  const { live, upcoming, feedVideos, loading, error, dbBroken, refresh, updateVideo } =
-    useSchedule()
+  const {
+    live,
+    upcoming,
+    feedVideos,
+    loading,
+    error,
+    dbBroken,
+    initialLoaded,
+    refresh,
+    updateVideo
+  } = useSchedule()
   const {
     isAuthenticated,
     authLoading,
@@ -104,7 +114,13 @@ export default function App() {
     handleImportCredentials
   } = useAuth({ onAuthenticated: refresh })
   const { darkMode, setDarkMode } = useDarkMode()
-  useNotificationCheck({ upcoming, live, isAuthenticated: true, reminderMinutes })
+  useNotificationCheck({
+    upcoming,
+    live,
+    isAuthenticated: true,
+    initialLoaded,
+    reminderMinutes
+  })
 
   async function handleReminderMinutesChange(value) {
     const next = normalizeReminderMinutes(value)
@@ -129,6 +145,11 @@ export default function App() {
     searchQuery,
     selectedChannel,
     setSelectedChannel,
+    archiveFilters,
+    setArchiveFilters,
+    archiveSort,
+    setArchiveSort,
+    resetArchiveFilters,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,
@@ -264,6 +285,8 @@ export default function App() {
   const inputBorder = darkMode ? '#2a2a38' : '#dddde8'
   const subBtnBg = darkMode ? '#1e1e2c' : '#ebebf5'
   const subBtnColor = darkMode ? '#8888b0' : '#555570'
+  const archiveHasActiveFilters =
+    archiveFilters.channelIds.length > 0 || archiveFilters.period !== 'all'
 
   // ===== 共通カード描画ハーネス =================================================
   /**
@@ -454,7 +477,7 @@ export default function App() {
             }}
           />
         </div>
-        {tabChannels.length > 1 && (
+        {activeTab !== 'archive' && tabChannels.length > 1 && (
           <div
             style={{
               display: 'flex',
@@ -517,6 +540,17 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {activeTab === 'archive' && (
+        <ArchiveFilterBar
+          channels={tabChannels}
+          filters={archiveFilters}
+          sort={archiveSort}
+          onChangeFilters={setArchiveFilters}
+          onChangeSort={setArchiveSort}
+          onReset={resetArchiveFilters}
+        />
+      )}
 
       {/* ── タブバー（ピル型）+ お気に入りセクションナビ ── */}
       <div
@@ -760,9 +794,9 @@ export default function App() {
             </div>
           ) : filteredArchive.length === 0 ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
-              {selectedChannel !== 'all' && !searchQuery.trim()
-                ? 'このチャンネルの配信はありません'
-                : searchQuery.trim() || selectedChannel !== 'all'
+              {archiveHasActiveFilters && !searchQuery.trim()
+                ? '条件に一致するアーカイブはありません'
+                : searchQuery.trim() || archiveHasActiveFilters
                   ? '検索結果がありません'
                   : 'アーカイブがありません'}
             </div>

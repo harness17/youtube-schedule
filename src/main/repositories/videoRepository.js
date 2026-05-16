@@ -8,13 +8,13 @@ export function createVideoRepository(db) {
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at, ended_at, source
+      url, first_seen_at, last_checked_at, ended_at, duration, published_at, source
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
       @url, @firstSeenAt, @lastCheckedAt,
       CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END,
-      @source
+      @duration, @publishedAt, @source
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -28,6 +28,8 @@ export function createVideoRepository(db) {
       concurrent_viewers = excluded.concurrent_viewers,
       url = excluded.url,
       last_checked_at = excluded.last_checked_at,
+      duration = COALESCE(excluded.duration, videos.duration),
+      published_at = COALESCE(excluded.published_at, videos.published_at),
       source = excluded.source,
       ended_at = CASE
         WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
@@ -66,21 +68,6 @@ export function createVideoRepository(db) {
       CASE WHEN c.is_pinned = 1 THEN 0 ELSE 1 END,
       CASE v.status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
       COALESCE(v.actual_start_time, v.scheduled_start_time) DESC
-  `)
-  const listArchiveStmt = db.prepare(`
-    SELECT * FROM videos
-    WHERE status = 'ended'
-      AND (@channelId IS NULL OR channel_id = @channelId)
-      AND (
-        @query = ''
-        OR (
-          (@searchTitle   AND title        LIKE '%' || @query || '%' ESCAPE '!')
-          OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
-          OR (@searchDesc    AND description  LIKE '%' || @query || '%' ESCAPE '!')
-        )
-      )
-    ORDER BY COALESCE(ended_at, last_checked_at) DESC
-    LIMIT @limit OFFSET @offset
   `)
   const listFavoritesStmt = db.prepare(`
     SELECT v.* FROM videos v
@@ -176,6 +163,16 @@ export function createVideoRepository(db) {
   const updateFavoriteOrderStmt = db.prepare(`
     UPDATE videos SET favorite_order = @orderIndex WHERE id = @id AND is_favorite = 1
   `)
+  const backfillTargetIdsStmt = db.prepare(`
+    SELECT id FROM videos
+    WHERE status = 'ended' AND (duration IS NULL OR published_at IS NULL)
+  `)
+  const backfillMetaStmt = db.prepare(`
+    UPDATE videos
+    SET duration = COALESCE(@duration, duration),
+        published_at = COALESCE(@publishedAt, published_at)
+    WHERE id = @id
+  `)
   const saveFavoriteOrderTx = db.transaction((ids) => {
     clearFavoriteOrderStmt.run()
     let orderIndex = 0
@@ -205,6 +202,8 @@ export function createVideoRepository(db) {
       viewedAt: row.viewed_at ?? null,
       favoriteOrder: row.favorite_order ?? null,
       source: row.source ?? 'api',
+      duration: row.duration ?? null,
+      publishedAt: row.published_at ?? null,
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -219,7 +218,12 @@ export function createVideoRepository(db) {
 
   return {
     upsert(video) {
-      upsertStmt.run({ ...video, source: video.source ?? 'api' })
+      upsertStmt.run({
+        ...video,
+        duration: video.duration ?? null,
+        publishedAt: video.publishedAt ?? null,
+        source: video.source ?? 'api'
+      })
     },
     getById(id) {
       return rowToVideo(getByIdStmt.get(id))
@@ -254,25 +258,95 @@ export function createVideoRepository(db) {
       offset = 0,
       query = '',
       channelId = null,
+      channelIds = null,
+      periodStart = null,
+      periodEnd = null,
+      sort = 'newest',
       title = true,
       channel = true,
       description = false
     } = {}) {
       const likeQuery = escapeLikeQuery(query)
-      return listArchiveStmt
-        .all({
-          limit,
-          offset,
-          query: likeQuery,
-          channelId: channelId && channelId !== 'all' ? channelId : null,
-          searchTitle: title ? 1 : 0,
-          searchChannel: channel ? 1 : 0,
-          searchDesc: description ? 1 : 0
+      const params = {
+        limit,
+        offset,
+        query: likeQuery,
+        searchTitle: title ? 1 : 0,
+        searchChannel: channel ? 1 : 0,
+        searchDesc: description ? 1 : 0
+      }
+      const where = [`status = 'ended'`]
+
+      // チャンネル絞り込み: channelIds（複数）を優先、無ければ channelId（単一・後方互換）
+      const ids =
+        Array.isArray(channelIds) && channelIds.length > 0
+          ? channelIds
+          : channelId && channelId !== 'all'
+            ? [channelId]
+            : []
+      if (ids.length > 0) {
+        const placeholders = ids.map((_, i) => `@ch${i}`).join(', ')
+        where.push(`channel_id IN (${placeholders})`)
+        ids.forEach((id, i) => {
+          params[`ch${i}`] = id
         })
-        .map(rowToVideo)
+      }
+
+      // アーカイブは「実際に配信されたライブ・プレミア」のみを対象とする。
+      // actual_start_time が無いもの＝通常アップロード動画・流れた配信（予約のみ）は除外。
+      where.push(`actual_start_time IS NOT NULL`)
+
+      // カードに表示する日付と同じ基準。配信実績 → 投稿日 → 予約 → ended → 最終確認 の順。
+      // 期間フィルタとソートの両方でこの式を使い、表示・絞り込み・並びを一致させる。
+      const dateExpr =
+        'COALESCE(actual_start_time, published_at, scheduled_start_time, ended_at, last_checked_at)'
+
+      // 期間
+      if (typeof periodStart === 'number') {
+        where.push(`${dateExpr} >= @periodStart`)
+        params.periodStart = periodStart
+      }
+      if (typeof periodEnd === 'number') {
+        where.push(`${dateExpr} <= @periodEnd`)
+        params.periodEnd = periodEnd
+      }
+
+      // テキスト検索
+      where.push(`(
+        @query = ''
+        OR (
+          (@searchTitle AND title LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchChannel AND channel_title LIKE '%' || @query || '%' ESCAPE '!')
+          OR (@searchDesc AND description LIKE '%' || @query || '%' ESCAPE '!')
+        )
+      )`)
+
+      const orderBy =
+        {
+          newest: `${dateExpr} DESC`,
+          oldest: `${dateExpr} ASC`,
+          channel: `channel_title COLLATE NOCASE ASC, ${dateExpr} DESC`,
+          duration: `duration IS NULL, duration DESC`
+        }[sort] ?? `${dateExpr} DESC`
+
+      const sql = `
+        SELECT * FROM videos
+        WHERE ${where.join(' AND ')}
+        ORDER BY ${orderBy}
+        LIMIT @limit OFFSET @offset
+      `
+      return db.prepare(sql).all(params).map(rowToVideo)
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
+    },
+    // duration / published_at が未取得の ended 動画 ID を返す（バックフィル対象）
+    listBackfillTargetIds() {
+      return backfillTargetIdsStmt.all().map((row) => row.id)
+    },
+    // duration / published_at のみを更新する。null は既存値を保持（COALESCE）
+    backfillMeta(id, { duration = null, publishedAt = null } = {}) {
+      backfillMetaStmt.run({ id, duration, publishedAt })
     },
     listFeed(limit = 50) {
       return listFeedStmt.all({ limit }).map(rowToVideo)

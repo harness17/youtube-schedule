@@ -1,4 +1,5 @@
 import { deriveStatus } from './videoStatus.js'
+import { parseDuration } from '../lib/parseDuration.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
@@ -6,6 +7,7 @@ const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000
 const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const CLEANUP_META_KEY = 'last_cleanup_at'
+const ARCHIVE_BACKFILL_META_KEY = 'archive_backfill_done'
 
 function chunk(arr, size) {
   const out = []
@@ -37,6 +39,8 @@ function toVideoRecord(v, now) {
     url: `https://www.youtube.com/watch?v=${v.id}`,
     firstSeenAt: now,
     lastCheckedAt: now,
+    duration: parseDuration(v.contentDetails?.duration),
+    publishedAt: v.snippet.publishedAt ? new Date(v.snippet.publishedAt).getTime() : null,
     source: 'api'
   }
 }
@@ -57,6 +61,8 @@ function toRssVideoRecord(entry, channel, now) {
     url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
     firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
     lastCheckedAt: now,
+    duration: null,
+    publishedAt: Number.isNaN(feedTime) ? null : feedTime,
     source: 'rss'
   }
 }
@@ -258,7 +264,46 @@ export function createSchedulerService({
     metaRepo.set(CLEANUP_META_KEY, String(now), now)
   }
 
+  // 既存アーカイブの duration / published_at を一度だけ補完する。
+  // migration 008/009 より前に ended 化した動画はこれらが NULL のため、
+  // videos.list（1ユニット/50件）でまとめて取得して埋める。
+  async function backfillArchiveMeta() {
+    if (metaRepo.get(ARCHIVE_BACKFILL_META_KEY)) {
+      return { skipped: 'already-done' }
+    }
+    if (!authClient) {
+      return { skipped: 'no-auth' }
+    }
+    const ids = videoRepo.listBackfillTargetIds()
+    if (ids.length === 0) {
+      metaRepo.set(ARCHIVE_BACKFILL_META_KEY, '1')
+      return { skipped: 'nothing-to-backfill' }
+    }
+    const yt = ytFactory(authClient)
+    let updated = 0
+    try {
+      for (const batch of chunk(ids, 50)) {
+        const details = await videoFetcher.fetch(yt, batch)
+        for (const v of details) {
+          videoRepo.backfillMeta(v.id, {
+            duration: parseDuration(v.contentDetails?.duration),
+            publishedAt: v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : null
+          })
+          updated += 1
+        }
+      }
+    } catch (err) {
+      // クォータ超過・タイムアウト等。フラグは立てず次回再開する
+      logger.error('scheduler.backfill.error', { candidates: ids.length, updated, error: err })
+      return { aborted: true, updated }
+    }
+    metaRepo.set(ARCHIVE_BACKFILL_META_KEY, '1')
+    logger.info('scheduler.backfill.done', { candidates: ids.length, updated })
+    return { done: true, candidates: ids.length, updated }
+  }
+
   return {
+    backfillArchiveMeta,
     async refresh(opts = {}) {
       if (inFlight) {
         logger.info('scheduler.refresh.deduplicated', {})
