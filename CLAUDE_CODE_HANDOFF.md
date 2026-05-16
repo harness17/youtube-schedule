@@ -1,10 +1,90 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-15
+最終更新: 2026-05-17
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、役割分担と merge ゲートは `.claude/rules/cross-agent-review.md` を参照。
+
+---
+
+## 2026-05-17 — Phase 2c-1 完了・API 検証結果（Claude）
+
+- 対象: feature/manual-membership-video
+- 作成者: ClaudeCode
+- 主題: Phase 2c-1（手動メン限動画登録）Task 1-10 の完了報告と API 検証結果
+
+### 実装完了（Task 1-9）
+
+migration 010・resolveVideoId・is_membership_only 配線・addManualVideo・videos:addManual IPC・スケジューラ追跡・設定 UI（📺 メンバー限定タブ）・🔒 バッジ・メン限非表示トグルをすべて実装。lint clean / 268 テスト pass / build 成功。
+
+### Task 10 検証結果
+
+- **手動登録の実機確認: ✅ 動作**。ユーザーが実機で動画を手動登録し表示を確認。その過程で 2 件のバグを発見・修正済み（メン限バッジの折り返し、見逃しタブのバッジ件数がメン限非表示時もメン限を数える不整合）
+- **`search.list` のメン限可視性検証: ⛔ 未検証**。検証にはメンバー限定の「予約配信」が現存するチャンネルが必要だが、検証時点で対象が見つからず実施不可
+
+### Plan 2c-2 への申し送り
+
+`search.list eventType:upcoming` がメン限予約配信を返すかは未検証のまま。Plan 2c-2（メン限チャンネル自動巡回）に着手する際は、まず対象（メン限予約配信のあるチャンネル）が手元にある状態で `search.list` 検証を再実施すること。返さないことが判明した場合、自動巡回はクォータ 100 ユニット/回を消費して空振りするだけになるため、Plan 2c-2 は「登録チャンネルの定期手動更新補助」など別方針へ切り替えを検討する。
+
+### 特記：相互レビュー未実施
+
+Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 回連続即失敗（ブローカー再起動でも回復せず）。フロント Task 7-9 も Claude が直接実装した。merge ゲート② 相互レビューは未実施で、ユーザーがそれを承知の上で merge を判断した。codex-companion の不調は別途調査が必要。
+
+### 次アクション
+
+- `feature/manual-membership-video` を develop へ merge
+- v1.16.0 リリース判断はユーザーに仰ぐ
+
+---
+
+## 2026-05-16 — Phase 2c-1 Task 7-9 依頼（Claude → Codex）
+
+- 対象: feature/manual-membership-video
+- 作成者: ClaudeCode
+- 主題: メン限動画手動登録のフロントエンド（設定 UI・🔒 バッジ・表示フィルタ）
+- レビュー担当: ClaudeCode
+- 実装プラン: `docs/superpowers/plans/2026-05-16-phase2c-1-manual-membership.md` の **Task 7・8・9**
+- 触ってよい範囲:
+  - `src/renderer/components/SettingsModal.jsx`
+  - `src/renderer/components/ScheduleCard.jsx`
+  - `src/renderer/hooks/useTabState.js`
+  - `src/renderer/src/App.jsx`
+- 触ってはいけない範囲: `src/main/`（Claude が Task 1-6 で実装済み、契約確定）
+- セルフ verify: ❌ 未実施
+- 実動確認: N/A（Claude が後で Playwright 実施）
+
+### 前提（Claude 実装済みのバックエンド契約）
+
+- `window.api.addManualVideo(input)` が使える。返り値は `{ ok: true, video }` または `{ ok: false, error }`
+  - error コード: `INVALID_INPUT` / `NOT_AUTHENTICATED` / `NOT_FOUND` / `FETCH_FAILED`
+- 動画 `item` に `item.isMembershipOnly`（boolean）が乗る（`rowToVideo` 経由）
+- `window.api.getSetting` / `setSetting` は汎用キーで使える
+
+### レビュー観点
+
+- プラン Task 7-9 の完成条件を満たしているか
+- error コードの日本語変換がプラン通りか
+- 既存テスト 268 件を壊していないか
+- Prettier 準拠（singleQuote / no semi / printWidth 100）
+
+### 完成条件（スプリントコントラクト）
+
+- 設定に「📺 メンバー限定」タブ＋ URL/ID 手動追加 UI（成功・各エラー表示）
+- `ScheduleCard` にメン限動画の 🔒 バッジ
+- メン限動画を一覧から隠すトグル（`hideMembershipVideos`、electron-store 永続化）
+- `npm run lint && npm run test && npm run build` がすべて pass
+- Merge は Claude が行う
+
+### Git について
+
+- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
+- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
+- 範囲外ファイルを作らない
+
+### 次アクション
+
+- Codex が Task 7-9 を実装 → セルフ verify → Claude がレビュー & コミット
 
 ---
 

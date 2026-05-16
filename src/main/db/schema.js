@@ -7,5 +7,6 @@ import * as m006 from './migrations/006_favorite_order.js'
 import * as m007 from './migrations/007_video_source.js'
 import * as m008 from './migrations/008_video_duration.js'
 import * as m009 from './migrations/009_video_published_at.js'
+import * as m010 from './migrations/010_membership_flag.js'
 
-export const migrations = [m001, m002, m003, m004, m005, m006, m007, m008, m009]
+export const migrations = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010]

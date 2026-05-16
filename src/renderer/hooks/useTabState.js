@@ -55,6 +55,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   const [selectedChannel, setSelectedChannel] = useState('all')
   const [archiveFilters, setArchiveFilters] = useState(DEFAULT_ARCHIVE_FILTERS)
   const [archiveSort, setArchiveSort] = useState('newest')
+  const [hideMembershipVideos, setHideMembershipVideos] = useState(false)
   const [favoriteReorderMode, setFavoriteReorderMode] = useState(false)
   const [favoriteOrderDirty, setFavoriteOrderDirty] = useState(false)
   const [favoriteOrderSaving, setFavoriteOrderSaving] = useState(false)
@@ -113,6 +114,24 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     if (!archiveSettingsLoadedRef.current) return
     window.api.setSetting?.('archiveFilters', { filters: archiveFilters, sort: archiveSort })
   }, [archiveFilters, archiveSort])
+
+  // 起動時にメン限非表示設定を復元
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const saved = await window.api.getSetting?.('hideMembershipVideos', false)
+      if (!cancelled) setHideMembershipVideos(saved === true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // メン限非表示トグル。即座に electron-store へ保存する
+  function toggleHideMembershipVideos(next) {
+    setHideMembershipVideos(next)
+    window.api.setSetting?.('hideMembershipVideos', next)
+  }
 
   // アーカイブの絞り込み・並び替えを初期状態に戻す
   function resetArchiveFilters() {
@@ -403,18 +422,32 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   const filterItem = useCallback(
     (item) => {
       const matchesChannel = selectedChannel === 'all' || item.channelId === selectedChannel
-      return matchesQuery(item) && matchesChannel
+      const matchesMembership = !hideMembershipVideos || !item.isMembershipOnly
+      return matchesQuery(item) && matchesChannel && matchesMembership
     },
-    [matchesQuery, selectedChannel]
+    [matchesQuery, selectedChannel, hideMembershipVideos]
   )
 
   const filteredLive = useMemo(() => live.filter(filterItem), [live, filterItem])
   const filteredUpcoming = useMemo(() => upcoming.filter(filterItem), [upcoming, filterItem])
   const filteredMissed = useMemo(() => missedVideos.filter(filterItem), [missedVideos, filterItem])
-  const filteredArchive = useMemo(() => archiveVideos, [archiveVideos])
+  const filteredArchive = useMemo(
+    () => (hideMembershipVideos ? archiveVideos.filter((v) => !v.isMembershipOnly) : archiveVideos),
+    [archiveVideos, hideMembershipVideos]
+  )
   const filteredFavorites = useMemo(
     () => favoriteVideos.filter(filterItem),
     [favoriteVideos, filterItem]
+  )
+
+  // 見逃しタブのバッジ件数。検索・チャンネル絞り込みのような一時フィルタには
+  // 影響されず、永続設定のメン限非表示だけを反映する。
+  const missedBadgeCount = useMemo(
+    () =>
+      hideMembershipVideos
+        ? missedVideos.filter((v) => !v.isMembershipOnly).length
+        : missedVideos.length,
+    [missedVideos, hideMembershipVideos]
   )
 
   /**
@@ -474,6 +507,8 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     archiveSort,
     setArchiveSort,
     resetArchiveFilters,
+    hideMembershipVideos,
+    toggleHideMembershipVideos,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,
@@ -490,6 +525,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     filteredMissed,
     filteredArchive,
     filteredFavorites,
+    missedBadgeCount,
     favoriteSections,
     missedSections,
     // ハンドラ
