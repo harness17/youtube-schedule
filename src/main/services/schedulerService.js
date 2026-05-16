@@ -1,5 +1,6 @@
 import { deriveStatus } from './videoStatus.js'
 import { parseDuration } from '../lib/parseDuration.js'
+import { resolveVideoId } from '../lib/resolveVideoId.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
@@ -302,8 +303,43 @@ export function createSchedulerService({
     return { done: true, candidates: ids.length, updated }
   }
 
+  // URL/ID で指定された動画を手動登録する。メンバー限定配信など
+  // RSS・購読 API で自動検出できない動画を追跡対象に加えるために使う。
+  async function addManualVideo(input) {
+    const videoId = resolveVideoId(input)
+    if (!videoId) {
+      return { ok: false, error: 'INVALID_INPUT' }
+    }
+    if (!authClient) {
+      return { ok: false, error: 'NOT_AUTHENTICATED' }
+    }
+    const yt = ytFactory(authClient)
+    let details
+    try {
+      details = await videoFetcher.fetch(yt, [videoId])
+    } catch (err) {
+      logger.error('scheduler.addManualVideo.error', { videoId, error: err })
+      return { ok: false, error: 'FETCH_FAILED' }
+    }
+    const item = details.find((v) => v.id === videoId)
+    if (!item) {
+      // 動画が存在しない / 非公開 / メンバーでないため取得不可
+      return { ok: false, error: 'NOT_FOUND' }
+    }
+    const now = Date.now()
+    const record = {
+      ...toVideoRecord(item, now),
+      isMembershipOnly: true,
+      source: 'manual'
+    }
+    videoRepo.upsert(record)
+    logger.info('scheduler.addManualVideo.done', { videoId, status: record.status })
+    return { ok: true, video: videoRepo.getById(videoId) }
+  }
+
   return {
     backfillArchiveMeta,
+    addManualVideo,
     async refresh(opts = {}) {
       if (inFlight) {
         logger.info('scheduler.refresh.deduplicated', {})
