@@ -4,6 +4,7 @@ import PropTypes from 'prop-types'
 const TABS = [
   { key: 'general', label: '⚙️ 基本' },
   { key: 'channels', label: '📌 チャンネル' },
+  { key: 'membership', label: '📺 メンバー限定' },
   { key: 'data', label: '📦 データ管理' }
 ]
 
@@ -35,6 +36,9 @@ export default function SettingsModal({
   const [manualChannelInput, setManualChannelInput] = useState('')
   const [manualChannelTitle, setManualChannelTitle] = useState('')
   const [manualChannelSaving, setManualChannelSaving] = useState(false)
+  const [manualVideoInput, setManualVideoInput] = useState('')
+  const [manualVideoSaving, setManualVideoSaving] = useState(false)
+  const [manualVideoMessage, setManualVideoMessage] = useState(null)
 
   function sortChannels(list) {
     return [...list].sort((a, b) => {
@@ -770,9 +774,95 @@ export default function SettingsModal({
     )
   }
 
+  async function handleAddManualVideo() {
+    const input = manualVideoInput.trim()
+    if (!input || manualVideoSaving) return
+    setManualVideoSaving(true)
+    setManualVideoMessage(null)
+    try {
+      const result = await window.api.addManualVideo(input)
+      if (result?.ok) {
+        setManualVideoMessage({
+          type: 'success',
+          text: `「${result.video?.title ?? '動画'}」を追加しました`
+        })
+        setManualVideoInput('')
+        onChannelsUpdated?.()
+      } else {
+        const errorText =
+          {
+            INVALID_INPUT: 'URL または動画 ID の形式が正しくありません',
+            NOT_AUTHENTICATED: 'ログインが必要です。基本タブからログインしてください',
+            NOT_FOUND:
+              '動画が見つかりません。非公開、またはこのアカウントで視聴できない可能性があります',
+            FETCH_FAILED: '取得に失敗しました。時間をおいて再試行してください'
+          }[result?.error] ?? '追加に失敗しました'
+        setManualVideoMessage({ type: 'error', text: errorText })
+      }
+    } finally {
+      setManualVideoSaving(false)
+    }
+  }
+
+  function renderMembership() {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <div style={sectionLabelStyle}>メン限動画の手動追加</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                自動取得できない動画を追加して追跡
+              </div>
+              <div style={descStyle}>
+                メンバー限定配信など、RSS・購読では取得できない動画を URL または動画 ID
+                で追加できます。追加にはその動画を視聴できる Google
+                アカウントでのログインが必要です。
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="https://www.youtube.com/watch?v=... または 動画ID"
+              value={manualVideoInput}
+              onChange={(e) => setManualVideoInput(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <button
+              style={btnStyle('primary', { disabled: manualVideoSaving })}
+              disabled={manualVideoSaving}
+              onClick={handleAddManualVideo}
+            >
+              {manualVideoSaving ? '追加中...' : '追加'}
+            </button>
+            {manualVideoMessage && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: manualVideoMessage.type === 'success' ? '#1e9e54' : '#e8001c'
+                }}
+              >
+                {manualVideoMessage.text}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const tabContent = {
     general: renderGeneral,
     channels: renderChannels,
+    membership: renderMembership,
     data: renderData
   }
 
