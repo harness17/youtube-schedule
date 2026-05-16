@@ -63,6 +63,15 @@ describe('listArchive filters and sort', () => {
     expect(rows.map((r) => r.id)).toEqual(['recent'])
   })
 
+  it('sorts uploads by published_at when actual/scheduled times are absent', () => {
+    // 通常アップロード（actual/scheduled 無し）。published_at で並ぶことを確認。
+    // lastCheckedAt の順とは逆にしておき、published_at が効いていることを検証する。
+    insertEndedVideo(repo, { id: 'newpub', lastCheckedAt: 1000, publishedAt: 9000 })
+    insertEndedVideo(repo, { id: 'oldpub', lastCheckedAt: 2000, publishedAt: 3000 })
+    const rows = repo.listArchive({ sort: 'newest' })
+    expect(rows.map((r) => r.id)).toEqual(['newpub', 'oldpub'])
+  })
+
   it('sorts by duration descending with NULL last', () => {
     insertEndedVideo(repo, { id: 'short', lastCheckedAt: 1000, duration: 60 })
     insertEndedVideo(repo, { id: 'long', lastCheckedAt: 2000, duration: 600 })

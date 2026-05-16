@@ -39,6 +39,7 @@ function toVideoRecord(v, now) {
     firstSeenAt: now,
     lastCheckedAt: now,
     duration: parseDuration(v.contentDetails?.duration),
+    publishedAt: v.snippet.publishedAt ? new Date(v.snippet.publishedAt).getTime() : null,
     source: 'api'
   }
 }
@@ -60,6 +61,7 @@ function toRssVideoRecord(entry, channel, now) {
     firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
     lastCheckedAt: now,
     duration: null,
+    publishedAt: Number.isNaN(feedTime) ? null : feedTime,
     source: 'rss'
   }
 }

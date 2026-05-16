@@ -8,13 +8,13 @@ export function createVideoRepository(db) {
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at, ended_at, duration, source
+      url, first_seen_at, last_checked_at, ended_at, duration, published_at, source
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
       @url, @firstSeenAt, @lastCheckedAt,
       CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END,
-      @duration, @source
+      @duration, @publishedAt, @source
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -29,6 +29,7 @@ export function createVideoRepository(db) {
       url = excluded.url,
       last_checked_at = excluded.last_checked_at,
       duration = COALESCE(excluded.duration, videos.duration),
+      published_at = COALESCE(excluded.published_at, videos.published_at),
       source = excluded.source,
       ended_at = CASE
         WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
@@ -192,6 +193,7 @@ export function createVideoRepository(db) {
       favoriteOrder: row.favorite_order ?? null,
       source: row.source ?? 'api',
       duration: row.duration ?? null,
+      publishedAt: row.published_at ?? null,
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -206,7 +208,12 @@ export function createVideoRepository(db) {
 
   return {
     upsert(video) {
-      upsertStmt.run({ ...video, duration: video.duration ?? null, source: video.source ?? 'api' })
+      upsertStmt.run({
+        ...video,
+        duration: video.duration ?? null,
+        publishedAt: video.publishedAt ?? null,
+        source: video.source ?? 'api'
+      })
     },
     getById(id) {
       return rowToVideo(getByIdStmt.get(id))
@@ -279,13 +286,18 @@ export function createVideoRepository(db) {
       // 通常のアップロード動画（actual も scheduled も無い）は除外しない。
       where.push(`NOT (actual_start_time IS NULL AND scheduled_start_time IS NOT NULL)`)
 
-      // 期間（ended_at 基準、欠損時は last_checked_at にフォールバック）
+      // カードに表示する日付と同じ基準。配信実績 → 投稿日 → 予約 → ended → 最終確認 の順。
+      // 期間フィルタとソートの両方でこの式を使い、表示・絞り込み・並びを一致させる。
+      const dateExpr =
+        'COALESCE(actual_start_time, published_at, scheduled_start_time, ended_at, last_checked_at)'
+
+      // 期間
       if (typeof periodStart === 'number') {
-        where.push(`COALESCE(ended_at, last_checked_at) >= @periodStart`)
+        where.push(`${dateExpr} >= @periodStart`)
         params.periodStart = periodStart
       }
       if (typeof periodEnd === 'number') {
-        where.push(`COALESCE(ended_at, last_checked_at) <= @periodEnd`)
+        where.push(`${dateExpr} <= @periodEnd`)
         params.periodEnd = periodEnd
       }
 
@@ -301,11 +313,11 @@ export function createVideoRepository(db) {
 
       const orderBy =
         {
-          newest: `COALESCE(ended_at, last_checked_at) DESC`,
-          oldest: `COALESCE(ended_at, last_checked_at) ASC`,
-          channel: `channel_title COLLATE NOCASE ASC, COALESCE(ended_at, last_checked_at) DESC`,
+          newest: `${dateExpr} DESC`,
+          oldest: `${dateExpr} ASC`,
+          channel: `channel_title COLLATE NOCASE ASC, ${dateExpr} DESC`,
           duration: `duration IS NULL, duration DESC`
-        }[sort] ?? `COALESCE(ended_at, last_checked_at) DESC`
+        }[sort] ?? `${dateExpr} DESC`
 
       const sql = `
         SELECT * FROM videos
