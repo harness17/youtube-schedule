@@ -213,7 +213,9 @@ export default function ScheduleCard({
                   : '1px solid rgba(46,160,90,0.3)',
                 color: darkMode ? '#3ddc84' : '#1e9e54',
                 verticalAlign: 'middle',
-                fontWeight: 'normal'
+                fontWeight: 'normal',
+                display: 'inline-block',
+                whiteSpace: 'nowrap'
               }}
             >
               🔒 メン限

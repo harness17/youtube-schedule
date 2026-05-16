@@ -163,6 +163,7 @@ export default function App() {
     filteredLive,
     filteredUpcoming,
     filteredMissed,
+    missedBadgeCount,
     filteredArchive,
     filteredFavorites,
     favoriteSections,
@@ -573,8 +574,8 @@ export default function App() {
                 className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
               >
                 {label}
-                {key === 'missed' && missedVideos.length > 0 && (
-                  <span className="yt-tab-badge">{missedVideos.length}</span>
+                {key === 'missed' && missedBadgeCount > 0 && (
+                  <span className="yt-tab-badge">{missedBadgeCount}</span>
                 )}
               </button>
             ))}

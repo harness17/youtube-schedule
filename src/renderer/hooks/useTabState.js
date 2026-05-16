@@ -440,6 +440,16 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     [favoriteVideos, filterItem]
   )
 
+  // 見逃しタブのバッジ件数。検索・チャンネル絞り込みのような一時フィルタには
+  // 影響されず、永続設定のメン限非表示だけを反映する。
+  const missedBadgeCount = useMemo(
+    () =>
+      hideMembershipVideos
+        ? missedVideos.filter((v) => !v.isMembershipOnly).length
+        : missedVideos.length,
+    [missedVideos, hideMembershipVideos]
+  )
+
   /**
    * お気に入りを 予定・配信中(upcoming|live) / 通常(ended+未視聴) / 視聴済み に分類。
    * 各セクション内の順番は favoriteVideos の保存済み順を維持する。
@@ -515,6 +525,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     filteredMissed,
     filteredArchive,
     filteredFavorites,
+    missedBadgeCount,
     favoriteSections,
     missedSections,
     // ハンドラ
