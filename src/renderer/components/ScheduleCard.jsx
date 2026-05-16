@@ -199,6 +199,26 @@ export default function ScheduleCard({
         {/* タイトル行 */}
         <div style={{ fontWeight: '700', fontSize: '14px', color: textColor, lineHeight: 1.4 }}>
           {item.title}
+          {item.isMembershipOnly && (
+            <span
+              title="メンバー限定"
+              style={{
+                fontSize: '10px',
+                padding: '2px 6px',
+                marginLeft: '6px',
+                borderRadius: '4px',
+                background: darkMode ? 'rgba(46,204,113,0.16)' : 'rgba(46,160,90,0.12)',
+                border: darkMode
+                  ? '1px solid rgba(46,204,113,0.35)'
+                  : '1px solid rgba(46,160,90,0.3)',
+                color: darkMode ? '#3ddc84' : '#1e9e54',
+                verticalAlign: 'middle',
+                fontWeight: 'normal'
+              }}
+            >
+              🔒 メン限
+            </span>
+          )}
           {isViewed && (
             <span
               style={{
@@ -401,6 +421,7 @@ ScheduleCard.propTypes = {
     scheduledStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     publishedAt: PropTypes.number,
     duration: PropTypes.number,
+    isMembershipOnly: PropTypes.bool,
     description: PropTypes.string,
     url: PropTypes.string,
     channelUrl: PropTypes.string,
