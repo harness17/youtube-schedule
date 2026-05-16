@@ -1,10 +1,40 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-15
+最終更新: 2026-05-17
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、役割分担と merge ゲートは `.claude/rules/cross-agent-review.md` を参照。
+
+---
+
+## 2026-05-17 — Phase 2c-1 完了・API 検証結果（Claude）
+
+- 対象: feature/manual-membership-video
+- 作成者: ClaudeCode
+- 主題: Phase 2c-1（手動メン限動画登録）Task 1-10 の完了報告と API 検証結果
+
+### 実装完了（Task 1-9）
+
+migration 010・resolveVideoId・is_membership_only 配線・addManualVideo・videos:addManual IPC・スケジューラ追跡・設定 UI（📺 メンバー限定タブ）・🔒 バッジ・メン限非表示トグルをすべて実装。lint clean / 268 テスト pass / build 成功。
+
+### Task 10 検証結果
+
+- **手動登録の実機確認: ✅ 動作**。ユーザーが実機で動画を手動登録し表示を確認。その過程で 2 件のバグを発見・修正済み（メン限バッジの折り返し、見逃しタブのバッジ件数がメン限非表示時もメン限を数える不整合）
+- **`search.list` のメン限可視性検証: ⛔ 未検証**。検証にはメンバー限定の「予約配信」が現存するチャンネルが必要だが、検証時点で対象が見つからず実施不可
+
+### Plan 2c-2 への申し送り
+
+`search.list eventType:upcoming` がメン限予約配信を返すかは未検証のまま。Plan 2c-2（メン限チャンネル自動巡回）に着手する際は、まず対象（メン限予約配信のあるチャンネル）が手元にある状態で `search.list` 検証を再実施すること。返さないことが判明した場合、自動巡回はクォータ 100 ユニット/回を消費して空振りするだけになるため、Plan 2c-2 は「登録チャンネルの定期手動更新補助」など別方針へ切り替えを検討する。
+
+### 特記：相互レビュー未実施
+
+Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 回連続即失敗（ブローカー再起動でも回復せず）。フロント Task 7-9 も Claude が直接実装した。merge ゲート② 相互レビューは未実施で、ユーザーがそれを承知の上で merge を判断した。codex-companion の不調は別途調査が必要。
+
+### 次アクション
+
+- `feature/manual-membership-video` を develop へ merge
+- v1.16.0 リリース判断はユーザーに仰ぐ
 
 ---
 
