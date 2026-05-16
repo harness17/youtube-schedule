@@ -192,7 +192,9 @@ export function createSchedulerService({
           )
           .map((v) => v.id)
     const newIds = videoIds.filter((id) => !knownIds.has(id))
-    const target = Array.from(new Set([...newIds, ...recheckIds]))
+    // 手動登録動画は RSS に出ないため、明示的に再チェック対象へ加える
+    const manualIds = videoRepo.listManualTrackingIds()
+    const target = Array.from(new Set([...newIds, ...recheckIds, ...manualIds]))
 
     const details = authClient
       ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {

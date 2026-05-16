@@ -175,6 +175,9 @@ export function createVideoRepository(db) {
         published_at = COALESCE(@publishedAt, published_at)
     WHERE id = @id
   `)
+  const manualTrackingIdsStmt = db.prepare(`
+    SELECT id FROM videos WHERE source = 'manual' AND status != 'ended'
+  `)
   const saveFavoriteOrderTx = db.transaction((ids) => {
     clearFavoriteOrderStmt.run()
     let orderIndex = 0
@@ -351,6 +354,10 @@ export function createVideoRepository(db) {
     // duration / published_at のみを更新する。null は既存値を保持（COALESCE）
     backfillMeta(id, { duration = null, publishedAt = null } = {}) {
       backfillMetaStmt.run({ id, duration, publishedAt })
+    },
+    // 手動登録された未終了の動画 ID（スケジューラの再チェック対象）
+    listManualTrackingIds() {
+      return manualTrackingIdsStmt.all().map((row) => row.id)
     },
     listFeed(limit = 50) {
       return listFeedStmt.all({ limit }).map(rowToVideo)
