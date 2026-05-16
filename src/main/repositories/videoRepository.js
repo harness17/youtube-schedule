@@ -163,6 +163,16 @@ export function createVideoRepository(db) {
   const updateFavoriteOrderStmt = db.prepare(`
     UPDATE videos SET favorite_order = @orderIndex WHERE id = @id AND is_favorite = 1
   `)
+  const backfillTargetIdsStmt = db.prepare(`
+    SELECT id FROM videos
+    WHERE status = 'ended' AND (duration IS NULL OR published_at IS NULL)
+  `)
+  const backfillMetaStmt = db.prepare(`
+    UPDATE videos
+    SET duration = COALESCE(@duration, duration),
+        published_at = COALESCE(@publishedAt, published_at)
+    WHERE id = @id
+  `)
   const saveFavoriteOrderTx = db.transaction((ids) => {
     clearFavoriteOrderStmt.run()
     let orderIndex = 0
@@ -329,6 +339,14 @@ export function createVideoRepository(db) {
     },
     listFavorites() {
       return listFavoritesStmt.all().map(rowToVideo)
+    },
+    // duration / published_at が未取得の ended 動画 ID を返す（バックフィル対象）
+    listBackfillTargetIds() {
+      return backfillTargetIdsStmt.all().map((row) => row.id)
+    },
+    // duration / published_at のみを更新する。null は既存値を保持（COALESCE）
+    backfillMeta(id, { duration = null, publishedAt = null } = {}) {
+      backfillMetaStmt.run({ id, duration, publishedAt })
     },
     listFeed(limit = 50) {
       return listFeedStmt.all({ limit }).map(rowToVideo)

@@ -101,3 +101,37 @@ describe('listArchive filters and sort', () => {
     expect(rows.map((r) => r.id)).toEqual(['match'])
   })
 })
+
+describe('archive backfill', () => {
+  let db, repo
+  beforeEach(() => {
+    db = makeDb()
+    repo = createVideoRepository(db)
+  })
+
+  it('listBackfillTargetIds returns ended videos missing duration or published_at', () => {
+    insertEndedVideo(repo, { id: 'needs', duration: null, publishedAt: null })
+    insertEndedVideo(repo, { id: 'has-duration-only', duration: 100, publishedAt: null })
+    insertEndedVideo(repo, { id: 'complete', duration: 100, publishedAt: 5000 })
+    const ids = repo.listBackfillTargetIds().sort()
+    expect(ids).toEqual(['has-duration-only', 'needs'])
+  })
+
+  it('backfillMeta updates duration and published_at without touching other fields', () => {
+    insertEndedVideo(repo, { id: 'v1', title: 'Original', duration: null, publishedAt: null })
+    repo.backfillMeta('v1', { duration: 360, publishedAt: 7000 })
+    const video = repo.getById('v1')
+    expect(video.duration).toBe(360)
+    expect(video.publishedAt).toBe(7000)
+    expect(video.title).toBe('Original')
+    expect(video.status).toBe('ended')
+  })
+
+  it('backfillMeta keeps existing values when passed null (COALESCE)', () => {
+    insertEndedVideo(repo, { id: 'v1', duration: 120, publishedAt: 3000 })
+    repo.backfillMeta('v1', { duration: null, publishedAt: null })
+    const video = repo.getById('v1')
+    expect(video.duration).toBe(120)
+    expect(video.publishedAt).toBe(3000)
+  })
+})
