@@ -20,7 +20,6 @@ const ARCHIVE_LIMIT = 50
 const SEARCH_TARGETS = { title: true, channel: true, description: false }
 const DEFAULT_ARCHIVE_FILTERS = {
   channelIds: [],
-  videoType: 'all',
   period: 'all',
   customStart: null,
   customEnd: null
@@ -135,7 +134,6 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       offset,
       query: query.trim(),
       channelIds: archiveFilters.channelIds,
-      videoType: archiveFilters.videoType,
       periodStart,
       periodEnd,
       sort: archiveSort,

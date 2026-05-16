@@ -285,9 +285,7 @@ export default function App() {
   const subBtnBg = darkMode ? '#1e1e2c' : '#ebebf5'
   const subBtnColor = darkMode ? '#8888b0' : '#555570'
   const archiveHasActiveFilters =
-    archiveFilters.channelIds.length > 0 ||
-    archiveFilters.videoType !== 'all' ||
-    archiveFilters.period !== 'all'
+    archiveFilters.channelIds.length > 0 || archiveFilters.period !== 'all'
 
   // ===== 共通カード描画ハーネス =================================================
   /**

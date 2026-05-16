@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
 function toDateInputValue(value) {
@@ -25,10 +25,31 @@ function toEndOfDayEpoch(value) {
 
 export function ArchiveFilterBar({ channels, filters, sort, onChangeFilters, onChangeSort }) {
   const [expanded, setExpanded] = useState(false)
+  const [channelPopoverOpen, setChannelPopoverOpen] = useState(false)
+  const [channelSearch, setChannelSearch] = useState('')
+  const channelPopoverRef = useRef(null)
   const activeFilterCount =
-    (filters.channelIds.length > 0 ? 1 : 0) +
-    (filters.videoType !== 'all' ? 1 : 0) +
-    (filters.period !== 'all' ? 1 : 0)
+    (filters.channelIds.length > 0 ? 1 : 0) + (filters.period !== 'all' ? 1 : 0)
+  const selectedChannels = useMemo(
+    () => channels.filter((channel) => filters.channelIds.includes(channel.id)),
+    [channels, filters.channelIds]
+  )
+  const filteredChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase()
+    if (!query) return channels
+    return channels.filter((channel) => channel.title.toLowerCase().includes(query))
+  }, [channelSearch, channels])
+
+  useEffect(() => {
+    if (!channelPopoverOpen) return
+    function handleDocumentMouseDown(event) {
+      if (!channelPopoverRef.current?.contains(event.target)) {
+        setChannelPopoverOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleDocumentMouseDown)
+    return () => document.removeEventListener('mousedown', handleDocumentMouseDown)
+  }, [channelPopoverOpen])
 
   function updateFilters(patch) {
     onChangeFilters({ ...filters, ...patch })
@@ -88,20 +109,6 @@ export function ArchiveFilterBar({ channels, filters, sort, onChangeFilters, onC
           </label>
 
           <label style={{ display: 'grid', gap: '4px', fontSize: '12px', color: 'var(--sub)' }}>
-            配信タイプ
-            <select
-              aria-label="配信タイプ"
-              value={filters.videoType}
-              onChange={(e) => updateFilters({ videoType: e.target.value })}
-              style={selectStyle}
-            >
-              <option value="all">すべて</option>
-              <option value="live-done">ライブ配信済み</option>
-              <option value="didnt-air">流れた配信</option>
-            </select>
-          </label>
-
-          <label style={{ display: 'grid', gap: '4px', fontSize: '12px', color: 'var(--sub)' }}>
             期間
             <select
               aria-label="期間"
@@ -145,49 +152,77 @@ export function ArchiveFilterBar({ channels, filters, sort, onChangeFilters, onC
           )}
 
           {channels.length > 0 && (
-            <fieldset
+            <div
+              ref={channelPopoverRef}
               style={{
                 display: 'grid',
                 gap: '6px',
                 gridColumn: '1 / -1',
-                padding: 0,
-                margin: 0,
-                border: 'none'
+                position: 'relative'
               }}
             >
-              <legend style={{ fontSize: '12px', color: 'var(--sub)', marginBottom: '2px' }}>
-                チャンネル
-              </legend>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {channels.map((channel) => (
-                  <label
-                    key={channel.id}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      maxWidth: '100%',
-                      padding: '5px 8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      background: 'var(--surface2)',
-                      fontSize: '12px',
-                      color: 'var(--text)'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={filters.channelIds.includes(channel.id)}
-                      onChange={(e) => handleChannelToggle(channel.id, e.target.checked)}
-                    />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {channel.isPinned ? '📌 ' : ''}
-                      {channel.title}
-                    </span>
-                  </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="yt-nav-btn"
+                  aria-label="チャンネル"
+                  aria-expanded={channelPopoverOpen}
+                  onClick={() => setChannelPopoverOpen((value) => !value)}
+                >
+                  チャンネル{' '}
+                  {filters.channelIds.length > 0 && (
+                    <span className="yt-tab-badge">{filters.channelIds.length}</span>
+                  )}
+                </button>
+                {selectedChannels.map((channel) => (
+                  <span key={channel.id} style={chipStyle}>
+                    {channel.isPinned ? '📌 ' : ''}
+                    {channel.title}
+                    <button
+                      type="button"
+                      aria-label={`${channel.title} を解除`}
+                      onClick={() => handleChannelToggle(channel.id, false)}
+                      style={chipButtonStyle}
+                    >
+                      ×
+                    </button>
+                  </span>
                 ))}
               </div>
-            </fieldset>
+              {channelPopoverOpen && (
+                <div style={popoverStyle}>
+                  <input
+                    type="search"
+                    aria-label="チャンネル検索"
+                    placeholder="チャンネル検索"
+                    value={channelSearch}
+                    onChange={(e) => setChannelSearch(e.target.value)}
+                    style={selectStyle}
+                  />
+                  <div style={channelListStyle}>
+                    {filteredChannels.length > 0 ? (
+                      filteredChannels.map((channel) => (
+                        <label key={channel.id} style={channelOptionStyle}>
+                          <input
+                            type="checkbox"
+                            checked={filters.channelIds.includes(channel.id)}
+                            onChange={(e) => handleChannelToggle(channel.id, e.target.checked)}
+                          />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {channel.isPinned ? '📌 ' : ''}
+                            {channel.title}
+                          </span>
+                        </label>
+                      ))
+                    ) : (
+                      <div style={{ padding: '8px', fontSize: '12px', color: 'var(--sub)' }}>
+                        一致するチャンネルはありません
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -207,6 +242,64 @@ const selectStyle = {
   fontFamily: 'inherit'
 }
 
+const popoverStyle = {
+  position: 'absolute',
+  top: '34px',
+  left: 0,
+  zIndex: 10,
+  display: 'grid',
+  gap: '8px',
+  width: 'min(360px, calc(100vw - 48px))',
+  padding: '10px',
+  border: '1px solid var(--border)',
+  borderRadius: '8px',
+  background: 'var(--surface)',
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)'
+}
+
+const channelListStyle = {
+  display: 'grid',
+  gap: '4px',
+  maxHeight: '220px',
+  overflowY: 'auto'
+}
+
+const channelOptionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  minWidth: 0,
+  padding: '6px 8px',
+  borderRadius: '6px',
+  background: 'var(--surface2)',
+  fontSize: '12px',
+  color: 'var(--text)'
+}
+
+const chipStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  minWidth: 0,
+  maxWidth: '180px',
+  padding: '5px 7px',
+  border: '1px solid var(--border)',
+  borderRadius: '999px',
+  background: 'var(--surface2)',
+  color: 'var(--text)',
+  fontSize: '12px'
+}
+
+const chipButtonStyle = {
+  border: 'none',
+  background: 'transparent',
+  color: 'inherit',
+  cursor: 'pointer',
+  fontSize: '14px',
+  lineHeight: 1,
+  padding: 0
+}
+
 ArchiveFilterBar.propTypes = {
   channels: PropTypes.arrayOf(
     PropTypes.shape({
@@ -217,7 +310,6 @@ ArchiveFilterBar.propTypes = {
   ).isRequired,
   filters: PropTypes.shape({
     channelIds: PropTypes.arrayOf(PropTypes.string).isRequired,
-    videoType: PropTypes.oneOf(['all', 'live-done', 'didnt-air']).isRequired,
     period: PropTypes.oneOf(['all', '7d', '30d', '90d', 'custom']).isRequired,
     customStart: PropTypes.number,
     customEnd: PropTypes.number

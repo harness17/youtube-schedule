@@ -64,9 +64,23 @@ status: active
 - Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
 - 依頼範囲外のファイルを作らない
 
+### レビュー結果（2026-05-16, Claude）
+
+- 公開可否: 🟢 重大指摘なし
+- 配信タイプ削除: 🟢 `videoType` を filters / buildArchiveOptions / archiveHasActiveFilters / PropTypes / テストから完全削除。残骸 grep クリーン
+- チャンネルポップオーバー: 🟢 検索 input・スクロールリスト・選択チップ（× 解除）・外側クリック検知（document mousedown）すべて実装
+- lint clean / 246 テスト pass / build 成功
+- 軽微指摘: なし
+- 補足: 初回タスク（task-mp6v2sdb-8ngwcs）は `rg` 不在直後でスタック。キャンセルして再ディスパッチ（task-mp7wdleo-abd52c）で完走
+
+### Merge ゲート 4 条件
+| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
+|---------|-------------|----------|-------------|
+| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
+
 ### 次アクション
 
-- Codex が修正 → セルフ verify → Claude がレビュー & コミット
+- Phase 2a 全体（バックエンド＋フロント＋UX修正）の merge 判断をユーザーに仰ぐ
 
 ---
 
