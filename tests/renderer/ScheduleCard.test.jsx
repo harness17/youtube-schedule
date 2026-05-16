@@ -57,6 +57,52 @@ describe('ScheduleCard', () => {
     expect(screen.queryByText(/2026\/4\/13/)).not.toBeInTheDocument()
   })
 
+  it('duration が number のとき再生時間を分秒形式で表示する', () => {
+    render(<ScheduleCard item={{ ...mockItem, duration: 930 }} />)
+    expect(screen.getByText(/15:30/)).toBeInTheDocument()
+  })
+
+  it('duration が 1 時間以上のとき時分秒形式で表示する', () => {
+    render(<ScheduleCard item={{ ...mockItem, duration: 3723 }} />)
+    expect(screen.getByText(/1:02:03/)).toBeInTheDocument()
+  })
+
+  it('duration が null のとき再生時間を表示しない', () => {
+    render(<ScheduleCard item={{ ...mockItem, duration: null }} />)
+    expect(screen.queryByText(/⏱/)).not.toBeInTheDocument()
+  })
+
+  it('ended で actualStartTime があるとき配信日を表示する', () => {
+    render(
+      <ScheduleCard
+        item={{
+          ...mockItem,
+          status: 'ended',
+          scheduledStartTime: null,
+          actualStartTime: Date.parse('2026-04-12T08:05:00Z')
+        }}
+        showDateInTime={true}
+      />
+    )
+    expect(screen.getByText(/配信 2026\/4\/12/)).toBeInTheDocument()
+  })
+
+  it('publishedAt のみがあるとき投稿日を表示する', () => {
+    render(
+      <ScheduleCard
+        item={{
+          ...mockItem,
+          status: 'ended',
+          scheduledStartTime: null,
+          actualStartTime: null,
+          publishedAt: Date.parse('2026-04-13T09:00:00Z')
+        }}
+        showDateInTime={true}
+      />
+    )
+    expect(screen.getByText(/投稿 2026\/4\/13/)).toBeInTheDocument()
+  })
+
   it('YouTube で開くボタンで openExternal が呼ばれる', () => {
     render(<ScheduleCard item={mockItem} />)
     fireEvent.click(screen.getByText('▶ 開く'))

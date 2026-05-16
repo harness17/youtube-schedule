@@ -37,6 +37,21 @@ function formatCountdown(isoString) {
   return remainHours > 0 ? `あと${days}日${remainHours}時間` : `あと${days}日`
 }
 
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) return null
+  const totalSeconds = Math.floor(seconds)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const remainingSeconds = totalSeconds % 60
+  const paddedSeconds = String(remainingSeconds).padStart(2, '0')
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${paddedSeconds}`
+  }
+
+  return `${minutes}:${paddedSeconds}`
+}
+
 export default function ScheduleCard({
   item,
   darkMode = false,
@@ -65,6 +80,16 @@ export default function ScheduleCard({
   const viewers = item.concurrentViewers ? formatViewers(item.concurrentViewers) : null
   const isLive = item.status === 'live'
   const isUpcoming = item.status === 'upcoming'
+  const duration = formatDuration(item.duration)
+  const timeLabel = isLive
+    ? `配信中（${formatTime(item.actualStartTime, showDateInTime) || '時刻未取得'}〜）`
+    : item.actualStartTime
+      ? `配信 ${formatTime(item.actualStartTime, showDateInTime)}`
+      : item.scheduledStartTime
+        ? `${formatTime(item.scheduledStartTime, showDateInTime)}〜`
+        : item.publishedAt
+          ? `投稿 ${formatTime(item.publishedAt, showDateInTime)}`
+          : '時刻未取得'
 
   // カラートークン（light / dark）
   const surfaceColor = darkMode ? '#16161e' : '#ffffff'
@@ -289,16 +314,13 @@ export default function ScheduleCard({
 
         {/* 時刻・カウントダウン行 */}
         <div style={{ fontSize: '12px', color: timeColor }}>
-          {isLive
-            ? `配信中（${formatTime(item.actualStartTime, showDateInTime) || '時刻未取得'}〜）`
-            : item.scheduledStartTime
-              ? `${formatTime(item.scheduledStartTime, showDateInTime)}〜`
-              : '時刻未取得'}
+          {timeLabel}
           {!isLive && countdown && (
             <span style={{ marginLeft: '8px', color: '#e07800', fontWeight: '700' }}>
               {countdown}
             </span>
           )}
+          {duration && <span style={{ marginLeft: '8px', color: subColor }}>⏱ {duration}</span>}
           {viewers && <span style={{ marginLeft: '8px', color: subColor }}>👥 {viewers}</span>}
         </div>
 
@@ -377,6 +399,8 @@ ScheduleCard.propTypes = {
     channelId: PropTypes.string,
     actualStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     scheduledStartTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    publishedAt: PropTypes.number,
+    duration: PropTypes.number,
     description: PropTypes.string,
     url: PropTypes.string,
     channelUrl: PropTypes.string,
