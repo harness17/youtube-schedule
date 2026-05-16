@@ -8,6 +8,75 @@ status: active
 
 ---
 
+## 2026-05-16 — ScheduleCard 再生時間・日付表示依頼（Claude → Codex）
+
+- 対象: feature/archive-date-duration-display
+- 作成者: ClaudeCode
+- 主題: レビュー指摘対応。カードに再生時間表示を追加し、時刻未取得カードに投稿日を出す
+- レビュー担当: ClaudeCode
+- 触ってよい範囲:
+  - `src/renderer/components/ScheduleCard.jsx`
+  - `tests/renderer/`（ScheduleCard のテストがあれば追従、無ければ新規追加可）
+- 触ってはいけない範囲: `src/main/`（Claude が migration 009・listArchive を実装済み、契約確定）
+
+### 前提（Claude 実装済みのバックエンド契約）
+
+- `videos` レコードに `duration`（秒, number|null）と `publishedAt`（epoch ms, number|null）が乗る
+- `rowToVideo` が両方を返すので、カードの `item` には `item.duration` と `item.publishedAt` がある
+
+### 修正内容
+
+**1. 再生時間の表示**
+
+- `item.duration`（秒）が number のとき、カードに再生時間を表示する
+- 形式: `1:23:45`（時:分:秒）。1 時間未満は `45:30`（分:秒）。秒は常に 2 桁ゼロ埋め、分は時がある場合のみ 2 桁ゼロ埋め
+- 例: 3723 → `1:02:03`、930 → `15:30`、45 → `0:45`
+- `duration` が null/未定義のときは何も出さない
+- 表示位置: 時刻・カウントダウン行（現在 290-303 行付近）の中か隣に、控えめに（例: `⏱ 1:23:45`）
+
+**2. 時刻行の日付ロジック改善**
+
+現在の時刻行ロジック（290-303 行付近）:
+- `isLive` → `配信中（{actualStartTime}〜）`
+- `item.scheduledStartTime` あり → `{scheduledStartTime}〜`
+- それ以外 → `時刻未取得`
+
+問題: 配信済みライブ（ended で actualStartTime あり）や通常アップロードが「時刻未取得」になる。
+
+新ロジック（`isLive` でない場合）:
+- `item.actualStartTime` あり → `配信 {日付}`（実際に配信された）
+- 上記なし & `item.scheduledStartTime` あり → `{日付}〜`（予約）
+- 上記なし & `item.publishedAt` あり → `投稿 {日付}`（アップロード動画）
+- いずれも無し → `時刻未取得`
+
+日付フォーマットは既存の `formatTime(value, showDateInTime)` を流用してよい（`formatTime` は ISO 文字列も epoch number も `new Date()` で受けられる）。`isLive` の分岐は現状維持。
+
+### レビュー観点
+
+- duration フォーマットが仕様通り（時:分:秒 / 分:秒、ゼロ埋め）
+- 時刻行が配信済みライブ・アップロード動画で適切な日付を出す
+- 既存テスト 246 件を壊さない
+- Prettier 準拠
+
+### 完成条件（スプリントコントラクト）
+
+- 再生時間取得済みの動画にカードで `1:23:45` 形式の再生時間が出る
+- 通常アップロード動画のカードに「投稿 {日付}」が出る（`時刻未取得` にならない）
+- 配信済みライブのカードに「配信 {日付}」が出る
+- `npm run lint && npm run test && npm run build` がすべて pass
+
+### Git について
+
+- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
+- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
+- 範囲外ファイルを作らない
+
+### 次アクション
+
+- Codex が修正 → セルフ verify → Claude がレビュー & コミット
+
+---
+
 ## 2026-05-15 — Phase 2a UX 修正依頼（Claude → Codex）
 
 - 対象: feature/archive-filter-sort
