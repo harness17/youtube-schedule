@@ -26,6 +26,8 @@ export default function SettingsModal({
   authError,
   onLogin,
   onImportCredentials,
+  hideMembershipVideos = false,
+  onHideMembershipVideosChange,
   initialTab = 'general'
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
@@ -855,6 +857,32 @@ export default function SettingsModal({
             )}
           </div>
         </div>
+        <div>
+          <div style={sectionLabelStyle}>表示</div>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>メン限動画を一覧に表示しない</div>
+              <div style={descStyle}>
+                🔒 メンバー限定の動画を予定・見逃し・アーカイブ・お気に入りから隠します
+              </div>
+            </div>
+            <button
+              onClick={() => onHideMembershipVideosChange?.(!hideMembershipVideos)}
+              style={{
+                padding: '4px 14px',
+                fontSize: '11px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                background: hideMembershipVideos ? '#6060c0' : '#ddd',
+                color: hideMembershipVideos ? 'white' : '#666'
+              }}
+            >
+              {hideMembershipVideos ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -1003,5 +1031,7 @@ SettingsModal.propTypes = {
   authError: PropTypes.string,
   onLogin: PropTypes.func.isRequired,
   onImportCredentials: PropTypes.func.isRequired,
-  initialTab: PropTypes.oneOf(['general', 'channels', 'data'])
+  hideMembershipVideos: PropTypes.bool,
+  onHideMembershipVideosChange: PropTypes.func,
+  initialTab: PropTypes.oneOf(['general', 'channels', 'membership', 'data'])
 }
