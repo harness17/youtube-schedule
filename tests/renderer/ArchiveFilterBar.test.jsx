@@ -12,6 +12,7 @@ const baseFilters = {
 function setup(overrides = {}) {
   const onChangeFilters = vi.fn()
   const onChangeSort = vi.fn()
+  const onReset = vi.fn()
   render(
     <ArchiveFilterBar
       channels={[
@@ -22,10 +23,11 @@ function setup(overrides = {}) {
       sort="newest"
       onChangeFilters={onChangeFilters}
       onChangeSort={onChangeSort}
+      onReset={onReset}
       {...overrides}
     />
   )
-  return { onChangeFilters, onChangeSort }
+  return { onChangeFilters, onChangeSort, onReset }
 }
 
 describe('ArchiveFilterBar', () => {
@@ -102,5 +104,22 @@ describe('ArchiveFilterBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Channel One を解除' }))
 
     expect(onChangeFilters).toHaveBeenCalledWith(expect.objectContaining({ channelIds: [] }))
+  })
+
+  it('hides the reset button when filters and sort are at defaults', () => {
+    setup()
+    expect(screen.queryByRole('button', { name: 'リセット' })).not.toBeInTheDocument()
+  })
+
+  it('shows the reset button when a filter is active and calls onReset', () => {
+    const { onReset } = setup({ filters: { ...baseFilters, period: '30d' } })
+    const resetButton = screen.getByRole('button', { name: 'リセット' })
+    fireEvent.click(resetButton)
+    expect(onReset).toHaveBeenCalled()
+  })
+
+  it('shows the reset button when sort is not the default', () => {
+    setup({ sort: 'duration' })
+    expect(screen.getByRole('button', { name: 'リセット' })).toBeInTheDocument()
   })
 })

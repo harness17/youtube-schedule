@@ -9,8 +9,8 @@ function makeDb() {
   return db
 }
 
-function insertEndedVideo(repo, overrides) {
-  repo.upsert({
+function insertEndedVideo(repo, overrides = {}) {
+  const merged = {
     id: 'v1',
     channelId: 'c1',
     channelTitle: 'Channel One',
@@ -27,7 +27,14 @@ function insertEndedVideo(repo, overrides) {
     duration: null,
     source: 'api',
     ...overrides
-  })
+  }
+  // アーカイブは配信済み（actual_start_time あり）のみ対象。
+  // テストで actualStartTime を明示しない場合は lastCheckedAt を配信時刻として補い、
+  // 並び順テストが actual_start_time 基準で成立するようにする。
+  if (!('actualStartTime' in overrides) && merged.actualStartTime === null) {
+    merged.actualStartTime = merged.lastCheckedAt
+  }
+  repo.upsert(merged)
 }
 
 describe('listArchive filters and sort', () => {
@@ -45,18 +52,18 @@ describe('listArchive filters and sort', () => {
     expect(rows.map((r) => r.id).sort()).toEqual(['a', 'c'])
   })
 
-  it('always excludes cancelled scheduled streams but keeps aired streams and normal uploads', () => {
+  it('shows only aired streams; excludes uploads and cancelled streams', () => {
     // 配信されたライブ（actual あり）→ 残す
     insertEndedVideo(repo, { id: 'aired', actualStartTime: 5000, scheduledStartTime: 4000 })
     // 流れた配信（予約枠あり・未配信）→ 除外
     insertEndedVideo(repo, { id: 'cancelled', actualStartTime: null, scheduledStartTime: 5000 })
-    // 通常アップロード（actual も scheduled も無し）→ 残す
+    // 通常アップロード（actual も scheduled も無し）→ 除外
     insertEndedVideo(repo, { id: 'upload', actualStartTime: null, scheduledStartTime: null })
     const rows = repo.listArchive({})
-    expect(rows.map((r) => r.id).sort()).toEqual(['aired', 'upload'])
+    expect(rows.map((r) => r.id)).toEqual(['aired'])
   })
 
-  it('filters by period (ended_at within range)', () => {
+  it('filters by period (within range)', () => {
     insertEndedVideo(repo, { id: 'old', lastCheckedAt: 1000 })
     insertEndedVideo(repo, { id: 'recent', lastCheckedAt: 9000 })
     const rows = repo.listArchive({ periodStart: 5000 })
@@ -90,5 +97,39 @@ describe('listArchive filters and sort', () => {
     insertEndedVideo(repo, { id: 'nomatch', channelId: 'c1', title: 'other' })
     const rows = repo.listArchive({ query: 'keyword', channelIds: ['c1'] })
     expect(rows.map((r) => r.id)).toEqual(['match'])
+  })
+})
+
+describe('archive backfill', () => {
+  let db, repo
+  beforeEach(() => {
+    db = makeDb()
+    repo = createVideoRepository(db)
+  })
+
+  it('listBackfillTargetIds returns ended videos missing duration or published_at', () => {
+    insertEndedVideo(repo, { id: 'needs', duration: null, publishedAt: null })
+    insertEndedVideo(repo, { id: 'has-duration-only', duration: 100, publishedAt: null })
+    insertEndedVideo(repo, { id: 'complete', duration: 100, publishedAt: 5000 })
+    const ids = repo.listBackfillTargetIds().sort()
+    expect(ids).toEqual(['has-duration-only', 'needs'])
+  })
+
+  it('backfillMeta updates duration and published_at without touching other fields', () => {
+    insertEndedVideo(repo, { id: 'v1', title: 'Original', duration: null, publishedAt: null })
+    repo.backfillMeta('v1', { duration: 360, publishedAt: 7000 })
+    const video = repo.getById('v1')
+    expect(video.duration).toBe(360)
+    expect(video.publishedAt).toBe(7000)
+    expect(video.title).toBe('Original')
+    expect(video.status).toBe('ended')
+  })
+
+  it('backfillMeta keeps existing values when passed null (COALESCE)', () => {
+    insertEndedVideo(repo, { id: 'v1', duration: 120, publishedAt: 3000 })
+    repo.backfillMeta('v1', { duration: null, publishedAt: null })
+    const video = repo.getById('v1')
+    expect(video.duration).toBe(120)
+    expect(video.publishedAt).toBe(3000)
   })
 })

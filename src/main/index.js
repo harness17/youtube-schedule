@@ -173,6 +173,10 @@ function startPolling(mainWindow) {
     }
   }
   kick()
+  // 既存アーカイブの duration / published_at を一度だけ補完（自己ガード付き）
+  scheduler
+    .backfillArchiveMeta()
+    .catch((err) => logger?.error('scheduler.backfill.kick.error', { error: err }))
   refreshTimer = setInterval(kick, REFRESH_INTERVAL_MS)
 }
 

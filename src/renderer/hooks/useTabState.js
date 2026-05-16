@@ -114,6 +114,12 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     window.api.setSetting?.('archiveFilters', { filters: archiveFilters, sort: archiveSort })
   }, [archiveFilters, archiveSort])
 
+  // アーカイブの絞り込み・並び替えを初期状態に戻す
+  function resetArchiveFilters() {
+    setArchiveFilters(DEFAULT_ARCHIVE_FILTERS)
+    setArchiveSort('newest')
+  }
+
   // フィルタの period 種別を { periodStart, periodEnd } の epoch ms へ変換する
   function resolvePeriod(filters) {
     const dayMs = 24 * 60 * 60 * 1000
@@ -467,6 +473,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     setArchiveFilters,
     archiveSort,
     setArchiveSort,
+    resetArchiveFilters,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,

@@ -426,6 +426,7 @@ describe('VideoRepository', () => {
           id: `e${i}`,
           status: 'ended',
           scheduledStartTime: null,
+          actualStartTime: base - i * 1000,
           lastCheckedAt: base - i * 1000
         })
       )
@@ -445,6 +446,7 @@ describe('VideoRepository', () => {
           channelId: 'UCother',
           status: 'ended',
           scheduledStartTime: null,
+          actualStartTime: base - i * 1000,
           lastCheckedAt: base - i * 1000
         })
       )
@@ -456,6 +458,7 @@ describe('VideoRepository', () => {
           channelId: 'UCtarget',
           status: 'ended',
           scheduledStartTime: null,
+          actualStartTime: base - (10 + i) * 1000,
           lastCheckedAt: base - (10 + i) * 1000
         })
       )
@@ -477,6 +480,7 @@ describe('VideoRepository', () => {
         title: '耐久歌枠',
         status: 'ended',
         scheduledStartTime: null,
+        actualStartTime: base,
         lastCheckedAt: base
       })
     )
@@ -487,6 +491,7 @@ describe('VideoRepository', () => {
         title: '耐久歌枠',
         status: 'ended',
         scheduledStartTime: null,
+        actualStartTime: base - 1000,
         lastCheckedAt: base - 1000
       })
     )
@@ -497,6 +502,7 @@ describe('VideoRepository', () => {
         title: '耐久雑談',
         status: 'ended',
         scheduledStartTime: null,
+        actualStartTime: base - 2000,
         lastCheckedAt: base - 2000
       })
     )
@@ -663,6 +669,7 @@ describe('VideoRepository', () => {
         id: 'older',
         status: 'ended',
         scheduledStartTime: null,
+        actualStartTime: now - 2000,
         lastCheckedAt: now - 2000
       })
     )
@@ -671,6 +678,7 @@ describe('VideoRepository', () => {
         id: 'newer',
         status: 'ended',
         scheduledStartTime: null,
+        actualStartTime: now - 1000,
         lastCheckedAt: now - 1000
       })
     )
