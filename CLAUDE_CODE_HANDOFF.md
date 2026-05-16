@@ -8,6 +8,56 @@ status: active
 
 ---
 
+## 2026-05-16 — Phase 2c-1 Task 7-9 依頼（Claude → Codex）
+
+- 対象: feature/manual-membership-video
+- 作成者: ClaudeCode
+- 主題: メン限動画手動登録のフロントエンド（設定 UI・🔒 バッジ・表示フィルタ）
+- レビュー担当: ClaudeCode
+- 実装プラン: `docs/superpowers/plans/2026-05-16-phase2c-1-manual-membership.md` の **Task 7・8・9**
+- 触ってよい範囲:
+  - `src/renderer/components/SettingsModal.jsx`
+  - `src/renderer/components/ScheduleCard.jsx`
+  - `src/renderer/hooks/useTabState.js`
+  - `src/renderer/src/App.jsx`
+- 触ってはいけない範囲: `src/main/`（Claude が Task 1-6 で実装済み、契約確定）
+- セルフ verify: ❌ 未実施
+- 実動確認: N/A（Claude が後で Playwright 実施）
+
+### 前提（Claude 実装済みのバックエンド契約）
+
+- `window.api.addManualVideo(input)` が使える。返り値は `{ ok: true, video }` または `{ ok: false, error }`
+  - error コード: `INVALID_INPUT` / `NOT_AUTHENTICATED` / `NOT_FOUND` / `FETCH_FAILED`
+- 動画 `item` に `item.isMembershipOnly`（boolean）が乗る（`rowToVideo` 経由）
+- `window.api.getSetting` / `setSetting` は汎用キーで使える
+
+### レビュー観点
+
+- プラン Task 7-9 の完成条件を満たしているか
+- error コードの日本語変換がプラン通りか
+- 既存テスト 268 件を壊していないか
+- Prettier 準拠（singleQuote / no semi / printWidth 100）
+
+### 完成条件（スプリントコントラクト）
+
+- 設定に「📺 メンバー限定」タブ＋ URL/ID 手動追加 UI（成功・各エラー表示）
+- `ScheduleCard` にメン限動画の 🔒 バッジ
+- メン限動画を一覧から隠すトグル（`hideMembershipVideos`、electron-store 永続化）
+- `npm run lint && npm run test && npm run build` がすべて pass
+- Merge は Claude が行う
+
+### Git について
+
+- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
+- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
+- 範囲外ファイルを作らない
+
+### 次アクション
+
+- Codex が Task 7-9 を実装 → セルフ verify → Claude がレビュー & コミット
+
+---
+
 ## 2026-05-16 — ScheduleCard 再生時間・日付表示依頼（Claude → Codex）
 
 - 対象: feature/archive-date-duration-display
