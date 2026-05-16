@@ -292,9 +292,9 @@ export function createVideoRepository(db) {
         })
       }
 
-      // 流れた配信（予約枠はあったが配信されなかったもの）は常に除外する。
-      // 通常のアップロード動画（actual も scheduled も無い）は除外しない。
-      where.push(`NOT (actual_start_time IS NULL AND scheduled_start_time IS NOT NULL)`)
+      // アーカイブは「実際に配信されたライブ・プレミア」のみを対象とする。
+      // actual_start_time が無いもの＝通常アップロード動画・流れた配信（予約のみ）は除外。
+      where.push(`actual_start_time IS NOT NULL`)
 
       // カードに表示する日付と同じ基準。配信実績 → 投稿日 → 予約 → ended → 最終確認 の順。
       // 期間フィルタとソートの両方でこの式を使い、表示・絞り込み・並びを一致させる。

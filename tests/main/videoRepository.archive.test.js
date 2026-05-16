@@ -9,8 +9,8 @@ function makeDb() {
   return db
 }
 
-function insertEndedVideo(repo, overrides) {
-  repo.upsert({
+function insertEndedVideo(repo, overrides = {}) {
+  const merged = {
     id: 'v1',
     channelId: 'c1',
     channelTitle: 'Channel One',
@@ -27,7 +27,14 @@ function insertEndedVideo(repo, overrides) {
     duration: null,
     source: 'api',
     ...overrides
-  })
+  }
+  // アーカイブは配信済み（actual_start_time あり）のみ対象。
+  // テストで actualStartTime を明示しない場合は lastCheckedAt を配信時刻として補い、
+  // 並び順テストが actual_start_time 基準で成立するようにする。
+  if (!('actualStartTime' in overrides) && merged.actualStartTime === null) {
+    merged.actualStartTime = merged.lastCheckedAt
+  }
+  repo.upsert(merged)
 }
 
 describe('listArchive filters and sort', () => {
@@ -45,31 +52,22 @@ describe('listArchive filters and sort', () => {
     expect(rows.map((r) => r.id).sort()).toEqual(['a', 'c'])
   })
 
-  it('always excludes cancelled scheduled streams but keeps aired streams and normal uploads', () => {
+  it('shows only aired streams; excludes uploads and cancelled streams', () => {
     // 配信されたライブ（actual あり）→ 残す
     insertEndedVideo(repo, { id: 'aired', actualStartTime: 5000, scheduledStartTime: 4000 })
     // 流れた配信（予約枠あり・未配信）→ 除外
     insertEndedVideo(repo, { id: 'cancelled', actualStartTime: null, scheduledStartTime: 5000 })
-    // 通常アップロード（actual も scheduled も無し）→ 残す
+    // 通常アップロード（actual も scheduled も無し）→ 除外
     insertEndedVideo(repo, { id: 'upload', actualStartTime: null, scheduledStartTime: null })
     const rows = repo.listArchive({})
-    expect(rows.map((r) => r.id).sort()).toEqual(['aired', 'upload'])
+    expect(rows.map((r) => r.id)).toEqual(['aired'])
   })
 
-  it('filters by period (ended_at within range)', () => {
+  it('filters by period (within range)', () => {
     insertEndedVideo(repo, { id: 'old', lastCheckedAt: 1000 })
     insertEndedVideo(repo, { id: 'recent', lastCheckedAt: 9000 })
     const rows = repo.listArchive({ periodStart: 5000 })
     expect(rows.map((r) => r.id)).toEqual(['recent'])
-  })
-
-  it('sorts uploads by published_at when actual/scheduled times are absent', () => {
-    // 通常アップロード（actual/scheduled 無し）。published_at で並ぶことを確認。
-    // lastCheckedAt の順とは逆にしておき、published_at が効いていることを検証する。
-    insertEndedVideo(repo, { id: 'newpub', lastCheckedAt: 1000, publishedAt: 9000 })
-    insertEndedVideo(repo, { id: 'oldpub', lastCheckedAt: 2000, publishedAt: 3000 })
-    const rows = repo.listArchive({ sort: 'newest' })
-    expect(rows.map((r) => r.id)).toEqual(['newpub', 'oldpub'])
   })
 
   it('sorts by duration descending with NULL last', () => {
