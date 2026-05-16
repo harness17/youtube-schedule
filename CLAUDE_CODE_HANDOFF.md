@@ -71,9 +71,22 @@ status: active
 - npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
 - 範囲外ファイルを作らない
 
+### レビュー結果（2026-05-16, Claude）
+
+- 公開可否: 🟢 重大指摘なし
+- `formatDuration`: `Number.isFinite` ガード、h:mm:ss / m:ss 切替、ゼロ埋め仕様通り
+- 時刻行: isLive→actualStartTime→scheduledStartTime→publishedAt の cascade、PropTypes 更新済み
+- lint clean / 252 テスト pass（ScheduleCard テスト 25 件）/ build 成功
+- 軽微指摘: なし
+
+### Merge ゲート 4 条件
+| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
+|---------|-------------|----------|-------------|
+| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
+
 ### 次アクション
 
-- Codex が修正 → セルフ verify → Claude がレビュー & コミット
+- ユーザー merge 指示後に `feature/archive-date-duration-display` を develop へ merge
 
 ---
 
