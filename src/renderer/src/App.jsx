@@ -150,6 +150,8 @@ export default function App() {
     archiveSort,
     setArchiveSort,
     resetArchiveFilters,
+    hideMembershipVideos,
+    toggleHideMembershipVideos,
     favoriteReorderMode,
     setFavoriteReorderMode,
     favoriteOrderDirty,
@@ -161,6 +163,7 @@ export default function App() {
     filteredLive,
     filteredUpcoming,
     filteredMissed,
+    missedBadgeCount,
     filteredArchive,
     filteredFavorites,
     favoriteSections,
@@ -541,17 +544,6 @@ export default function App() {
         )}
       </div>
 
-      {activeTab === 'archive' && (
-        <ArchiveFilterBar
-          channels={tabChannels}
-          filters={archiveFilters}
-          sort={archiveSort}
-          onChangeFilters={setArchiveFilters}
-          onChangeSort={setArchiveSort}
-          onReset={resetArchiveFilters}
-        />
-      )}
-
       {/* ── タブバー（ピル型）+ お気に入りセクションナビ ── */}
       <div
         style={{
@@ -582,8 +574,8 @@ export default function App() {
                 className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
               >
                 {label}
-                {key === 'missed' && missedVideos.length > 0 && (
-                  <span className="yt-tab-badge">{missedVideos.length}</span>
+                {key === 'missed' && missedBadgeCount > 0 && (
+                  <span className="yt-tab-badge">{missedBadgeCount}</span>
                 )}
               </button>
             ))}
@@ -597,6 +589,18 @@ export default function App() {
           >
             {pickupMode ? 'ピックアップ中' : 'ピックアップ'}
           </button>
+        )}
+        {activeTab === 'archive' && (
+          <div style={{ paddingTop: '4px', flexShrink: 0 }}>
+            <ArchiveFilterBar
+              channels={tabChannels}
+              filters={archiveFilters}
+              sort={archiveSort}
+              onChangeFilters={setArchiveFilters}
+              onChangeSort={setArchiveSort}
+              onReset={resetArchiveFilters}
+            />
+          </div>
         )}
         {activeTab === 'missed' &&
           filteredMissed.length > 0 &&
@@ -677,6 +681,48 @@ export default function App() {
               </div>
             )
           })()}
+        {activeTab === 'favorites' && favoriteVideos.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              paddingTop: '4px',
+              flexShrink: 0,
+              flexWrap: 'wrap'
+            }}
+          >
+            <button
+              className={`yt-nav-btn${favoriteReorderMode ? ' yt-nav-btn--live' : ''}`}
+              disabled={Boolean(searchQuery.trim()) || selectedChannel !== 'all'}
+              onClick={() => {
+                setFavoriteReorderMode(!favoriteReorderMode)
+              }}
+            >
+              ↕ 並び替え
+            </button>
+            {favoriteReorderMode && (
+              <button
+                className="yt-nav-btn yt-nav-btn--save"
+                disabled={!favoriteOrderDirty || favoriteOrderSaving}
+                onClick={async () => {
+                  const ok = await saveFavoriteOrder()
+                  setToast(ok ? 'お気に入りの並び順を保存しました' : '並び順の保存に失敗しました')
+                }}
+              >
+                {favoriteOrderSaving ? '保存中...' : '保存'}
+              </button>
+            )}
+            {(searchQuery.trim() || selectedChannel !== 'all') && (
+              <span style={{ fontSize: '12px', color: subColor }}>
+                並び替えは絞り込みを解除すると使えます
+              </span>
+            )}
+            {favoriteReorderMode && favoriteOrderDirty && (
+              <span style={{ fontSize: '12px', color: subColor }}>未保存の変更があります</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── 新着動画タブ（簡易モード） ── */}
@@ -829,47 +875,6 @@ export default function App() {
       {/* ── お気に入りタブ（区分ごとに保存済みの任意順） ── */}
       {activeTab === 'favorites' && (
         <div>
-          {favoriteVideos.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '12px',
-                flexWrap: 'wrap'
-              }}
-            >
-              <button
-                className={`yt-nav-btn${favoriteReorderMode ? ' yt-nav-btn--live' : ''}`}
-                disabled={Boolean(searchQuery.trim()) || selectedChannel !== 'all'}
-                onClick={() => {
-                  setFavoriteReorderMode(!favoriteReorderMode)
-                }}
-              >
-                ↕ 並び替え
-              </button>
-              {favoriteReorderMode && (
-                <button
-                  className="yt-nav-btn yt-nav-btn--save"
-                  disabled={!favoriteOrderDirty || favoriteOrderSaving}
-                  onClick={async () => {
-                    const ok = await saveFavoriteOrder()
-                    setToast(ok ? 'お気に入りの並び順を保存しました' : '並び順の保存に失敗しました')
-                  }}
-                >
-                  {favoriteOrderSaving ? '保存中...' : '保存'}
-                </button>
-              )}
-              {(searchQuery.trim() || selectedChannel !== 'all') && (
-                <span style={{ fontSize: '12px', color: subColor }}>
-                  並び替えは絞り込みを解除すると使えます
-                </span>
-              )}
-              {favoriteReorderMode && favoriteOrderDirty && (
-                <span style={{ fontSize: '12px', color: subColor }}>未保存の変更があります</span>
-              )}
-            </div>
-          )}
           {tabLoading ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
               読み込み中...
@@ -976,6 +981,8 @@ export default function App() {
             loadAllDbChannels()
             refresh()
           }}
+          hideMembershipVideos={hideMembershipVideos}
+          onHideMembershipVideosChange={toggleHideMembershipVideos}
         />
       )}
       {toast && <Toast message={toast} onClose={handleToastClose} />}

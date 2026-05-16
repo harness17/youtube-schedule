@@ -25,6 +25,7 @@ function createMocks() {
     upsert: vi.fn(),
     getByIds: vi.fn().mockReturnValue([]),
     listVisible: vi.fn().mockReturnValue([]),
+    listManualTrackingIds: vi.fn().mockReturnValue([]),
     markEnded: vi.fn(),
     deleteExpiredEnded: vi.fn()
   }

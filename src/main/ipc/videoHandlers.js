@@ -85,6 +85,12 @@ export function registerVideoHandlers({
     return repo.listArchive(opts ?? {})
   })
 
+  ipcMain.handle('videos:addManual', async (_, input) => {
+    const scheduler = getScheduler()
+    if (!scheduler) return { ok: false, error: 'NOT_AUTHENTICATED' }
+    return scheduler.addManualVideo(input)
+  })
+
   ipcMain.handle('videos:listFavorites', () => {
     const repo = getVideoRepo()
     if (!repo) return []

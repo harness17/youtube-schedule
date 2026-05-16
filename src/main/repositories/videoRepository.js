@@ -8,13 +8,14 @@ export function createVideoRepository(db) {
     INSERT INTO videos (
       id, channel_id, channel_title, title, description, thumbnail,
       status, scheduled_start_time, actual_start_time, concurrent_viewers,
-      url, first_seen_at, last_checked_at, ended_at, duration, published_at, source
+      url, first_seen_at, last_checked_at, ended_at, duration, published_at,
+      is_membership_only, source
     ) VALUES (
       @id, @channelId, @channelTitle, @title, @description, @thumbnail,
       @status, @scheduledStartTime, @actualStartTime, @concurrentViewers,
       @url, @firstSeenAt, @lastCheckedAt,
       CASE WHEN @status = 'ended' THEN @lastCheckedAt ELSE NULL END,
-      @duration, @publishedAt, @source
+      @duration, @publishedAt, @isMembershipOnly, @source
     )
     ON CONFLICT(id) DO UPDATE SET
       channel_id = excluded.channel_id,
@@ -30,6 +31,7 @@ export function createVideoRepository(db) {
       last_checked_at = excluded.last_checked_at,
       duration = COALESCE(excluded.duration, videos.duration),
       published_at = COALESCE(excluded.published_at, videos.published_at),
+      is_membership_only = MAX(excluded.is_membership_only, videos.is_membership_only),
       source = excluded.source,
       ended_at = CASE
         WHEN excluded.status = 'ended' AND videos.ended_at IS NULL THEN excluded.last_checked_at
@@ -173,6 +175,9 @@ export function createVideoRepository(db) {
         published_at = COALESCE(@publishedAt, published_at)
     WHERE id = @id
   `)
+  const manualTrackingIdsStmt = db.prepare(`
+    SELECT id FROM videos WHERE source = 'manual' AND status != 'ended'
+  `)
   const saveFavoriteOrderTx = db.transaction((ids) => {
     clearFavoriteOrderStmt.run()
     let orderIndex = 0
@@ -204,6 +209,7 @@ export function createVideoRepository(db) {
       source: row.source ?? 'api',
       duration: row.duration ?? null,
       publishedAt: row.published_at ?? null,
+      isMembershipOnly: row.is_membership_only === 1,
       isFavorite: row.is_favorite === 1,
       isNotify: row.notify === 1
     }
@@ -222,6 +228,7 @@ export function createVideoRepository(db) {
         ...video,
         duration: video.duration ?? null,
         publishedAt: video.publishedAt ?? null,
+        isMembershipOnly: video.isMembershipOnly ? 1 : 0,
         source: video.source ?? 'api'
       })
     },
@@ -347,6 +354,10 @@ export function createVideoRepository(db) {
     // duration / published_at のみを更新する。null は既存値を保持（COALESCE）
     backfillMeta(id, { duration = null, publishedAt = null } = {}) {
       backfillMetaStmt.run({ id, duration, publishedAt })
+    },
+    // 手動登録された未終了の動画 ID（スケジューラの再チェック対象）
+    listManualTrackingIds() {
+      return manualTrackingIdsStmt.all().map((row) => row.id)
     },
     listFeed(limit = 50) {
       return listFeedStmt.all({ limit }).map(rowToVideo)

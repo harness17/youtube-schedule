@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   listMissed: () => ipcRenderer.invoke('videos:listMissed'),
   listArchive: (opts) => ipcRenderer.invoke('videos:listArchive', opts),
+  addManualVideo: (input) => ipcRenderer.invoke('videos:addManual', input),
   listFavorites: () => ipcRenderer.invoke('videos:listFavorites'),
   saveFavoriteOrder: (ids) => ipcRenderer.invoke('videos:saveFavoriteOrder', ids),
   searchByText: (query, opts) => ipcRenderer.invoke('videos:searchByText', query, opts),
