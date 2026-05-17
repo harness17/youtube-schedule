@@ -144,15 +144,16 @@ master への直接コミット禁止。
 
 ## 共同開発ハーネス（Codex × Claude Code）
 
-このリポジトリは Codex と Claude Code が共同で開発する。役割分担・merge ゲート・指摘ラベルは以下のルールに従う。
+このリポジトリは Codex と Claude Code が共同で開発する。Codex は作業開始時に `CLAUDE_CODE_HANDOFF.md` の最新セクションを読み、`.agents/skills/implement-task/SKILL.md` と `.claude/rules/project-collaboration-profile.md` に従って作業する。
 
-@.claude/rules/cross-agent-review.md
+@.claude/rules/cross-agent-harness.md
+@.claude/rules/project-collaboration-profile.md
 @.claude/rules/handoff-protocol.md
 
 **Codex が作業を開始するときの流れ：**
 
 1. `CLAUDE_CODE_HANDOFF.md` の最新セクションを読み、自分宛ての依頼があるか確認
-2. `.agents/skills/implement-task/SKILL.md` の手順に従い、ブランチを切って実装
+2. `.agents/skills/implement-task/SKILL.md` と YouTom profile の担当境界に従い、必要ならブランチを切って実装
 3. セルフ verify（`npm run lint && npm run test && npm run build`）を通す
 4. ハンドオフのセルフ verify を ✅ に更新
 5. レビュー依頼を残してターンを Claude に渡す
