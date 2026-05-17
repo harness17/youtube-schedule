@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 
 const TABS = [
-  { key: 'general', label: '⚙️ 基本' },
+  { key: 'display', label: '🎨 表示' },
   { key: 'channels', label: '📌 チャンネル' },
-  { key: 'membership', label: '📺 メンバー限定' },
-  { key: 'data', label: '📦 データ管理' }
+  { key: 'data', label: '📦 データ' },
+  { key: 'connection', label: '🔌 接続' },
+  { key: 'about', label: 'ℹ️ アプリ情報' }
 ]
 
 export default function SettingsModal({
@@ -28,7 +29,7 @@ export default function SettingsModal({
   onImportCredentials,
   hideMembershipVideos = false,
   onHideMembershipVideosChange,
-  initialTab = 'general'
+  initialTab = 'display'
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [autoDownload, setAutoDownload] = useState(true)
@@ -216,7 +217,37 @@ export default function SettingsModal({
     }
   }
 
-  function renderGeneral() {
+  async function handleAddManualVideo() {
+    const input = manualVideoInput.trim()
+    if (!input || manualVideoSaving) return
+    setManualVideoSaving(true)
+    setManualVideoMessage(null)
+    try {
+      const result = await window.api.addManualVideo(input)
+      if (result?.ok) {
+        setManualVideoMessage({
+          type: 'success',
+          text: `「${result.video?.title ?? '動画'}」を追加しました`
+        })
+        setManualVideoInput('')
+        onChannelsUpdated?.()
+      } else {
+        const errorText =
+          {
+            INVALID_INPUT: 'URL または動画 ID の形式が正しくありません',
+            NOT_AUTHENTICATED: 'ログインが必要です。接続タブからログインしてください',
+            NOT_FOUND:
+              '動画が見つかりません。非公開、またはこのアカウントで視聴できない可能性があります',
+            FETCH_FAILED: '取得に失敗しました。時間をおいて再試行してください'
+          }[result?.error] ?? '追加に失敗しました'
+        setManualVideoMessage({ type: 'error', text: errorText })
+      }
+    } finally {
+      setManualVideoSaving(false)
+    }
+  }
+
+  function renderConnection() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
@@ -345,6 +376,34 @@ export default function SettingsModal({
           </div>
         </div>
         <div>
+          <div style={sectionLabelStyle}>アカウント</div>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                Google アカウントからログアウト
+              </div>
+              <div style={descStyle}>再ログインが必要になります</div>
+            </div>
+            <button
+              style={btnStyle('danger', { disabled: !isAuthenticated })}
+              disabled={!isAuthenticated}
+              onClick={() => {
+                onClose()
+                onLogout()
+              }}
+            >
+              ログアウト
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderDisplay() {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
           <div style={sectionLabelStyle}>テーマ</div>
           <div style={rowStyle}>
             <div>
@@ -401,39 +460,16 @@ export default function SettingsModal({
           </div>
         </div>
         <div>
-          <div style={sectionLabelStyle}>アップデート確認</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>最新バージョンを確認する</div>
-              <div style={descStyle}>
-                現在: v{appVersion}
-                {updateChecking ? '　確認中...' : ''}
-              </div>
-            </div>
-            <button
-              style={btnStyle('primary', { disabled: updateChecking })}
-              onClick={handleCheckUpdate}
-              disabled={updateChecking}
-            >
-              🔍 今すぐ確認
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>自動アップデート</div>
+          <div style={sectionLabelStyle}>メンバー限定動画</div>
           <div style={rowStyle}>
             <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
+              <div style={{ color: textColor, fontSize: '13px' }}>メン限動画を一覧に表示しない</div>
               <div style={descStyle}>
-                新しいバージョンが見つかると自動でダウンロードします
-                <br />
-                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
-                  ※ 変更は次回起動時に反映されます
-                </span>
+                🔒 メンバー限定の動画を予定・見逃し・アーカイブ・お気に入りから隠します
               </div>
             </div>
             <button
-              onClick={handleAutoDownloadToggle}
+              onClick={() => onHideMembershipVideosChange?.(!hideMembershipVideos)}
               style={{
                 padding: '4px 14px',
                 fontSize: '11px',
@@ -441,78 +477,11 @@ export default function SettingsModal({
                 borderRadius: '10px',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
-                background: autoDownload ? '#6060c0' : '#ddd',
-                color: autoDownload ? 'white' : '#666'
+                background: hideMembershipVideos ? '#6060c0' : '#ddd',
+                color: hideMembershipVideos ? 'white' : '#666'
               }}
             >
-              {autoDownload ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>バージョン情報</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
-            {[
-              ['アプリ名', 'Youtom'],
-              ['説明', 'YouTube 配信予定ビューア'],
-              ['バージョン', `v${appVersion}`]
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}
-              >
-                <span style={{ color: subColor }}>{label}</span>
-                <span style={{ color: textColor }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>ライセンス</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '2px' }}>
-            <div style={{ color: textColor, fontSize: '13px' }}>MIT License</div>
-            <div style={descStyle}>Copyright © 2026 harness17</div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>リンク</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule')
-              }
-            >
-              GitHub ↗
-            </button>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule/issues')
-              }
-            >
-              バグ報告 ↗
-            </button>
-          </div>
-        </div>
-        <div style={{ borderTop: `1px solid ${inputBorder}`, paddingTop: '14px' }}>
-          <div style={sectionLabelStyle}>アカウント</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                Google アカウントからログアウト
-              </div>
-              <div style={descStyle}>再ログインが必要になります</div>
-            </div>
-            <button
-              style={btnStyle('danger', { disabled: !isAuthenticated })}
-              disabled={!isAuthenticated}
-              onClick={() => {
-                onClose()
-                onLogout()
-              }}
-            >
-              ログアウト
+              {hideMembershipVideos ? 'ON' : 'OFF'}
             </button>
           </div>
         </div>
@@ -530,37 +499,23 @@ export default function SettingsModal({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
-          <div style={sectionLabelStyle}>手動追加</div>
+          <div style={sectionLabelStyle}>メン限動画の手動追加</div>
           <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
             <div>
               <div style={{ color: textColor, fontSize: '13px' }}>
-                Google連携なしで追加するチャンネル
+                自動取得できない動画を追加して追跡
               </div>
               <div style={descStyle}>
-                チャンネルページのURL、または @ハンドル名を入力してください。
+                メンバー限定配信など、RSS・購読では取得できない動画を URL または動画 ID
+                で追加できます。追加にはその動画を視聴できる Google
+                アカウントでのログインが必要です。
               </div>
             </div>
             <input
               type="text"
-              placeholder="https://www.youtube.com/@example または @example"
-              value={manualChannelInput}
-              onChange={(e) => setManualChannelInput(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="表示名（任意）"
-              value={manualChannelTitle}
-              onChange={(e) => setManualChannelTitle(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=... または 動画ID"
+              value={manualVideoInput}
+              onChange={(e) => setManualVideoInput(e.target.value)}
               style={{
                 padding: '8px 12px',
                 fontSize: '13px',
@@ -573,12 +528,22 @@ export default function SettingsModal({
               }}
             />
             <button
-              style={btnStyle('primary', { disabled: manualChannelSaving })}
-              disabled={manualChannelSaving}
-              onClick={handleAddManualChannel}
+              style={btnStyle('primary', { disabled: manualVideoSaving })}
+              disabled={manualVideoSaving}
+              onClick={handleAddManualVideo}
             >
-              {manualChannelSaving ? '追加中...' : '追加'}
+              {manualVideoSaving ? '追加中...' : '追加'}
             </button>
+            {manualVideoMessage && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: manualVideoMessage.type === 'success' ? '#1e9e54' : '#e8001c'
+                }}
+              >
+                {manualVideoMessage.text}
+              </div>
+            )}
           </div>
         </div>
         <div>
@@ -701,6 +666,58 @@ export default function SettingsModal({
             </div>
           </div>
         </div>
+        <div>
+          <div style={sectionLabelStyle}>チャンネル手動追加</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+            <div>
+              <div style={{ color: textColor, fontSize: '13px' }}>
+                Google連携なしで追加するチャンネル
+              </div>
+              <div style={descStyle}>
+                チャンネルページのURL、または @ハンドル名を入力してください。
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="https://www.youtube.com/@example または @example"
+              value={manualChannelInput}
+              onChange={(e) => setManualChannelInput(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="表示名（任意）"
+              value={manualChannelTitle}
+              onChange={(e) => setManualChannelTitle(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                background: inputBg,
+                color: textColor,
+                border: `1px solid ${inputBorder}`,
+                borderRadius: '8px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+            />
+            <button
+              style={btnStyle('primary', { disabled: manualChannelSaving })}
+              disabled={manualChannelSaving}
+              onClick={handleAddManualChannel}
+            >
+              {manualChannelSaving ? '追加中...' : '追加'}
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -776,98 +793,43 @@ export default function SettingsModal({
     )
   }
 
-  async function handleAddManualVideo() {
-    const input = manualVideoInput.trim()
-    if (!input || manualVideoSaving) return
-    setManualVideoSaving(true)
-    setManualVideoMessage(null)
-    try {
-      const result = await window.api.addManualVideo(input)
-      if (result?.ok) {
-        setManualVideoMessage({
-          type: 'success',
-          text: `「${result.video?.title ?? '動画'}」を追加しました`
-        })
-        setManualVideoInput('')
-        onChannelsUpdated?.()
-      } else {
-        const errorText =
-          {
-            INVALID_INPUT: 'URL または動画 ID の形式が正しくありません',
-            NOT_AUTHENTICATED: 'ログインが必要です。基本タブからログインしてください',
-            NOT_FOUND:
-              '動画が見つかりません。非公開、またはこのアカウントで視聴できない可能性があります',
-            FETCH_FAILED: '取得に失敗しました。時間をおいて再試行してください'
-          }[result?.error] ?? '追加に失敗しました'
-        setManualVideoMessage({ type: 'error', text: errorText })
-      }
-    } finally {
-      setManualVideoSaving(false)
-    }
-  }
-
-  function renderMembership() {
+  function renderAbout() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
-          <div style={sectionLabelStyle}>メン限動画の手動追加</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+          <div style={sectionLabelStyle}>アップデート確認</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                自動取得できない動画を追加して追跡
-              </div>
+              <div style={{ color: textColor, fontSize: '13px' }}>最新バージョンを確認する</div>
               <div style={descStyle}>
-                メンバー限定配信など、RSS・購読では取得できない動画を URL または動画 ID
-                で追加できます。追加にはその動画を視聴できる Google
-                アカウントでのログインが必要です。
+                現在: v{appVersion}
+                {updateChecking ? '　確認中...' : ''}
               </div>
             </div>
-            <input
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=... または 動画ID"
-              value={manualVideoInput}
-              onChange={(e) => setManualVideoInput(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
             <button
-              style={btnStyle('primary', { disabled: manualVideoSaving })}
-              disabled={manualVideoSaving}
-              onClick={handleAddManualVideo}
+              style={btnStyle('primary', { disabled: updateChecking })}
+              onClick={handleCheckUpdate}
+              disabled={updateChecking}
             >
-              {manualVideoSaving ? '追加中...' : '追加'}
+              🔍 今すぐ確認
             </button>
-            {manualVideoMessage && (
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: manualVideoMessage.type === 'success' ? '#1e9e54' : '#e8001c'
-                }}
-              >
-                {manualVideoMessage.text}
-              </div>
-            )}
           </div>
         </div>
         <div>
-          <div style={sectionLabelStyle}>表示</div>
+          <div style={sectionLabelStyle}>自動アップデート</div>
           <div style={rowStyle}>
             <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>メン限動画を一覧に表示しない</div>
+              <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
               <div style={descStyle}>
-                🔒 メンバー限定の動画を予定・見逃し・アーカイブ・お気に入りから隠します
+                新しいバージョンが見つかると自動でダウンロードします
+                <br />
+                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
+                  ※ 変更は次回起動時に反映されます
+                </span>
               </div>
             </div>
             <button
-              onClick={() => onHideMembershipVideosChange?.(!hideMembershipVideos)}
+              onClick={handleAutoDownloadToggle}
               style={{
                 padding: '4px 14px',
                 fontSize: '11px',
@@ -875,11 +837,57 @@ export default function SettingsModal({
                 borderRadius: '10px',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
-                background: hideMembershipVideos ? '#6060c0' : '#ddd',
-                color: hideMembershipVideos ? 'white' : '#666'
+                background: autoDownload ? '#6060c0' : '#ddd',
+                color: autoDownload ? 'white' : '#666'
               }}
             >
-              {hideMembershipVideos ? 'ON' : 'OFF'}
+              {autoDownload ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>バージョン情報</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
+            {[
+              ['アプリ名', 'Youtom'],
+              ['説明', 'YouTube 配信予定ビューア'],
+              ['バージョン', `v${appVersion}`]
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}
+              >
+                <span style={{ color: subColor }}>{label}</span>
+                <span style={{ color: textColor }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>ライセンス</div>
+          <div style={{ ...rowStyle, flexDirection: 'column', gap: '2px' }}>
+            <div style={{ color: textColor, fontSize: '13px' }}>MIT License</div>
+            <div style={descStyle}>Copyright © 2026 harness17</div>
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabelStyle}>リンク</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={btnStyle('secondary')}
+              onClick={() =>
+                window.api.openExternal('https://github.com/harness17/youtube-schedule')
+              }
+            >
+              GitHub ↗
+            </button>
+            <button
+              style={btnStyle('secondary')}
+              onClick={() =>
+                window.api.openExternal('https://github.com/harness17/youtube-schedule/issues')
+              }
+            >
+              バグ報告 ↗
             </button>
           </div>
         </div>
@@ -888,10 +896,11 @@ export default function SettingsModal({
   }
 
   const tabContent = {
-    general: renderGeneral,
+    connection: renderConnection,
+    display: renderDisplay,
     channels: renderChannels,
-    membership: renderMembership,
-    data: renderData
+    data: renderData,
+    about: renderAbout
   }
 
   return (
@@ -974,7 +983,7 @@ export default function SettingsModal({
               key={key}
               onClick={() => setActiveTab(key)}
               style={{
-                padding: '10px 12px',
+                padding: '10px 8px',
                 minWidth: 0,
                 fontSize: '12px',
                 cursor: 'pointer',
@@ -1033,5 +1042,5 @@ SettingsModal.propTypes = {
   onImportCredentials: PropTypes.func.isRequired,
   hideMembershipVideos: PropTypes.bool,
   onHideMembershipVideosChange: PropTypes.func,
-  initialTab: PropTypes.oneOf(['general', 'channels', 'membership', 'data'])
+  initialTab: PropTypes.oneOf(['connection', 'display', 'channels', 'data', 'about'])
 }
