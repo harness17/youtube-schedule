@@ -25,14 +25,70 @@ describe('ChannelRepository', () => {
     expect(list.map((c) => c.id).sort()).toEqual(['UC1', 'UC2'])
   })
 
-  it('syncSubscriptions does not delete channels removed from subscriptions', () => {
+  it('syncSubscriptions logically deletes channels removed from subscriptions', () => {
     repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
     repo.syncSubscriptions([{ id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }], 2)
     const ids = repo
       .listAll()
       .map((c) => c.id)
       .sort()
-    expect(ids).toEqual(['UC1', 'UC2'])
+    expect(ids).toEqual(['UC2'])
+  })
+
+  it('syncSubscriptions does not delete manually added channels', () => {
+    repo.addManual({ id: 'UC_MANUAL', title: 'Manual', uploadsPlaylistId: 'UU_MANUAL' })
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
+    const ids = repo
+      .listAll()
+      .map((c) => c.id)
+      .sort()
+    expect(ids).toEqual(['UC1', 'UC_MANUAL'])
+  })
+
+  it('syncSubscriptions does not delete anything when the fetch returns empty', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
+    repo.syncSubscriptions([], 2)
+    expect(repo.listAll().map((c) => c.id)).toEqual(['UC1'])
+  })
+
+  it('re-subscription revives a logically deleted channel with is_pinned intact', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
+    repo.togglePin('UC1')
+    repo.syncSubscriptions([{ id: 'UC2', title: 'B', uploadsPlaylistId: 'UU2' }], 2)
+    expect(repo.listAll().find((c) => c.id === 'UC1')).toBeUndefined()
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 3)
+    const uc1 = repo.listAll().find((c) => c.id === 'UC1')
+    expect(uc1).toBeDefined()
+    expect(uc1.isPinned).toBe(true)
+  })
+
+  it('delete logically removes a channel and clears is_pinned', () => {
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 1)
+    repo.togglePin('UC1')
+    expect(repo.delete('UC1')).toBe(true)
+    expect(repo.listAll().find((c) => c.id === 'UC1')).toBeUndefined()
+    // 手動削除後に再購読しても📌は復活しない
+    repo.syncSubscriptions([{ id: 'UC1', title: 'A', uploadsPlaylistId: 'UU1' }], 2)
+    expect(repo.listAll().find((c) => c.id === 'UC1').isPinned).toBe(false)
+  })
+
+  it('delete returns false for unknown or already deleted channel', () => {
+    expect(repo.delete('missing')).toBe(false)
+    repo.addManual({ id: 'UC_MANUAL', title: 'Manual', uploadsPlaylistId: 'UU_MANUAL' })
+    expect(repo.delete('UC_MANUAL')).toBe(true)
+    expect(repo.delete('UC_MANUAL')).toBe(false)
+  })
+
+  it('addManual marks the channel as manual', () => {
+    const ch = repo.addManual({ id: 'UC_MANUAL', title: 'Manual', uploadsPlaylistId: 'UU_MANUAL' })
+    expect(ch.isManual).toBe(true)
+  })
+
+  it('upsertSeen does not revive a logically deleted channel', () => {
+    repo.addManual({ id: 'UC_M', title: 'Manual', uploadsPlaylistId: 'UU_M' })
+    repo.delete('UC_M')
+    repo.upsertSeen('UC_M', 'Seen Again')
+    expect(repo.listAll().find((c) => c.id === 'UC_M')).toBeUndefined()
   })
 
   it('getLastSyncTime returns 0 when empty', () => {
@@ -90,8 +146,8 @@ describe('ChannelRepository', () => {
     const uc1 = list.find((c) => c.id === 'UC1')
     expect(uc1.isPinned).toBe(true)
     expect(uc1.title).toBe('A renamed')
-    // UC2 はサブスク外でも残る
-    expect(list.find((c) => c.id === 'UC2')).toBeDefined()
+    // UC2 はサブスク外になったため論理削除される
+    expect(list.find((c) => c.id === 'UC2')).toBeUndefined()
     expect(list.find((c) => c.id === 'UC3')).toBeDefined()
   })
 

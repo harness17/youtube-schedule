@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   onUpdaterError: (cb) => ipcRenderer.on('updater:error', (_, msg) => cb(msg)),
   quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),
   getRssFailureRate: () => ipcRenderer.invoke('diag:rssFailureRate'),
+  getQuotaStatus: () => ipcRenderer.invoke('diag:quotaStatus'),
   resetDatabase: () => ipcRenderer.invoke('schedule:resetDatabase'),
   onScheduleUpdated: (cb) => {
     const listener = () => cb()
@@ -38,6 +39,7 @@ contextBridge.exposeInMainWorld('api', {
   togglePin: (id) => ipcRenderer.invoke('channels:togglePin', id),
   listAllChannels: () => ipcRenderer.invoke('channels:listAll'),
   addManualChannel: (payload) => ipcRenderer.invoke('channels:addManual', payload),
+  deleteChannel: (id) => ipcRenderer.invoke('channels:delete', id),
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
   exportFavorites: () => ipcRenderer.invoke('favorites:export'),

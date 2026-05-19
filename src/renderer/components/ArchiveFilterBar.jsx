@@ -114,7 +114,7 @@ export function ArchiveFilterBar({
               style={{
                 gridColumn: '1 / -1',
                 display: 'flex',
-                justifyContent: 'flex-end'
+                justifyContent: 'flex-start'
               }}
             >
               <button type="button" className="yt-nav-btn" onClick={onReset}>

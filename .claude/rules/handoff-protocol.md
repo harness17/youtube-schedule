@@ -1,70 +1,44 @@
-# Handoff Protocol ルール（YouTom 共同開発）
+# Handoff Protocol
 
-Codex / Claude Code 間のハンドオフ運用ルール。グローバルの `handoff-capture.md` / `handoff-archive.md` をプロジェクト固有に具体化する。
+`CLAUDE_CODE_HANDOFF.md` は Codex と Claude Code の共有作業ログ。最新の追記を上に置く。
 
-## ファイル
+## 追記するタイミング
 
-`CLAUDE_CODE_HANDOFF.md`（リポジトリ直下、単一ファイル追記式）
+- 片方のエージェントへ実装、レビュー、検証を渡すとき。
+- 設計方針、触ってよい範囲、検証条件が変わったとき。
+- ブロッカー、競合、未解決リスクが出たとき。
+- 作業完了時に次の担当者が迷う情報があるとき。
 
-## セクション書式
+## 追記テンプレート
 
-新しいタスクごとに以下のテンプレを最上部に追記する（最新が上）。
+```md
+## YYYY-MM-DD HH:mm 追記（<主題> — <agent> 作成）
 
-```markdown
-## YYYY-MM-DD HH:mm 追記（<topic> — <agent> 作成）
-
-- 対象: feature/<branch-name> または develop
-- 作成者: ClaudeCode | Codex
-- 主題: <1行>
-- 変更ファイル: <list>
-- レビュー担当: <反対側>
-- 触ってよい範囲: <files>
-- セルフ verify: ✅/❌ (lint/test/build)
-- 実動確認: ✅/❌/N/A
+- 対象: <branch / worktree / path>
+- 作成者: <Codex | Claude Code | user>
+- 主題: <一文>
+- 触ってよい範囲: <files / directories>
+- 触ってはいけない範囲: <unrelated files / user changes>
+- 完成条件:
+  - <normal behavior>
+  - <preconditions / auth / usage>
+  - <error handling>
+  - <no-regression checks>
+- 変更内容:
+  - <summary>
+- セルフ verify: <command and result>
+- 実動確認: <method and result or N/A>
 - レビュー観点:
-  - <観点1>
-  - <観点2>
-
-### レビュー結果（YYYY-MM-DD, レビュー側）
-- 公開可否: 🟢 / 🔴 / 🟡
-- 重大指摘:
-- 軽微指摘:
-
-### 反映状況（YYYY-MM-DD, 実装側）
-| 指摘 | 反映内容 |
-|------|---------|
-
-### Merge ゲート 4 条件
-| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
-|---------|-------------|----------|-------------|
-| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
-
-### 次アクション
-- <次の人がやること>
+  - <risk-focused checks>
+- 未解決:
+  - <questions / blockers>
+- 次アクション:
+  - <one concrete action>
 ```
 
-## 更新タイミング
+## 書き方
 
-| タイミング | 誰が | 何を |
-|-----------|------|------|
-| タスク開始時 | 作成者 | 依頼セクション（対象・主題・変更ファイル・レビュー観点）を追記 |
-| セルフ verify 完了時 | 作成者 | セルフ verify を ✅ に更新 |
-| 実動確認完了時 | 検証担当 | 実動確認を ✅ に更新 |
-| レビュー完了時 | レビュー側 | レビュー結果セクションを追記 |
-| 指摘反映時 | 実装側 | 反映状況テーブルを追記 |
-| Merge 後 | merge 実行者 | 次アクションを「完了」に更新 |
-
-## アーカイブ閾値
-
-グローバルの `handoff-archive.md` に準拠。
-
-- セクション 10 を超えた、または最古セクションが 30 日以上前 → `handoffs/archive/YYYY-QN.md` に切り出し
-- 切り出し後、元ファイルには 1 行サマリ + archive へのリンクを残す
-
-## status 用語
-
-ハンドオフ全体の状態を文書頭に記載する場合、3 値のみ使う。
-
-- `active` — 後続作業・レビュー・merge 指示待ちが残っている
-- `completed` — Merge 完了・後続作業が別ハンドオフに移譲済み
-- `blocked` — 外部確認待ち・ユーザー判断待ちで前進できない
+- secret、個人情報、環境固有 token は書かない。
+- 「何をしたか」だけでなく「次に何を見ればよいか」を書く。
+- 検証未実行を成功扱いしない。
+- 同じ主題の handoff がある場合は重複作成より追記を優先する。
