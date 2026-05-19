@@ -5,6 +5,11 @@
  * Electron development uses scripts/rebuild-native.js for the Electron ABI.
  * Vitest runs under Node.js, so test setup must verify the Node ABI instead
  * of blindly rebuilding and depending on the user's global npm cache.
+ *
+ * 重要: ネイティブモジュールは同一プロセスで2回ロードすると（特にリビルドを
+ * 挟むと）"Module did not self-register" でセグフォルト（exit 139）する。
+ * そのため binding の検証は必ず使い捨ての子プロセスで行い、このスクリプト
+ * 本体のプロセスでは better-sqlite3 をロードしない。
  */
 const { spawnSync } = require('child_process')
 const path = require('path')
@@ -12,30 +17,33 @@ const { configureNativeBuildEnv } = require('./native-build-env')
 
 const projectRoot = path.resolve(__dirname, '..')
 
-function checkBinding() {
-  try {
-    const Database = require('better-sqlite3')
-    const db = new Database(':memory:')
-    db.prepare('select 1').get()
-    db.close()
-    return null
-  } catch (error) {
-    return error
-  }
+function verifyBindingInChildProcess() {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      "const D=require('better-sqlite3');const db=new D(':memory:');db.prepare('select 1').get();db.close()"
+    ],
+    { cwd: projectRoot, stdio: 'pipe' }
+  )
+  if (result.status === 0) return null
+  const stderr = (result.stderr && result.stderr.toString().trim()) || ''
+  return stderr || (result.error && result.error.message) || `exit code ${result.status}`
 }
 
-function rebuildForNode() {
+function rebuildForNode(reason) {
   const { cachePath, pythonPath } = configureNativeBuildEnv()
-  const env = {
-    ...process.env
-  }
+  const env = { ...process.env }
   const command = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'npm'
   const args =
     process.platform === 'win32'
       ? ['/d', '/s', '/c', 'npm rebuild better-sqlite3']
       : ['rebuild', 'better-sqlite3']
 
-  console.log(`better-sqlite3 binding is missing for Node ${process.versions.node}.`)
+  console.log(`better-sqlite3 binding is not usable from Node ${process.versions.node}.`)
+  if (reason) {
+    console.log(`  reason: ${reason}`)
+  }
   console.log(`Rebuilding better-sqlite3 with npm cache: ${cachePath}`)
   if (pythonPath) {
     console.log(`Using Python for node-gyp: ${pythonPath}`)
@@ -61,18 +69,18 @@ function rebuildForNode() {
   }
 }
 
-const firstError = checkBinding()
+const firstError = verifyBindingInChildProcess()
 if (!firstError) {
   console.log('better-sqlite3 Node binding is ready.')
   process.exit(0)
 }
 
-console.log(firstError.message.split('\n')[0])
-rebuildForNode()
+rebuildForNode(firstError.split('\n')[0])
 
-const secondError = checkBinding()
+const secondError = verifyBindingInChildProcess()
 if (secondError) {
-  console.error(secondError.message)
+  console.error('better-sqlite3 is still not usable after rebuild:')
+  console.error(secondError)
   process.exit(1)
 }
 
