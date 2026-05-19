@@ -6,7 +6,7 @@
  *   diag:rssFailureRate
  *   videos:listMissed / listArchive / listFavorites / searchByText
  *   videos:markViewed / clearViewed / toggleFavorite / saveFavoriteOrder / toggleNotify
- *   channels:togglePin / listAll
+ *   channels:togglePin / listAll / addManual / delete
  *
  * 依存オブジェクトは全てゲッター関数として受け取る。
  * index.js の変数が後から代入される場合（initDatabase 後など）でも
@@ -158,5 +158,11 @@ export function registerVideoHandlers({
     } catch (err) {
       return { error: err.message }
     }
+  })
+
+  ipcMain.handle('channels:delete', (_, id) => {
+    const repo = getChannelRepo()
+    if (!repo) return false
+    return repo.delete(id)
   })
 }

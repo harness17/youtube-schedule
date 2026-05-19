@@ -200,6 +200,18 @@ export default function SettingsModal({
     onToast('チャンネルを追加しました')
   }
 
+  async function handleDeleteChannel(channelId, channelTitle) {
+    if (!window.confirm(`「${channelTitle ?? channelId}」を一覧から削除しますか？`)) return
+    const ok = await window.api.deleteChannel?.(channelId)
+    if (!ok) {
+      onToast('チャンネルの削除に失敗しました')
+      return
+    }
+    await reloadChannels()
+    onPinnedChannelsUpdated()
+    onToast('チャンネルを削除しました')
+  }
+
   async function handleImportCredentials() {
     const result = await onImportCredentials()
     if (result?.canceled) return
@@ -489,11 +501,109 @@ export default function SettingsModal({
     )
   }
 
+  // チャンネル1行。優先チャンネルリストと手動追加チャンネルリストで共有する。
+  // showDelete=true のときだけ🗑削除ボタンを出す（手動追加チャンネル用）。
+  function renderChannelRow(channel, showDelete) {
+    const { id, title, isPinned } = channel
+    return (
+      <div
+        key={id}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '9px 10px',
+          background: isPinned
+            ? darkMode
+              ? 'rgba(255,201,64,0.08)'
+              : 'rgba(212,144,10,0.06)'
+            : bgColor,
+          border: `1px solid ${
+            isPinned ? (darkMode ? 'rgba(255,201,64,0.24)' : 'rgba(212,144,10,0.22)') : inputBorder
+          }`,
+          borderRadius: '8px'
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: '13px',
+            color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : textColor,
+            fontWeight: isPinned ? '600' : 'normal',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={title}
+        >
+          {isPinned && <span style={{ marginRight: '5px' }}>📌</span>}
+          {title}
+        </div>
+        <button
+          onClick={() => handleTogglePin(id)}
+          title={isPinned ? '優先解除' : '優先に設定'}
+          style={{
+            ...btnStyle('secondary'),
+            padding: '5px 12px',
+            background: isPinned
+              ? darkMode
+                ? 'rgba(255,201,64,0.18)'
+                : 'rgba(212,144,10,0.12)'
+              : subBtnBg,
+            color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subBtnColor,
+            border: `1px solid ${
+              isPinned ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)') : inputBorder
+            }`,
+            fontWeight: isPinned ? '600' : 'normal'
+          }}
+        >
+          {isPinned ? '優先中' : '優先'}
+        </button>
+        {showDelete && (
+          <button
+            onClick={() => handleDeleteChannel(id, title)}
+            title="一覧から削除"
+            style={{ ...btnStyle('danger'), padding: '5px 10px' }}
+          >
+            🗑
+          </button>
+        )}
+      </div>
+    )
+  }
+
   function renderChannels() {
-    const filteredChannels = channels.filter(
-      ({ title }) =>
-        channelManagerQuery === '' ||
-        (title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase())
+    // 購読チャンネル（is_manual=false）と手動追加チャンネル（is_manual=true）を分離して
+    // それぞれ別セクションで管理する。優先リストの絞り込みは購読チャンネルのみ対象。
+    const subscriptionChannels = channels.filter(
+      (c) =>
+        !c.isManual &&
+        (channelManagerQuery === '' ||
+          (c.title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase()))
+    )
+    const manualChannels = channels.filter((c) => c.isManual)
+    const listContainerStyle = {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+      maxHeight: '320px',
+      overflowY: 'auto'
+    }
+    const emptyBox = (text) => (
+      <div
+        style={{
+          padding: '12px',
+          borderRadius: '8px',
+          background: bgColor,
+          border: `1px dashed ${inputBorder}`,
+          color: subColor,
+          fontSize: '12px',
+          textAlign: 'center'
+        }}
+      >
+        {text}
+      </div>
     )
 
     return (
@@ -554,7 +664,8 @@ export default function SettingsModal({
                 予定・ライブ一覧の上部に表示するチャンネルを管理
               </div>
               <div style={descStyle}>
-                配信カードの 📌 ボタンと同じ設定です。ここからまとめて見直せます。
+                Google 連携で同期した購読チャンネルの一覧です。配信カードの 📌
+                ボタンと同じ設定で、ここからまとめて見直せます。
               </div>
             </div>
             <input
@@ -573,108 +684,23 @@ export default function SettingsModal({
                 fontFamily: 'inherit'
               }}
             />
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                maxHeight: '320px',
-                overflowY: 'auto'
-              }}
-            >
-              {filteredChannels.length > 0 ? (
-                filteredChannels.map(({ id, title, isPinned }) => (
-                  <div
-                    key={id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '9px 10px',
-                      background: isPinned
-                        ? darkMode
-                          ? 'rgba(255,201,64,0.08)'
-                          : 'rgba(212,144,10,0.06)'
-                        : bgColor,
-                      border: `1px solid ${
-                        isPinned
-                          ? darkMode
-                            ? 'rgba(255,201,64,0.24)'
-                            : 'rgba(212,144,10,0.22)'
-                          : inputBorder
-                      }`,
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <div
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: '13px',
-                        color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : textColor,
-                        fontWeight: isPinned ? '600' : 'normal',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
-                      title={title}
-                    >
-                      {isPinned && <span style={{ marginRight: '5px' }}>📌</span>}
-                      {title}
-                    </div>
-                    <button
-                      onClick={() => handleTogglePin(id)}
-                      title={isPinned ? '優先解除' : '優先に設定'}
-                      style={{
-                        ...btnStyle('secondary'),
-                        padding: '5px 12px',
-                        background: isPinned
-                          ? darkMode
-                            ? 'rgba(255,201,64,0.18)'
-                            : 'rgba(212,144,10,0.12)'
-                          : subBtnBg,
-                        color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subBtnColor,
-                        border: `1px solid ${
-                          isPinned
-                            ? darkMode
-                              ? 'rgba(255,201,64,0.4)'
-                              : 'rgba(212,144,10,0.35)'
-                            : inputBorder
-                        }`,
-                        fontWeight: isPinned ? '600' : 'normal'
-                      }}
-                    >
-                      {isPinned ? '優先中' : '優先'}
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div
-                  style={{
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: bgColor,
-                    border: `1px dashed ${inputBorder}`,
-                    color: subColor,
-                    fontSize: '12px',
-                    textAlign: 'center'
-                  }}
-                >
-                  該当するチャンネルがありません
-                </div>
-              )}
+            <div style={listContainerStyle}>
+              {subscriptionChannels.length > 0
+                ? subscriptionChannels.map((ch) => renderChannelRow(ch, false))
+                : emptyBox('該当するチャンネルがありません')}
             </div>
           </div>
         </div>
         <div>
-          <div style={sectionLabelStyle}>チャンネル手動追加</div>
+          <div style={sectionLabelStyle}>手動追加チャンネル</div>
           <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
             <div>
               <div style={{ color: textColor, fontSize: '13px' }}>
-                Google連携なしで追加するチャンネル
+                Google 連携なしで追加・管理するチャンネル
               </div>
               <div style={descStyle}>
-                チャンネルページのURL、または @ハンドル名を入力してください。
+                チャンネルページの URL、または @ハンドル名を入力してください。ここで追加した
+                チャンネルは購読同期では消えず、🗑 ボタンで削除できます。
               </div>
             </div>
             <input
@@ -716,6 +742,11 @@ export default function SettingsModal({
             >
               {manualChannelSaving ? '追加中...' : '追加'}
             </button>
+            <div style={listContainerStyle}>
+              {manualChannels.length > 0
+                ? manualChannels.map((ch) => renderChannelRow(ch, true))
+                : emptyBox('手動追加したチャンネルはまだありません')}
+            </div>
           </div>
         </div>
       </div>

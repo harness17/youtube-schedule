@@ -42,14 +42,21 @@ export function createVideoRepository(db) {
 
   const getByIdStmt = db.prepare(`SELECT * FROM videos WHERE id = ?`)
   const countStmt = db.prepare(`SELECT COUNT(*) AS c FROM videos`)
+  // 論理削除されたチャンネル（channels.deleted_at IS NOT NULL）の動画は
+  // アクティブな予定表に出さない。channels に行が無い動画（手動登録・インポート
+  // お気に入りなど）は LEFT JOIN で c.deleted_at が NULL になり、従来どおり表示される。
   const listVisibleStmt = db.prepare(`
-    SELECT * FROM videos
-    WHERE (status = 'live' AND actual_start_time > @liveThreshold)
-       OR (status = 'upcoming' AND scheduled_start_time > @upcomingThreshold AND scheduled_start_time < @upcomingUpperThreshold)
-       OR (@includeFeedItems AND status = 'upcoming' AND scheduled_start_time IS NULL AND last_checked_at > @rssOnlyThreshold)
+    SELECT v.* FROM videos v
+    LEFT JOIN channels c ON v.channel_id = c.id
+    WHERE c.deleted_at IS NULL
+      AND (
+           (v.status = 'live' AND v.actual_start_time > @liveThreshold)
+        OR (v.status = 'upcoming' AND v.scheduled_start_time > @upcomingThreshold AND v.scheduled_start_time < @upcomingUpperThreshold)
+        OR (@includeFeedItems AND v.status = 'upcoming' AND v.scheduled_start_time IS NULL AND v.last_checked_at > @rssOnlyThreshold)
+      )
     ORDER BY
-      CASE status WHEN 'live' THEN 0 ELSE 1 END,
-      COALESCE(scheduled_start_time, last_checked_at) ASC
+      CASE v.status WHEN 'live' THEN 0 ELSE 1 END,
+      COALESCE(v.scheduled_start_time, v.last_checked_at) ASC
   `)
   const listMissedStmt = db.prepare(`
     SELECT v.* FROM videos v
