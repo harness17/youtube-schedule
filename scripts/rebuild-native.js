@@ -6,11 +6,17 @@
  */
 const { rebuild } = require('@electron/rebuild')
 const path = require('path')
+const { configureNativeBuildEnv } = require('./native-build-env')
 
 const electronPkg = require('electron/package.json')
 const electronVersion = electronPkg.version
+const { cachePath, pythonPath } = configureNativeBuildEnv()
 
 console.log(`Rebuilding better-sqlite3 for Electron ${electronVersion}...`)
+console.log(`Using npm cache: ${cachePath}`)
+if (pythonPath) {
+  console.log(`Using Python for node-gyp: ${pythonPath}`)
+}
 
 rebuild({
   buildPath: path.resolve(__dirname, '..'),
