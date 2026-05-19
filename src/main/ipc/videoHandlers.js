@@ -3,7 +3,7 @@
  *
  * 登録チャンネル:
  *   schedule:get / schedule:refresh
- *   diag:rssFailureRate
+ *   diag:rssFailureRate / quotaStatus
  *   videos:listMissed / listArchive / listFavorites / searchByText
  *   videos:markViewed / clearViewed / toggleFavorite / saveFavoriteOrder / toggleNotify
  *   channels:togglePin / listAll / addManual / delete
@@ -59,8 +59,22 @@ export function registerVideoHandlers({
   ipcMain.handle('schedule:refresh', async () => {
     const scheduler = getScheduler()
     if (!scheduler) return { error: 'NOT_INITIALIZED' }
-    await scheduler.refresh({ forceFullRecheck: true })
-    getMainWindow()?.webContents.send('schedule:updated')
+    try {
+      await scheduler.refresh({ forceFullRecheck: true })
+      getMainWindow()?.webContents.send('schedule:updated')
+      return { ok: true }
+    } catch {
+      // クォータ超過は scheduler 内で握り潰されるためここには来ない。
+      // 想定外エラーのみ。スタックトレースを renderer へ渡さず汎用コードを返す。
+      return { error: 'REFRESH_FAILED' }
+    }
+  })
+
+  // ---- クォータ超過状態 --------------------------------------------------------
+  ipcMain.handle('diag:quotaStatus', () => {
+    const scheduler = getScheduler()
+    if (!scheduler) return { exceeded: false, resetAt: null }
+    return scheduler.getQuotaStatus()
   })
 
   // ---- RSS 失敗率診断 ----------------------------------------------------------

@@ -1,6 +1,7 @@
 import { deriveStatus } from './videoStatus.js'
 import { parseDuration } from '../lib/parseDuration.js'
 import { resolveVideoId } from '../lib/resolveVideoId.js'
+import { isQuotaError, nextQuotaReset } from '../lib/quotaReset.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
@@ -9,6 +10,7 @@ const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const CLEANUP_META_KEY = 'last_cleanup_at'
 const ARCHIVE_BACKFILL_META_KEY = 'archive_backfill_done'
+const QUOTA_EXCEEDED_META_KEY = 'quota_exceeded_at'
 
 function chunk(arr, size) {
   const out = []
@@ -339,9 +341,25 @@ export function createSchedulerService({
     return { ok: true, video: videoRepo.getById(videoId) }
   }
 
+  // クォータ超過の状態を返す。発生時刻を metaRepo から読み、その直後の
+  // リセット時刻をまだ過ぎていなければ exceeded=true とする。
+  function getQuotaStatus() {
+    const raw = metaRepo.get(QUOTA_EXCEEDED_META_KEY)
+    const exceededAt = Number(raw)
+    if (!raw || !Number.isFinite(exceededAt) || exceededAt <= 0) {
+      return { exceeded: false, resetAt: null }
+    }
+    const resetAt = nextQuotaReset(exceededAt)
+    if (Date.now() >= resetAt) {
+      return { exceeded: false, resetAt: null }
+    }
+    return { exceeded: true, resetAt }
+  }
+
   return {
     backfillArchiveMeta,
     addManualVideo,
+    getQuotaStatus,
     async refresh(opts = {}) {
       if (inFlight) {
         logger.info('scheduler.refresh.deduplicated', {})
@@ -352,8 +370,22 @@ export function createSchedulerService({
         logger.info('scheduler.refresh.start', { forceFullRecheck: !!opts.forceFullRecheck })
         try {
           await doRefresh(opts)
+          // 取得成功＝クォータ回復。記録済みの超過フラグがあれば消す。
+          if (metaRepo.get(QUOTA_EXCEEDED_META_KEY)) {
+            metaRepo.set(QUOTA_EXCEEDED_META_KEY, '', Date.now())
+          }
           logger.info('scheduler.refresh.done', { durationMs: Date.now() - startedAt })
         } catch (err) {
+          if (isQuotaError(err)) {
+            // クォータ超過は想定内の運用状態。例外として投げ直さず、発生時刻を
+            // 記録してバナー表示（getQuotaStatus）で案内する。巨大な GaxiosError
+            // スタックトレースはコンソールに出さない。
+            metaRepo.set(QUOTA_EXCEEDED_META_KEY, String(Date.now()), Date.now())
+            logger.warn('scheduler.refresh.quotaExceeded', {
+              durationMs: Date.now() - startedAt
+            })
+            return
+          }
           logger.error('scheduler.refresh.error', {
             durationMs: Date.now() - startedAt,
             error: err

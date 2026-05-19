@@ -346,3 +346,58 @@ describe('SchedulerService.refresh', () => {
     expect(mocks.videoRepo.upsert.mock.calls.length).toBeLessThanOrEqual(10)
   })
 })
+
+describe('SchedulerService quota handling', () => {
+  it('クォータ 403 エラーを握り潰し、quota_exceeded_at を記録する', async () => {
+    const mocks = createMocks()
+    const quotaErr = Object.assign(new Error('you have exceeded your quota'), { code: 403 })
+    mocks.subsFetcher.fetch = vi.fn().mockRejectedValue(quotaErr)
+    const svc = createService(mocks)
+    await expect(svc.refresh()).resolves.toBeUndefined()
+    expect(mocks.metaRepo.set).toHaveBeenCalledWith(
+      'quota_exceeded_at',
+      expect.any(String),
+      expect.any(Number)
+    )
+  })
+
+  it('クォータ以外のエラーは投げ直す', async () => {
+    const mocks = createMocks()
+    mocks.subsFetcher.fetch = vi.fn().mockRejectedValue(new Error('boom'))
+    const svc = createService(mocks)
+    await expect(svc.refresh()).rejects.toThrow('boom')
+  })
+
+  it('取得成功時に記録済みの quota_exceeded_at をクリアする', async () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn((key) => (key === 'quota_exceeded_at' ? String(Date.now()) : null))
+    const svc = createService(mocks)
+    await svc.refresh()
+    expect(mocks.metaRepo.set).toHaveBeenCalledWith('quota_exceeded_at', '', expect.any(Number))
+  })
+
+  it('getQuotaStatus: 直近の超過はリセット前なら exceeded=true', () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn((key) => (key === 'quota_exceeded_at' ? String(Date.now()) : null))
+    const svc = createService(mocks)
+    const status = svc.getQuotaStatus()
+    expect(status.exceeded).toBe(true)
+    expect(status.resetAt).toBeGreaterThan(Date.now())
+  })
+
+  it('getQuotaStatus: リセット時刻を過ぎていれば exceeded=false', () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn((key) =>
+      key === 'quota_exceeded_at' ? String(Date.now() - 2 * 24 * 3600_000) : null
+    )
+    const svc = createService(mocks)
+    expect(svc.getQuotaStatus().exceeded).toBe(false)
+  })
+
+  it('getQuotaStatus: 記録が無ければ exceeded=false', () => {
+    const mocks = createMocks()
+    mocks.metaRepo.get = vi.fn().mockReturnValue(null)
+    const svc = createService(mocks)
+    expect(svc.getQuotaStatus()).toEqual({ exceeded: false, resetAt: null })
+  })
+})
