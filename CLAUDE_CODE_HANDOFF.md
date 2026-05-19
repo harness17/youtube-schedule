@@ -4,7 +4,43 @@
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
-このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、役割分担と merge ゲートは `.claude/rules/cross-agent-review.md` を参照。
+このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
+
+既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-17 11:25 追記（cross-agent-harness profile 方式へ更新 — Codex 作成）
+
+- 対象: `master`
+- 作成者: Codex
+- 主題: 旧 `cross-agent-review.md` 参照から、汎用 `cross-agent-harness.md` + YouTom 固有 `project-collaboration-profile.md` 方式へ更新
+- 変更ファイル:
+  - `.claude/rules/cross-agent-harness.md`
+  - `.claude/rules/handoff-protocol.md`
+  - `.claude/rules/project-collaboration-profile.md`
+  - `.claude/skills/codex-handoff/SKILL.md`
+  - `.claude/skills/cross-review/SKILL.md`
+  - `.agents/skills/implement-task/SKILL.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `CLAUDE_CODE_HANDOFF.md`
+- レビュー担当: Claude Code
+- 触ってよい範囲: ハーネス文書・ルール・スキルのみ
+- 触ってはいけない範囲: アプリ本体、`credentials_D.json`、`backup/`
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（268 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（ハーネス文書のみ）
+- レビュー観点:
+  - YouTom profile の担当境界が Electron / IPC / SQLite / quota に合っているか
+  - 旧 `cross-agent-review.md` を参照し続ける箇所が残っていないか
+  - secret / credential を stage していないか
+
+### 次アクション
+
+- Claude Code が profile と handoff の実運用性をレビューする。
 
 ---
 

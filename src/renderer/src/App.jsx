@@ -66,7 +66,7 @@ export default function App() {
   const [updateStatus, setUpdateStatus] = useState(null)
   const [appVersion, setAppVersion] = useState('')
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsInitialTab, setSettingsInitialTab] = useState('general')
+  const [settingsInitialTab, setSettingsInitialTab] = useState('display')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
   const [pickupMode, setPickupMode] = useState(false)
@@ -128,7 +128,7 @@ export default function App() {
     await window.api.setSetting(REMINDER_SETTING_KEY, next)
   }
 
-  function openSettings(tab = 'general') {
+  function openSettings(tab = 'display') {
     setSettingsInitialTab(tab)
     setShowSettings(true)
   }
@@ -386,7 +386,7 @@ export default function App() {
           </div>
         </div>
         <span
-          onClick={!isAuthenticated ? () => openSettings('general') : undefined}
+          onClick={!isAuthenticated ? () => openSettings('connection') : undefined}
           style={{
             padding: '4px 8px',
             borderRadius: '6px',
@@ -428,7 +428,7 @@ export default function App() {
           {loading ? '更新中...' : '↺ 更新'}
         </button>
         <button
-          onClick={() => openSettings('general')}
+          onClick={() => openSettings('display')}
           title="設定"
           style={{
             padding: '7px 10px',
@@ -729,7 +729,10 @@ export default function App() {
       {activeTab === 'feed' && (
         <>
           {allDbChannels.length > 0 && (
-            <SimpleModeBanner darkMode={darkMode} onOpenSettings={() => openSettings('general')} />
+            <SimpleModeBanner
+              darkMode={darkMode}
+              onOpenSettings={() => openSettings('connection')}
+            />
           )}
           {loading ? (
             <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>

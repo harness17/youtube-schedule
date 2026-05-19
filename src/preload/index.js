@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   togglePin: (id) => ipcRenderer.invoke('channels:togglePin', id),
   listAllChannels: () => ipcRenderer.invoke('channels:listAll'),
   addManualChannel: (payload) => ipcRenderer.invoke('channels:addManual', payload),
+  deleteChannel: (id) => ipcRenderer.invoke('channels:delete', id),
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
   exportFavorites: () => ipcRenderer.invoke('favorites:export'),

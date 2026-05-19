@@ -71,6 +71,35 @@ describe('VideoRepository', () => {
     expect(ids).not.toContain('en1')
   })
 
+  it('listVisible excludes videos of logically deleted channels but keeps channelless videos', () => {
+    const now = Date.now()
+    channelRepo.syncSubscriptions(
+      [
+        { id: 'UC_LIVE', title: 'Live Ch', uploadsPlaylistId: 'UU_LIVE' },
+        { id: 'UC_DEL', title: 'Del Ch', uploadsPlaylistId: 'UU_DEL' }
+      ],
+      now
+    )
+    // UC_DEL を購読一覧から外して論理削除する
+    channelRepo.syncSubscriptions(
+      [{ id: 'UC_LIVE', title: 'Live Ch', uploadsPlaylistId: 'UU_LIVE' }],
+      now + 1
+    )
+
+    repo.upsert(sampleVideo({ id: 'vis', channelId: 'UC_LIVE', scheduledStartTime: now + 3600e3 }))
+    repo.upsert(
+      sampleVideo({ id: 'hidden', channelId: 'UC_DEL', scheduledStartTime: now + 3600e3 })
+    )
+    repo.upsert(
+      sampleVideo({ id: 'noChannel', channelId: 'UC_UNKNOWN', scheduledStartTime: now + 3600e3 })
+    )
+
+    const ids = repo.listVisible(now).map((v) => v.id)
+    expect(ids).toContain('vis')
+    expect(ids).toContain('noChannel')
+    expect(ids).not.toContain('hidden')
+  })
+
   it('listVisible includes recent unscheduled feed items only when requested', () => {
     const now = Date.now()
     repo.upsert(
