@@ -21,9 +21,7 @@ describe('StatsTab', () => {
     expect(screen.getByText('推し見落としチェック')).toBeInTheDocument()
     expect(screen.getByText('見逃しなし ✨')).toBeInTheDocument()
     // 沈黙・ランキングはサブナビには出るが、本文は非表示
-    expect(
-      screen.queryByText('60日以上配信していないチャンネルはありません')
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('60日以上活動のないチャンネルはありません')).not.toBeInTheDocument()
     expect(screen.queryByText('ランキング対象の配信はありません')).not.toBeInTheDocument()
   })
 
@@ -31,7 +29,7 @@ describe('StatsTab', () => {
     render(<StatsTab stats={baseStats} />)
 
     fireEvent.click(screen.getByRole('button', { name: /沈黙チャンネル/ }))
-    expect(screen.getByText('60日以上配信していないチャンネルはありません')).toBeInTheDocument()
+    expect(screen.getByText('60日以上活動のないチャンネルはありません')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /配信頻度ランキング/ }))
     expect(screen.getByText('ランキング対象の配信はありません')).toBeInTheDocument()

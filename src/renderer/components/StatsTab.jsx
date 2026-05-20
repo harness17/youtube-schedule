@@ -105,10 +105,10 @@ export default function StatsTab({
         <section className="yt-stats-section">
           <div className="yt-section-label">沈黙チャンネル</div>
           <div className="yt-stats-note">
-            過去に配信したが直近60日以上配信していないチャンネル。タイトルクリックで YouTube を開く
+            直近60日以上、配信・動画投稿のないチャンネル。タイトルクリックで YouTube を開く
           </div>
           {silentChannels.length === 0 ? (
-            <EmptyState>60日以上配信していないチャンネルはありません</EmptyState>
+            <EmptyState>60日以上活動のないチャンネルはありません</EmptyState>
           ) : (
             GROUPS.map(({ key, label }) => {
               const channels = silentChannels.filter((channel) => channel.category === key)

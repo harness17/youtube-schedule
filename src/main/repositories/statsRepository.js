@@ -70,9 +70,11 @@ export function createStatsRepository(db) {
     ORDER BY ${LIVE_ACTIVITY_AT} DESC, v.id ASC
   `)
 
-  // 沈黙チャンネル: 配信実績がある（last_activity_at > 0）チャンネルで、最新配信が
-  // threshold（60日前）より古いものだけを対象にする。配信したことがない動画投稿のみの
-  // チャンネルは「沈黙」ではなく「そもそも対象外」なのでここでは出さない。
+  // 沈黙チャンネル: 何らかの投稿実績（配信または動画投稿）があるチャンネルで、最新の
+  // 活動が threshold（60日前）より古いものを対象にする。投稿実績ゼロのチャンネル
+  // （subscriptions だけ同期されたが動画レコードがない等）は除外する。
+  // 直近60日に投稿（動画含む）があるチャンネルは「生きている」ため対象外。
+  const ANY_ACTIVITY_AT = 'COALESCE(v.actual_start_time, v.scheduled_start_time, v.published_at, 0)'
   const silentChannelsStmt = db.prepare(`
     SELECT
       c.id,
@@ -80,7 +82,7 @@ export function createStatsRepository(db) {
       c.uploads_playlist_id,
       c.is_pinned,
       c.is_manual,
-      MAX(CASE WHEN ${IS_LIVESTREAM} THEN ${LIVE_ACTIVITY_AT} ELSE 0 END) AS last_activity_at
+      MAX(${ANY_ACTIVITY_AT}) AS last_activity_at
     FROM channels c
     LEFT JOIN videos v ON v.channel_id = c.id
     WHERE c.deleted_at IS NULL

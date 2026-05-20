@@ -188,16 +188,17 @@ describe('StatsRepository', () => {
     expect(activity.silentChannels.map((channel) => channel.id)).not.toContain('UC_LIVE')
   })
 
-  it('excludes channels that have never livestreamed from silent list', () => {
+  it('includes channels with any old activity (upload or livestream) in silent list', () => {
     channels.syncSubscriptions(
       [
         { id: 'UC_OLD_UPLOAD', title: 'OldUploadOnly', uploadsPlaylistId: 'UU_OLD' },
-        { id: 'UC_OLD_LIVE', title: 'OldLive', uploadsPlaylistId: 'UU_OLDL' }
+        { id: 'UC_OLD_LIVE', title: 'OldLive', uploadsPlaylistId: 'UU_OLDL' },
+        { id: 'UC_NO_DATA', title: 'NoRecords', uploadsPlaylistId: 'UU_NONE' }
       ],
       1
     )
 
-    // 古い動画投稿のみのチャンネル（actual/scheduled どちらも null）→ 沈黙対象外
+    // 古い動画投稿のみのチャンネル（actual/scheduled 共に null、published_at のみ）→ 沈黙対象
     videos.upsert(
       sampleVideo({
         id: 'old-upload',
@@ -217,9 +218,11 @@ describe('StatsRepository', () => {
         actualStartTime: NOW - 200 * DAY_MS
       })
     )
+    // UC_NO_DATA: 動画レコードなし → 投稿実績ゼロ、沈黙対象外
 
     const silentIds = stats.getChannelActivity(NOW).silentChannels.map((channel) => channel.id)
     expect(silentIds).toContain('UC_OLD_LIVE')
-    expect(silentIds).not.toContain('UC_OLD_UPLOAD')
+    expect(silentIds).toContain('UC_OLD_UPLOAD')
+    expect(silentIds).not.toContain('UC_NO_DATA')
   })
 })

@@ -10,6 +10,24 @@ status: active
 
 ---
 
+## 2026-05-20 23:52 ユーザー指示反映（沈黙判定を投稿活動ベースに変更 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: 沈黙判定は「配信のみ」ではなく「投稿活動全般（配信＋動画投稿）」を基準にする
+- ユーザーフィードバック: 「投稿が指定日以内にあったら対象にしていい」— 動画投稿しか出していないチャンネルでも、最近の投稿があれば「生きている」と判断し、60日超活動なしのチャンネルだけを沈黙対象にしたい
+- 対応:
+  - `silentChannelsStmt` の活動時刻計算を `LIVE_ACTIVITY_AT`（actual/scheduled のみ）から `ANY_ACTIVITY_AT = COALESCE(v.actual_start_time, v.scheduled_start_time, v.published_at, 0)` に変更
+  - 結果: 動画投稿のみのチャンネルも投稿日で評価される。直近60日に投稿があれば沈黙対象外、60日超なしなら沈黙対象
+  - 投稿実績ゼロ（subscriptions だけ同期で videos レコードなし）は引き続き除外
+  - UI note: 「直近60日以上、配信・動画投稿のないチャンネル」に再変更
+  - empty state: 「60日以上活動のないチャンネルはありません」に変更
+  - テスト更新: `excludes channels that have never livestreamed from silent list` を `includes channels with any old activity (upload or livestream) in silent list` にリネーム。UC_OLD_UPLOAD の期待を `not.toContain` → `toContain` に反転、UC_NO_DATA（動画レコードなし）が除外されることも確認
+  - 推し見落とし / 配信頻度ランキング は引き続き配信のみ
+- セルフ verify: ✅ lint / ✅ test（34 files / 306 passed）/ ✅ build
+- レビュー観点: セクションごとに活動時刻の定義が違う（沈黙=投稿全般 / 他=配信のみ）ため、コード上のコメントで意図を明確化
+
+---
+
 ## 2026-05-20 23:46 ユーザー指示反映（沈黙チャンネルから配信実績ゼロを除外 — Claude Code 作成）
 
 - 作成者: Claude Code
