@@ -183,8 +183,43 @@ describe('StatsRepository', () => {
     expect(activity.unwatchedPinned.map((video) => video.id)).toEqual(['live-one'])
     // ランキングも配信のみ
     expect(activity.frequencyRanking.map((row) => row.channelId)).toEqual(['UC_LIVE'])
-    // 沈黙チャンネル: UploadOnly は配信履歴がないため last_activity_at=0 で沈黙扱い
-    expect(activity.silentChannels.map((channel) => channel.id)).toContain('UC_UPLOAD')
+    // 沈黙チャンネル: UploadOnly は配信実績ゼロなので「沈黙」の対象外、UC_LIVE は直近5日で対象外
+    expect(activity.silentChannels.map((channel) => channel.id)).not.toContain('UC_UPLOAD')
     expect(activity.silentChannels.map((channel) => channel.id)).not.toContain('UC_LIVE')
+  })
+
+  it('excludes channels that have never livestreamed from silent list', () => {
+    channels.syncSubscriptions(
+      [
+        { id: 'UC_OLD_UPLOAD', title: 'OldUploadOnly', uploadsPlaylistId: 'UU_OLD' },
+        { id: 'UC_OLD_LIVE', title: 'OldLive', uploadsPlaylistId: 'UU_OLDL' }
+      ],
+      1
+    )
+
+    // 古い動画投稿のみのチャンネル（actual/scheduled どちらも null）→ 沈黙対象外
+    videos.upsert(
+      sampleVideo({
+        id: 'old-upload',
+        channelId: 'UC_OLD_UPLOAD',
+        status: 'ended',
+        actualStartTime: null,
+        scheduledStartTime: null,
+        publishedAt: NOW - 200 * DAY_MS
+      })
+    )
+    // 古い配信実績があるチャンネル → 沈黙対象
+    videos.upsert(
+      sampleVideo({
+        id: 'old-live',
+        channelId: 'UC_OLD_LIVE',
+        status: 'ended',
+        actualStartTime: NOW - 200 * DAY_MS
+      })
+    )
+
+    const silentIds = stats.getChannelActivity(NOW).silentChannels.map((channel) => channel.id)
+    expect(silentIds).toContain('UC_OLD_LIVE')
+    expect(silentIds).not.toContain('UC_OLD_UPLOAD')
   })
 })
