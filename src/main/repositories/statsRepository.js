@@ -53,15 +53,21 @@ function rowToRanking(row) {
 }
 
 export function createStatsRepository(db) {
+  // 配信（ライブ・プレミア）のみを対象にする。通常の動画投稿は actual_start_time も
+  // scheduled_start_time も持たないため、いずれかが NULL でない行が livestreaming 由来。
+  const IS_LIVESTREAM = '(v.actual_start_time IS NOT NULL OR v.scheduled_start_time IS NOT NULL)'
+  // 配信の活動時刻は actual_start_time を優先、未開始なら scheduled_start_time を使う。
+  const LIVE_ACTIVITY_AT = 'COALESCE(v.actual_start_time, v.scheduled_start_time, 0)'
+
   const unwatchedPinnedStmt = db.prepare(`
     SELECT v.* FROM videos v
     JOIN channels c ON c.id = v.channel_id
     WHERE c.deleted_at IS NULL
       AND c.is_pinned = 1
       AND v.viewed_at IS NULL
-      AND MAX(COALESCE(v.actual_start_time, 0), COALESCE(v.published_at, 0)) >= @since
-    ORDER BY MAX(COALESCE(v.actual_start_time, 0), COALESCE(v.published_at, 0)) DESC,
-             v.id ASC
+      AND ${IS_LIVESTREAM}
+      AND ${LIVE_ACTIVITY_AT} >= @since
+    ORDER BY ${LIVE_ACTIVITY_AT} DESC, v.id ASC
   `)
 
   const silentChannelsStmt = db.prepare(`
@@ -71,7 +77,7 @@ export function createStatsRepository(db) {
       c.uploads_playlist_id,
       c.is_pinned,
       c.is_manual,
-      MAX(MAX(COALESCE(v.actual_start_time, 0), COALESCE(v.published_at, 0))) AS last_activity_at
+      MAX(CASE WHEN ${IS_LIVESTREAM} THEN ${LIVE_ACTIVITY_AT} ELSE 0 END) AS last_activity_at
     FROM channels c
     LEFT JOIN videos v ON v.channel_id = c.id
     WHERE c.deleted_at IS NULL
@@ -90,13 +96,14 @@ export function createStatsRepository(db) {
       COALESCE(c.title, v.channel_title) AS channel_title,
       COALESCE(c.is_pinned, 0) AS is_pinned,
       COUNT(*) AS video_count,
-      MAX(MAX(COALESCE(v.actual_start_time, 0), COALESCE(v.published_at, 0))) AS last_activity_at
+      MAX(${LIVE_ACTIVITY_AT}) AS last_activity_at
     FROM videos v
     LEFT JOIN channels c ON c.id = v.channel_id
     WHERE (c.deleted_at IS NULL OR c.id IS NULL)
       AND v.channel_id IS NOT NULL
       AND v.channel_id != ''
-      AND MAX(COALESCE(v.actual_start_time, 0), COALESCE(v.published_at, 0)) >= @since
+      AND ${IS_LIVESTREAM}
+      AND ${LIVE_ACTIVITY_AT} >= @since
     GROUP BY v.channel_id
     ORDER BY video_count DESC, last_activity_at DESC, channel_title COLLATE NOCASE ASC
     LIMIT 20

@@ -127,18 +127,64 @@ describe('StatsRepository', () => {
     })
   })
 
-  it('uses the later value of actual_start_time and published_at as activity time', () => {
-    channels.syncSubscriptions([{ id: 'UC1', title: 'Channel', uploadsPlaylistId: 'UU1' }], 1)
+  it('uses scheduled_start_time when actual_start_time is missing (upcoming streams)', () => {
+    channels.syncSubscriptions([{ id: 'UC_UP', title: 'Upcoming', uploadsPlaylistId: 'UU_UP' }], 1)
 
+    // 未開始の配信予約だけがあるチャンネル: actual_start_time は NULL、scheduled_start_time のみ
     videos.upsert(
       sampleVideo({
-        id: 'published-newer',
-        channelId: 'UC1',
-        actualStartTime: NOW - 61 * DAY_MS,
-        publishedAt: NOW - 10 * DAY_MS
+        id: 'sched',
+        channelId: 'UC_UP',
+        status: 'upcoming',
+        actualStartTime: null,
+        scheduledStartTime: NOW - 10 * DAY_MS
       })
     )
 
+    // scheduled が直近なので沈黙チャンネルには出ない
     expect(stats.getChannelActivity(NOW).silentChannels.map((channel) => channel.id)).toEqual([])
+  })
+
+  it('excludes regular video uploads (no actual_start_time and no scheduled_start_time)', () => {
+    channels.syncSubscriptions(
+      [
+        { id: 'UC_UPLOAD', title: 'UploadOnly', uploadsPlaylistId: 'UU_UP' },
+        { id: 'UC_LIVE', title: 'LiveChannel', uploadsPlaylistId: 'UU_LV' }
+      ],
+      1
+    )
+    channels.togglePin('UC_UPLOAD')
+    channels.togglePin('UC_LIVE')
+
+    // 通常動画投稿: actual も scheduled も null、published_at のみ
+    videos.upsert(
+      sampleVideo({
+        id: 'upload-only',
+        channelId: 'UC_UPLOAD',
+        status: 'ended',
+        actualStartTime: null,
+        scheduledStartTime: null,
+        publishedAt: NOW - 5 * DAY_MS
+      })
+    )
+    // 配信: actual_start_time あり
+    videos.upsert(
+      sampleVideo({
+        id: 'live-one',
+        channelId: 'UC_LIVE',
+        status: 'ended',
+        actualStartTime: NOW - 5 * DAY_MS
+      })
+    )
+
+    const activity = stats.getChannelActivity(NOW)
+
+    // 推し見落としには配信のみが出る
+    expect(activity.unwatchedPinned.map((video) => video.id)).toEqual(['live-one'])
+    // ランキングも配信のみ
+    expect(activity.frequencyRanking.map((row) => row.channelId)).toEqual(['UC_LIVE'])
+    // 沈黙チャンネル: UploadOnly は配信履歴がないため last_activity_at=0 で沈黙扱い
+    expect(activity.silentChannels.map((channel) => channel.id)).toContain('UC_UPLOAD')
+    expect(activity.silentChannels.map((channel) => channel.id)).not.toContain('UC_LIVE')
   })
 })

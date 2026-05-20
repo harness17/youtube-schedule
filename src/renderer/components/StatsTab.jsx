@@ -79,7 +79,7 @@ export default function StatsTab({
       {activeSection === 'unwatched' && (
         <section className="yt-stats-section">
           <div className="yt-section-label">推し見落としチェック</div>
-          <div className="yt-stats-note">推しチャンネル（📌）の直近30日の未視聴動画</div>
+          <div className="yt-stats-note">推しチャンネル（📌）の直近30日の未視聴配信</div>
           {unwatchedPinned.length === 0 ? (
             <EmptyState>見逃しなし ✨</EmptyState>
           ) : (
@@ -105,10 +105,10 @@ export default function StatsTab({
         <section className="yt-stats-section">
           <div className="yt-section-label">沈黙チャンネル</div>
           <div className="yt-stats-note">
-            60日以上動きのないチャンネル。タイトルをクリックで YouTube を開く
+            60日以上配信実績のないチャンネル。タイトルクリックで YouTube を開く
           </div>
           {silentChannels.length === 0 ? (
-            <EmptyState>60日以上動きのないチャンネルはありません</EmptyState>
+            <EmptyState>60日以上配信していないチャンネルはありません</EmptyState>
           ) : (
             GROUPS.map(({ key, label }) => {
               const channels = silentChannels.filter((channel) => channel.category === key)
@@ -168,9 +168,9 @@ export default function StatsTab({
           <div className="yt-section-label">配信頻度ランキング</div>
           <div
             className="yt-stats-note"
-            title="削除済み・メンバー限定化された動画もDBに残っている場合は件数に含まれます"
+            title="ライブ・プレミア公開（actual/scheduled start time あり）のみカウント。通常の動画投稿は含みません"
           >
-            直近90日のDB上の配信件数
+            直近90日の配信件数（ライブ・プレミアのみ）
           </div>
           {frequencyRanking.length === 0 ? (
             <EmptyState>ランキング対象の配信はありません</EmptyState>

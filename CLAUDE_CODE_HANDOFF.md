@@ -10,6 +10,22 @@ status: active
 
 ---
 
+## 2026-05-20 23:25 ユーザー指示反映（配信のみフィルタ化 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: インサイトタブの 3 セクションを「配信（ライブ・プレミア）のみ」に絞る
+- ユーザーフィードバック: 配信頻度ランキングに通常の動画投稿が含まれていた。「配信なら配信のみにしてほしい」、対象は3セクション全部
+- 対応:
+  - `statsRepository.js` の WHERE 句で `(v.actual_start_time IS NOT NULL OR v.scheduled_start_time IS NOT NULL)` を追加
+  - 活動時刻の基準を `MAX(actual_start_time, published_at)` から `COALESCE(actual_start_time, scheduled_start_time, 0)` に変更（配信に限定したため published_at は不要）
+  - StatsTab.jsx の note 文言を「配信のみ」に統一: 「直近30日の未視聴配信」「60日以上配信実績のないチャンネル」「直近90日の配信件数（ライブ・プレミアのみ）」
+  - empty state も「60日以上配信していないチャンネルはありません」に変更
+  - テスト更新: published_at 依存テストを削除、`scheduled_start_time` のみで未開始配信が活動扱いになるテストと、通常動画投稿が除外されるテストを追加
+- セルフ verify: ✅ lint / ✅ test（34 files / 305 passed）/ ✅ build
+- レビュー観点: 配信判定が actual/scheduled の有無依存なので、もし将来 RSS から取得した動画にも scheduled_start_time が誤って付与されるケースが出たら誤検知の可能性あり（現状の `videoStatus.js` ではないため問題なし）
+
+---
+
 ## 2026-05-20 20:45 ユーザー指示反映（タブ名変更・サブナビ追加 — Claude Code 作成）
 
 - 作成者: Claude Code
