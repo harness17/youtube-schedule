@@ -11,6 +11,9 @@ const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const CLEANUP_META_KEY = 'last_cleanup_at'
 const ARCHIVE_BACKFILL_META_KEY = 'archive_backfill_done'
 const QUOTA_EXCEEDED_META_KEY = 'quota_exceeded_at'
+const RSS_FALLBACK_COOLDOWN_MS = 6 * 60 * 60 * 1000
+const RSS_FALLBACK_MAX_PER_REFRESH = 20
+const RSS_FALLBACK_META_PREFIX = 'rss_fallback_at:'
 
 function chunk(arr, size) {
   const out = []
@@ -70,6 +73,16 @@ function toRssVideoRecord(entry, channel, now) {
   }
 }
 
+function getLastRssFallbackAt(metaRepo, channelId) {
+  const raw = metaRepo.get(`${RSS_FALLBACK_META_PREFIX}${channelId}`)
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : 0
+}
+
+function recordRssFallback(metaRepo, channelId, now) {
+  metaRepo.set(`${RSS_FALLBACK_META_PREFIX}${channelId}`, String(now), now)
+}
+
 const NOOP_LOGGER = {
   info() {},
   warn() {},
@@ -124,6 +137,8 @@ export function createSchedulerService({
         let rssSuccess = 0
         let rssFailure = 0
         let fallbackAttempts = 0
+        let fallbackSkippedByCooldown = 0
+        let fallbackSkippedByLimit = 0
         for (const batch of chunk(channels, RSS_PARALLEL)) {
           await Promise.all(
             batch.map(async (ch) => {
@@ -148,7 +163,28 @@ export function createSchedulerService({
               } else {
                 rssFailure++
                 if (!authClient || !ch.uploadsPlaylistId) return
+                if (fallbackAttempts >= RSS_FALLBACK_MAX_PER_REFRESH) {
+                  fallbackSkippedByLimit++
+                  logger.warn('scheduler.rss.fallbackSkipped', {
+                    channelId: ch.id,
+                    reason: 'limit',
+                    maxPerRefresh: RSS_FALLBACK_MAX_PER_REFRESH
+                  })
+                  return
+                }
+                const lastFallbackAt = getLastRssFallbackAt(metaRepo, ch.id)
+                if (now - lastFallbackAt < RSS_FALLBACK_COOLDOWN_MS) {
+                  fallbackSkippedByCooldown++
+                  logger.warn('scheduler.rss.fallbackSkipped', {
+                    channelId: ch.id,
+                    reason: 'cooldown',
+                    lastFallbackAt,
+                    cooldownMs: RSS_FALLBACK_COOLDOWN_MS
+                  })
+                  return
+                }
                 fallbackAttempts++
+                recordRssFallback(metaRepo, ch.id, now)
                 logger.warn('scheduler.rss.fallback', {
                   channelId: ch.id,
                   reason: res.reason,
@@ -165,7 +201,9 @@ export function createSchedulerService({
           videoIds: collected.size,
           rssSuccess,
           rssFailure,
-          fallbackAttempts
+          fallbackAttempts,
+          fallbackSkippedByCooldown,
+          fallbackSkippedByLimit
         })
         return { videoIds: [...collected], rssEntries }
       },
