@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),
   getRssFailureRate: () => ipcRenderer.invoke('diag:rssFailureRate'),
   getQuotaStatus: () => ipcRenderer.invoke('diag:quotaStatus'),
+  getChannelActivityStats: () => ipcRenderer.invoke('stats:channelActivity'),
   resetDatabase: () => ipcRenderer.invoke('schedule:resetDatabase'),
   onScheduleUpdated: (cb) => {
     const listener = () => cb()

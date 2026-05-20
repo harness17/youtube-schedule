@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
 import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
+import StatsTab from '../components/StatsTab.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
 import SettingsModal from '../components/SettingsModal.jsx'
 import Toast from '../components/Toast.jsx'
@@ -16,6 +17,7 @@ import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
 import { useSchedule } from '../hooks/useSchedule.js'
+import { useStats } from '../hooks/useStats.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
 import { useNotificationCheck } from '../hooks/useNotificationCheck.js'
 import { useAuth } from '../hooks/useAuth.js'
@@ -182,6 +184,12 @@ export default function App() {
     updateVideo,
     initialTab: isAuthenticated ? 'schedule' : 'feed'
   })
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+    reload: reloadStats
+  } = useStats(activeTab === 'stats')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -190,7 +198,7 @@ export default function App() {
     if (authLoading) return
     if (isAuthenticated && activeTab === 'feed') {
       handleTabChange('schedule')
-    } else if (!isAuthenticated && ['schedule', 'missed', 'archive'].includes(activeTab)) {
+    } else if (!isAuthenticated && ['schedule', 'missed', 'archive', 'stats'].includes(activeTab)) {
       handleTabChange('feed')
     }
     // handleTabChange はタブごとのロードを含むため、モード境界だけで実行する
@@ -335,6 +343,20 @@ export default function App() {
         </SortableContext>
       </DndContext>
     )
+  }
+
+  async function handleStatsTogglePin(channelId) {
+    await handleTogglePin(channelId)
+    reloadStats()
+  }
+
+  async function handleStatsDeleteChannel(channelId) {
+    const ok = await window.api.deleteChannel?.(channelId)
+    if (ok) {
+      loadAllDbChannels()
+      reloadStats()
+      setToast('手動追加チャンネルを削除しました')
+    }
   }
 
   // ===== メイン UI =============================================================
@@ -560,6 +582,7 @@ export default function App() {
             { key: 'schedule', label: '予定・ライブ', mode: 'full' },
             { key: 'missed', label: '見逃し', mode: 'full' },
             { key: 'archive', label: 'アーカイブ', mode: 'full' },
+            { key: 'stats', label: '💡 インサイト', mode: 'full' },
             { key: 'favorites', label: '⭐ お気に入り', mode: 'both' }
           ]
             .filter(
@@ -873,6 +896,20 @@ export default function App() {
             </>
           )}
         </div>
+      )}
+
+      {/* ── 統計タブ ── */}
+      {activeTab === 'stats' && (
+        <StatsTab
+          stats={stats}
+          loading={statsLoading}
+          error={statsError}
+          darkMode={darkMode}
+          onToggleNotify={handleToggleNotify}
+          onToggleFavorite={handleToggleFavorite}
+          onTogglePin={handleStatsTogglePin}
+          onDeleteChannel={handleStatsDeleteChannel}
+        />
       )}
 
       {/* ── お気に入りタブ（区分ごとに保存済みの任意順） ── */}
