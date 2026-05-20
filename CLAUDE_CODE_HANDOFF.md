@@ -10,6 +10,109 @@ status: active
 
 ---
 
+## 2026-05-20 19:00 依頼（チャンネル整理支援ダッシュボード「📊 統計」タブの実装 — Claude Code → Codex）
+
+- 作成者: Claude Code（設計）／実装担当: Codex
+- ブランチ: `develop`（または `feature/stats-tab` を切ってもよい）
+- worktree: `H:/ClaudeCode/Youtube/youtube-schedule`
+
+### 目的
+
+ユーザーが推しチャンネル・手動追加チャンネル・お気に入りを「結果を見ながら整理する」ための専用タブを追加する。設定モーダルの「📌 チャンネル」タブ（能動的に追加・推す場）と役割を分け、本タブは「活動量を見て整理判断する場」とする。
+
+### 背景
+
+- 既存タブ構成（App.jsx）: `schedule` / `missed` / `archive` / `favorites` / `new-videos`（簡易モード時）
+- 推しチャンネル（`channels.is_pinned=1`）、お気に入り動画（`videos.is_favorite=1`）、手動追加チャンネル（`channels.source='manual'` 想定 — 既存スキーマを確認）、`viewed_at` / `notify` / `published_at` / `ended_at` の集計から、ユーザーの整理判断に役立つ指標を出す
+- 既存の `videos_fts` / cleanup ポリシー（30日/90日/お気に入り永久）には触らない
+
+### 完成条件
+
+1. ヘッダーのタブ列に **「📊 統計」タブ** が追加され、クリックで表示が切り替わる
+2. タブ内に **3セクション** が縦に並ぶ:
+   - **① 推し見落としチェック**: `is_pinned=1` のチャンネルが直近30日に公開した動画のうち `viewed_at IS NULL` のものを ScheduleCard ベースで一覧表示。空なら「見逃しなし ✨」の empty state
+   - **② 沈黙チャンネル**: 各チャンネルの最終 `published_at`（または最終 `actual_start`）から **60日以上経過** したチャンネルを「📌 推し / 🖐 手動追加 / その他」に分類。各分類ごとに件数バッジ + チャンネル名・最終配信日・アクションボタン（推し解除 / 手動追加削除）の行リスト
+   - **③ 配信頻度ランキング**: 全チャンネルの直近90日の公開動画数（または `live`/`upcoming`/`ended` 全て含む配信数）を多い順に最大20件表示。推しバッジ付き、行クリックで YouTube チャンネルページを開く
+3. アクションボタンは既存 IPC（`channels:setPinned` 等）を再利用。新規 IPC は **集計用1件** に限定する: `stats:channelActivity()` → `{ unwatchedPinned, silentChannels, frequencyRanking }`
+4. データ取得は `useStats.js` hook 経由。タブ切替時にロード、`schedule:updated` で再取得
+5. 既存4タブ（schedule / missed / archive / favorites）の動作・スタイルを変更しない
+6. ダークモード対応
+7. Vitest テストを以下に追加:
+   - 集計クエリの境界値テスト（29日 / 30日 / 31日、59日 / 60日 / 61日、89日 / 90日 / 91日）
+   - 推し / 手動追加 / その他の分類テスト
+   - StatsTab レンダリング smoke test（空状態 / データあり）
+8. `npm run lint` / `npm run test` / `npm run build` 全パス
+
+### 対象ファイル
+
+**新規作成**
+- `src/main/repositories/statsRepo.js`（または `src/main/services/statsService.js`） — 集計 SQL を集約
+- `src/main/ipc/statsHandlers.js`（または `videoHandlers.js` に同居） — `stats:channelActivity` IPC
+- `src/renderer/src/hooks/useStats.js`
+- `src/renderer/src/components/StatsTab.jsx`
+- `tests/main/statsRepo.test.js`
+- `tests/renderer/StatsTab.test.jsx`
+
+**変更**
+- `src/main/index.js`（IPC 登録）
+- `src/preload/index.js`（API 公開）
+- `src/renderer/src/App.jsx`（タブ追加）
+- `src/renderer/src/components/ScheduleCard.jsx`（再利用可能なら触らない、props 追加が必要なら最小限）
+
+### 触ってよい範囲
+
+- 上記「対象ファイル」のリスト
+- `App.jsx` のタブ切替ロジック（既存タブの定義は変更しない、追加のみ）
+- 既存スタイルの再利用（CSS Modules / Tailwind / styled — 既存方針に合わせる）
+
+### 触ってはいけない範囲
+
+- 既存 DB migration（`migrations/001..004`）の改変
+- 既存 IPC handler の signature 変更
+- `videos_fts` トリガー / cleanup ポリシー
+- 既存タブのレイアウト / 並び
+- `release.yml` / `ci.yml`
+- 別 feature/branch の未マージ変更
+- 未 push のローカルコミット `64fc89f`（SignPath メモ） / `2c1c4d1`（クォータリセット修正）を巻き戻さない
+
+### verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認（Claude Code 側で実施予定 — Codex はセルフ verify のみで OK）:
+```powershell
+npm run dev
+```
+
+### 既知リスク
+
+- **チャンネルの「手動追加」フラグ**: スキーマに `channels.source` カラムがあるか未確認。なければ `subscriptions.list` 由来かどうかを別経路で判定する必要あり。実装着手時に `src/main/db/migrations/` と `channelsRepo.js` を読んで確認すること
+- **`videos.published_at` vs `actual_start`**: 沈黙判定の基準時刻はどちらを使うか要判断。RSS 由来の動画は `published_at`、ライブは `actual_start` がより新しい。両方の MAX を取るのが正解
+- **配信頻度の母数**: 削除済み / メン限化された動画を `videos` テーブルから消していないため、過去90日の DB 件数 = 実配信数 とは限らない。今回は「DB 上の件数」を母数とし、その旨をツールチップで補足する
+- **タブ列の幅**: タブが多くなりつつあるためモバイル想定はないが、横幅 1280px で全タブが収まることを確認
+- **テストの DB**: `better-sqlite3` の in-memory DB を使う既存パターンに合わせる（`tests/main/` の他テスト参照）
+
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- 設定モーダル「📌 チャンネル」タブとの役割重複がないか
+- アクションボタンの誤操作防止（推し解除の確認ダイアログ要否）
+- 集計クエリの N+1 / 不要な FULL SCAN がないか
+- ダークモードでコントラスト破綻していないか
+- 空状態 / loading / error の3状態が網羅されているか
+- IPC 契約の preload / main / renderer 三点一致
+
+### 次アクション
+
+1. Codex: スキーマ確認 → 実装 → セルフ verify → ハンドオフに完了セクション追記（実装ファイル一覧・自己検証結果）
+2. Claude Code: `/cross-review` で review → 🔴 解消後にユーザー判断で develop へ統合
+3. ユーザー: 動作確認 → v1.18.0 リリースに含める判断
+
+---
+
 ## 2026-05-20 18:42 追記（クォータリセット時刻の PT 対応 + SignPath 準備メモ — Claude Code 作成）
 
 - 作成者: Claude Code
