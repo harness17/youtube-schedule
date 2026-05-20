@@ -40,7 +40,14 @@ Zenn 公開記事（YouTom 派生・関連）:
 | YouTube Data APIのクォータ枯渇をRSSで99%削減した話 | 2026-05-10 | 公開（READMEから直接リンク済み） |
 | その他関連記事 | 2026-04〜05 | Zenn 実サイト 200 確認済み 8本 / 403 が 3本（My-Skill-Graph goals 参照） |
 
-外部メディア（Qiita / Hatena / X 等）からの言及: **0 件**（確認できる範囲で）
+外部メディア（Qiita / Hatena / X 等）からの言及: **2 件**（2026-05-20 に Qiita 投稿）
+
+Qiita 公開記事:
+
+| 記事 | 公開日 | URL |
+|------|--------|-----|
+| YouTube Data API のクォータ枯渇を RSS で避ける設計にした話 | 2026-05-20 | https://qiita.com/harnesswinner/items/e2d5dba192540222d8d5 |
+| YouTubeの配信予定を追うWindowsアプリ Youtom を作った | 2026-05-20 | https://qiita.com/harnesswinner/items/52c94119fed2aba20f7e |
 
 ### コミュニティ活動
 
@@ -121,3 +128,4 @@ gh api repos/harness17/youtube-schedule/releases --jq '.[] | {tag: .tag_name, pu
 - [README コード署名セクション](../README.md#コード署名)
 - [.github/signpath-setup.md](../.github/signpath-setup.md) — workflow 側の設定手順
 - [.github/workflows/release.yml](../.github/workflows/release.yml) — `Sign with SignPath` ステップ（現在は環境変数未設定でスキップ）
+
