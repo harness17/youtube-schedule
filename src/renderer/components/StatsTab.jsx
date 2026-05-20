@@ -43,7 +43,9 @@ export default function StatsTab({
   onToggleNotify,
   onToggleFavorite,
   onTogglePin,
-  onDeleteChannel
+  onDeleteChannel,
+  onSyncNow,
+  syncing = false
 }) {
   const [activeSection, setActiveSection] = useState('unwatched')
 
@@ -103,7 +105,20 @@ export default function StatsTab({
 
       {activeSection === 'silent' && (
         <section className="yt-stats-section">
-          <div className="yt-section-label">沈黙チャンネル</div>
+          <div className="yt-section-header">
+            <div className="yt-section-label">沈黙チャンネル</div>
+            {onSyncNow && (
+              <button
+                type="button"
+                className="yt-action-btn"
+                onClick={onSyncNow}
+                disabled={syncing}
+                title="購読チャンネルを今すぐ再同期（subscriptions.list を即時取得）"
+              >
+                {syncing ? '同期中…' : '🔄 今すぐ同期'}
+              </button>
+            )}
+          </div>
           <div className="yt-stats-note">
             直近60日以上、配信・動画投稿のないチャンネル。タイトルクリックで YouTube を開く
           </div>
@@ -210,5 +225,7 @@ StatsTab.propTypes = {
   onToggleNotify: PropTypes.func,
   onToggleFavorite: PropTypes.func,
   onTogglePin: PropTypes.func,
-  onDeleteChannel: PropTypes.func
+  onDeleteChannel: PropTypes.func,
+  onSyncNow: PropTypes.func,
+  syncing: PropTypes.bool
 }

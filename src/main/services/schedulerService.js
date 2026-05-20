@@ -108,7 +108,7 @@ export function createSchedulerService({
 }) {
   let inFlight = null
 
-  async function resolveChannels(yt, now) {
+  async function resolveChannels(yt, now, { forceSubscriptionsResync = false } = {}) {
     if (!authClient) {
       const manual = channelRepo.listAll().filter(isRssCapableChannel)
       logger.info('scheduler.resolveChannels.rssOnly', { count: manual.length })
@@ -116,7 +116,7 @@ export function createSchedulerService({
     }
 
     const lastSync = channelRepo.getLastSyncTime()
-    if (lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
+    if (!forceSubscriptionsResync && lastSync && now - lastSync < SUBS_CACHE_TTL_MS) {
       const cached = channelRepo.listAll().filter(isRssCapableChannel)
       logger.info('scheduler.resolveChannels.cached', { count: cached.length })
       return cached
@@ -211,11 +211,11 @@ export function createSchedulerService({
     )
   }
 
-  async function doRefresh({ forceFullRecheck = false } = {}) {
+  async function doRefresh({ forceFullRecheck = false, forceSubscriptionsResync = false } = {}) {
     const now = Date.now()
     const yt = ytFactory(authClient)
 
-    const channels = await resolveChannels(yt, now)
+    const channels = await resolveChannels(yt, now, { forceSubscriptionsResync })
     const channelIds = new Set(channels.map((c) => c.id))
     const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
 

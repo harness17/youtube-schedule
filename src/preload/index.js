@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('api', {
   listAllChannels: () => ipcRenderer.invoke('channels:listAll'),
   addManualChannel: (payload) => ipcRenderer.invoke('channels:addManual', payload),
   deleteChannel: (id) => ipcRenderer.invoke('channels:delete', id),
+  syncChannelsNow: () => ipcRenderer.invoke('channels:syncNow'),
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
   exportFavorites: () => ipcRenderer.invoke('favorites:export'),

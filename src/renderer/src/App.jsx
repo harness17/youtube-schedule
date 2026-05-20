@@ -72,6 +72,7 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [reminderMinutes, setReminderMinutes] = useState(DEFAULT_REMINDER_MINUTES)
   const [pickupMode, setPickupMode] = useState(false)
+  const [isSyncingChannels, setIsSyncingChannels] = useState(false)
 
   useEffect(() => {
     window.api.getVersion().then((v) => setAppVersion(v))
@@ -356,6 +357,27 @@ export default function App() {
       loadAllDbChannels()
       reloadStats()
       setToast('手動追加チャンネルを削除しました')
+    }
+  }
+
+  async function handleSyncChannelsNow({ reloadStatsAfter = false } = {}) {
+    if (isSyncingChannels) return
+    setIsSyncingChannels(true)
+    try {
+      const result = await window.api.syncChannelsNow?.()
+      if (result?.ok) {
+        loadAllDbChannels()
+        if (reloadStatsAfter) reloadStats()
+        setToast('チャンネルを同期しました')
+      } else {
+        setToast(
+          result?.error === 'SYNC_FAILED'
+            ? '同期に失敗しました（クォータ超過の可能性）'
+            : '同期できませんでした'
+        )
+      }
+    } finally {
+      setIsSyncingChannels(false)
     }
   }
 
@@ -909,6 +931,8 @@ export default function App() {
           onToggleFavorite={handleToggleFavorite}
           onTogglePin={handleStatsTogglePin}
           onDeleteChannel={handleStatsDeleteChannel}
+          onSyncNow={() => handleSyncChannelsNow({ reloadStatsAfter: true })}
+          syncing={isSyncingChannels}
         />
       )}
 
@@ -1023,6 +1047,8 @@ export default function App() {
           }}
           hideMembershipVideos={hideMembershipVideos}
           onHideMembershipVideosChange={toggleHideMembershipVideos}
+          onSyncChannelsNow={() => handleSyncChannelsNow()}
+          isSyncingChannels={isSyncingChannels}
         />
       )}
       {toast && <Toast message={toast} onClose={handleToastClose} />}

@@ -92,6 +92,16 @@ describe('SchedulerService.refresh', () => {
     expect(mocks.subsFetcher.fetch).not.toHaveBeenCalled()
   })
 
+  it('forces subscriptions fetch when forceSubscriptionsResync is true (cache bypass)', async () => {
+    const mocks = createMocks()
+    mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000) // fresh cache
+    mocks.channelRepo.listAll.mockReturnValue([{ id: 'UC1', title: 'C', uploadsPlaylistId: 'UU1' }])
+    const svc = createService(mocks)
+    await svc.refresh({ forceSubscriptionsResync: true })
+    expect(mocks.subsFetcher.fetch).toHaveBeenCalled()
+    expect(mocks.channelRepo.syncSubscriptions).toHaveBeenCalled()
+  })
+
   it('uses RSS first; falls back to playlist on RSS failure', async () => {
     const mocks = createMocks()
     mocks.channelRepo.getLastSyncTime.mockReturnValue(Date.now() - 60_000)

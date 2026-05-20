@@ -35,6 +35,24 @@ describe('StatsTab', () => {
     expect(screen.getByText('ランキング対象の配信はありません')).toBeInTheDocument()
   })
 
+  it('shows sync-now button in silent section and calls onSyncNow', () => {
+    const onSyncNow = vi.fn()
+    render(<StatsTab stats={baseStats} onSyncNow={onSyncNow} syncing={false} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /沈黙チャンネル/ }))
+    const syncBtn = screen.getByRole('button', { name: /今すぐ同期/ })
+    fireEvent.click(syncBtn)
+    expect(onSyncNow).toHaveBeenCalled()
+  })
+
+  it('disables sync button while syncing', () => {
+    render(<StatsTab stats={baseStats} onSyncNow={vi.fn()} syncing={true} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /沈黙チャンネル/ }))
+    const syncBtn = screen.getByRole('button', { name: /同期中/ })
+    expect(syncBtn).toBeDisabled()
+  })
+
   it('renders stats data and opens links for silent channels and ranking', () => {
     render(
       <StatsTab

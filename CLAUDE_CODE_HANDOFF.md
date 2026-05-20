@@ -10,6 +10,27 @@ status: active
 
 ---
 
+## 2026-05-21 00:16 機能追加（チャンネル「今すぐ同期」ボタン — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: subscriptions.list の 24h キャッシュをバイパスして即座にチャンネル同期削除を反映するボタン
+- ユーザー要望: 「沈黙チャンネルで対象を排除した後、反映されるタイミングが分からないと不便」+「ボタンは沈黙チャンネルにも追加」
+- 変更:
+  - `SchedulerService.resolveChannels` / `doRefresh` に `forceSubscriptionsResync` オプションを追加。true の場合 `lastSync` キャッシュチェックをスキップして subscriptions.list を即時取得
+  - 新 IPC `channels:syncNow` を `videoHandlers.js` に追加（`scheduler.refresh({ forceSubscriptionsResync: true })` を呼んで `schedule:updated` を送信）
+  - preload に `syncChannelsNow()` を公開
+  - SettingsModal の「📌 チャンネル」タブ「優先チャンネル」セクションヘッダー下に「🔄 今すぐ同期」ボタン追加（disabled when 同期中/未認証）
+  - StatsTab の「沈黙チャンネル」セクションヘッダー横に「🔄 今すぐ同期」ボタン追加。完了後 `reloadStats` も呼ぶ
+  - App.jsx に `handleSyncChannelsNow({ reloadStatsAfter })` ハンドラと `isSyncingChannels` state を追加。toast でフィードバック
+  - 既存の 30分自動ポーリング・24h キャッシュは変更なし
+- テスト追加: 
+  - schedulerService: forceSubscriptionsResync で fresh cache でも subsFetcher.fetch が呼ばれる
+  - StatsTab: 同期ボタン表示・クリックで onSyncNow 呼び出し・syncing=true で disabled
+- セルフ verify: ✅ lint / ✅ test（34 files / 309 passed、+3 件）/ ✅ build
+- 実動確認: ユーザーが Electron 閉じてからセルフ verify 実行、未確認の動作確認は次回 npm run dev で
+
+---
+
 ## 2026-05-20 23:52 ユーザー指示反映（沈黙判定を投稿活動ベースに変更 — Claude Code 作成）
 
 - 作成者: Claude Code

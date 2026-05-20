@@ -29,7 +29,9 @@ export default function SettingsModal({
   onImportCredentials,
   hideMembershipVideos = false,
   onHideMembershipVideosChange,
-  initialTab = 'display'
+  initialTab = 'display',
+  onSyncChannelsNow,
+  isSyncingChannels = false
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [autoDownload, setAutoDownload] = useState(true)
@@ -667,6 +669,31 @@ export default function SettingsModal({
                 Google 連携で同期した購読チャンネルの一覧です。配信カードの 📌
                 ボタンと同じ設定で、ここからまとめて見直せます。
               </div>
+              {onSyncChannelsNow && (
+                <div style={{ marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={onSyncChannelsNow}
+                    disabled={isSyncingChannels || !isAuthenticated}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      background: inputBg,
+                      color: textColor,
+                      border: `1px solid ${inputBorder}`,
+                      borderRadius: '6px',
+                      cursor: isSyncingChannels || !isAuthenticated ? 'not-allowed' : 'pointer',
+                      opacity: isSyncingChannels || !isAuthenticated ? 0.5 : 1
+                    }}
+                    title="購読チャンネルを今すぐ再同期（通常は 24h キャッシュ）"
+                  >
+                    {isSyncingChannels ? '同期中…' : '🔄 今すぐ同期'}
+                  </button>
+                  <span style={{ ...descStyle, marginLeft: '8px' }}>
+                    通常は24時間ごとに自動同期されます
+                  </span>
+                </div>
+              )}
             </div>
             <input
               type="text"
@@ -1073,5 +1100,7 @@ SettingsModal.propTypes = {
   onImportCredentials: PropTypes.func.isRequired,
   hideMembershipVideos: PropTypes.bool,
   onHideMembershipVideosChange: PropTypes.func,
-  initialTab: PropTypes.oneOf(['connection', 'display', 'channels', 'data', 'about'])
+  initialTab: PropTypes.oneOf(['connection', 'display', 'channels', 'data', 'about']),
+  onSyncChannelsNow: PropTypes.func,
+  isSyncingChannels: PropTypes.bool
 }
