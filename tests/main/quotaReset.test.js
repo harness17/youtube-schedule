@@ -53,4 +53,15 @@ describe('nextQuotaReset', () => {
     const now = Date.now()
     expect(nextQuotaReset(now)).toBeGreaterThan(now)
   })
+
+  // PDT 期間（3〜11月）はリセットが 07:00 UTC、PST 期間は 08:00 UTC になる。
+  it('returns 07:00 UTC during PDT (e.g. July)', () => {
+    const from = Date.UTC(2026, 6, 15, 12, 0, 0) // 2026-07-15 12:00 UTC = LA 05:00 PDT
+    expect(nextQuotaReset(from)).toBe(Date.UTC(2026, 6, 16, 7, 0, 0))
+  })
+
+  it('returns 08:00 UTC during PST (e.g. December)', () => {
+    const from = Date.UTC(2026, 11, 15, 12, 0, 0) // 2026-12-15 12:00 UTC = LA 04:00 PST
+    expect(nextQuotaReset(from)).toBe(Date.UTC(2026, 11, 16, 8, 0, 0))
+  })
 })
