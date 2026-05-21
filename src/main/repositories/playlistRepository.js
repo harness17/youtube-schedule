@@ -69,6 +69,9 @@ export function createPlaylistRepository(db) {
     WHERE in_playlist = 0 AND playlist_removed_at IS NOT NULL
   `)
   const playlistVideoIdsStmt = db.prepare(`SELECT id FROM videos WHERE in_playlist = 1`)
+  const removedPlaylistVideoIdsStmt = db.prepare(`
+    SELECT id FROM videos WHERE playlist_removed_at IS NOT NULL
+  `)
 
   const applyDiffTx = db.transaction(({ added, removed, restored, now }) => {
     for (const id of added) {
@@ -117,6 +120,9 @@ export function createPlaylistRepository(db) {
     },
     getPlaylistVideoIds() {
       return new Set(playlistVideoIdsStmt.all().map((row) => row.id))
+    },
+    getRemovedPlaylistVideoIds() {
+      return new Set(removedPlaylistVideoIdsStmt.all().map((row) => row.id))
     }
   }
 }
