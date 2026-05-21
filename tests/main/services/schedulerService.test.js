@@ -45,6 +45,10 @@ function createMocks() {
   }
   const playlistFetcher = { fetch: vi.fn().mockResolvedValue([]) }
   const videoFetcher = { fetch: vi.fn().mockResolvedValue([videoDetail('V1')]) }
+  const playlistSyncService = {
+    refresh: vi.fn().mockResolvedValue({ added: 1, removed: 0, restored: 0 }),
+    refreshIfDue: vi.fn().mockResolvedValue({ skipped: true, reason: 'fresh' })
+  }
 
   return {
     videoRepo,
@@ -54,6 +58,7 @@ function createMocks() {
     subsFetcher,
     rssFetcher,
     playlistFetcher,
+    playlistSyncService,
     videoFetcher
   }
 }
@@ -67,6 +72,7 @@ function createService(mocks, overrides = {}) {
     subsFetcher: mocks.subsFetcher,
     rssFetcher: mocks.rssFetcher,
     playlistFetcher: mocks.playlistFetcher,
+    playlistSyncService: mocks.playlistSyncService,
     videoFetcher: mocks.videoFetcher,
     authClient: {},
     ytFactory: () => ({}),
@@ -340,6 +346,15 @@ describe('SchedulerService.refresh', () => {
         channelTitle: 'Stored Channel'
       })
     )
+  })
+
+  it('delegates playlist refresh to the playlist sync service', async () => {
+    const mocks = createMocks()
+    const svc = createService(mocks)
+    await expect(svc.refreshPlaylist()).resolves.toEqual({ added: 1, removed: 0, restored: 0 })
+    await expect(svc.refreshPlaylistIfDue()).resolves.toEqual({ skipped: true, reason: 'fresh' })
+    expect(mocks.playlistSyncService.refresh).toHaveBeenCalledTimes(1)
+    expect(mocks.playlistSyncService.refreshIfDue).toHaveBeenCalledTimes(1)
   })
 
   it('uses RSS published time as feed sort timestamp in RSS-only mode', async () => {

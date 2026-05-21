@@ -42,6 +42,20 @@ contextBridge.exposeInMainWorld('api', {
   addManualChannel: (payload) => ipcRenderer.invoke('channels:addManual', payload),
   deleteChannel: (id) => ipcRenderer.invoke('channels:delete', id),
   syncChannelsNow: () => ipcRenderer.invoke('channels:syncNow'),
+  playlist: {
+    listMine: () => ipcRenderer.invoke('playlist:listMine'),
+    setConfig: (payload) => ipcRenderer.invoke('playlist:setConfig', payload),
+    getConfig: () => ipcRenderer.invoke('playlist:getConfig'),
+    get: (opts) => ipcRenderer.invoke('playlist:get', opts),
+    refresh: () => ipcRenderer.invoke('playlist:refresh'),
+    cleanup: () => ipcRenderer.invoke('playlist:cleanup'),
+    exportFavorites: () => ipcRenderer.invoke('playlist:exportFavorites'),
+    onUpdated: (cb) => {
+      const listener = (_, result) => cb(result)
+      ipcRenderer.on('playlist:updated', listener)
+      return () => ipcRenderer.off('playlist:updated', listener)
+    }
+  },
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
   exportFavorites: () => ipcRenderer.invoke('favorites:export'),

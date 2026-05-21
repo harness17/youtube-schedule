@@ -63,6 +63,7 @@ describe('PlaylistRepository', () => {
     playlistRepo.applyDiff({ added: ['existing', 'new'], removed: ['removed'] }, NOW)
 
     expect(playlistRepo.getPlaylistVideoIds()).toEqual(new Set(['existing', 'new']))
+    expect(playlistRepo.getRemovedPlaylistVideoIds()).toEqual(new Set(['removed']))
     expect(db.prepare(`SELECT in_playlist FROM videos WHERE id = 'removed'`).get()).toEqual({
       in_playlist: 0
     })
@@ -75,6 +76,7 @@ describe('PlaylistRepository', () => {
       .prepare(`SELECT in_playlist, playlist_removed_at FROM videos WHERE id = ?`)
       .get('removed')
     expect(restored).toEqual({ in_playlist: 1, playlist_removed_at: null })
+    expect(playlistRepo.getRemovedPlaylistVideoIds()).toEqual(new Set())
   })
 
   it('applyDiff accepts empty arrays and deduplicates repeated video ids', () => {

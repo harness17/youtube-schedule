@@ -10,6 +10,279 @@ status: active
 
 ---
 
+## 2026-05-21 09:56 修正完了（Phase 2 軽微指摘 3 件 — Codex 作成）
+
+- 対象: `feature/playlist-sync-phase2`
+- 作成者: Codex
+- 主題: Claude Code クロスレビュー軽微指摘 3 件の反映
+- 変更ファイル:
+  - `src/main/index.js`
+  - `src/main/services/playlistPolling.js`
+  - `src/main/ipc/playlistHandlers.js`
+  - `src/main/services/playlistSyncService.js`
+  - `tests/main/services/playlistPolling.test.js`
+  - `tests/main/ipc/playlistHandlers.test.js`
+  - `tests/main/services/playlistSyncService.test.js`
+- 実装概要:
+  - 軽微1: playlist polling を認証済み時のみ開始。未認証・ログアウト時は既存 timer を clear して kick しない。
+  - 軽微2: `playlist:setConfig` は `{ ok: true }` を即時返却し、初回 refresh は background 実行。完了時は `playlist:updated`、失敗時は `playlist:error` を送信。
+  - 軽微3: playlist 取り込み時に `videoDetailsFetcher.fetch()` で `videos.list` 詳細をバッチ取得し、`deriveStatus()` で `upcoming/live/ended` を補正。
+- 追加・更新テスト:
+  - 未認証時に playlist polling が既存 timer を停止し、refresh kick も interval 登録も行わないこと。
+  - `playlist:setConfig` が refresh 完了を待たず `{ ok: true }` を返し、background refresh 完了後に `playlist:updated` を送ること。
+  - playlist 取り込み後、`videos.list` 詳細に基づいて `upcoming` / `live` status と時刻・視聴者数が保存されること。
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（40 files / 343 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - 未実施。今回の変更は main process / IPC / service の単体テスト対象で、renderer UI 変更・DB migration 変更なし。
+- 残リスク:
+  - `videos.list` 追加消費は 500 件で最大 10 units。Phase 2 設計の許容範囲内だが、Phase 3 UI では refresh 中表示と quota error 表示を確認すること。
+- 次アクション:
+  - Claude Code が本修正差分を再レビューし、ユーザーが merge 判断を行う。
+
+---
+
+## 2026-05-21 クロスレビュー結果（プレイリスト同期 Phase 2 — Claude Code 作成）
+
+- レビュアー: Claude Code
+- 対象: Codex 実装 `feature/playlist-sync-phase2`（未コミット）
+- セルフ verify 再実行: ✅ `npm run lint`（warning 0） / ✅ `npm run test`（39 files / 340 passed）
+- 完成条件 8 項目: ✅ 全て満たす
+- **🔴 重大指摘: なし**
+
+### 設計判断の良い点
+
+- 🟢 `PlaylistFetchError` クラスでエラーを型付け化（`QUOTA_EXCEEDED` / `PLAYLIST_NOT_FOUND` / `NOT_AUTHENTICATED` / `PLAYLIST_NOT_CONFIGURED` / `FETCH_FAILED`）。renderer が分岐しやすい
+- 🟢 `Promise.race` でタイムアウト（15秒）。fetcher が無限待ちにならない
+- 🟢 ページング処理で `pageToken=null` を検出して終了（無限ループ防止）
+- 🟢 fetcher → upsert → applyDiff の順序契約を `playlistSyncService.doRefresh()` 内で厳守。Phase 1 申し送り遵守
+- 🟢 `channelRepository.ensureChannel()` 追加で未登録チャンネル自動 INSERT。同時に `maxSyncStmt` を `uploads_playlist_id != ''` で絞り、subscription cache の 24h タイムスタンプ計算が `ensureChannel` 由来の空 uploads_playlist_id で破壊されないよう保護
+- 🟢 `playlistSyncService.refresh()` に `inFlight` deduplication を導入。重複リクエストを 1 実行に集約
+- 🟢 `refreshIfDue()` で `lastSyncedAt` を確認し 24h 未満ならスキップ。起動直後の二重実行回避
+- 🟢 IPC エラーは `{ error: 'CODE' }` 形式で統一（既存パターン踏襲）
+- 🟢 preload で `onUpdated(cb)` がリスナー解除関数を返す（メモリリーク回避の正攻法）
+- 🟢 scheduler timer は `playlistRefreshTimer` として完全独立。`refreshTimer`（30 分）と干渉しない
+
+### 🟡 軽微指摘（merge ブロッカーではない）
+
+- 🟡 軽微1: ログイン/ログアウトで `initScheduler(null)` → `startPlaylistPolling()` が即座にキックされ、未認証 skip を返す。挙動は正しいが、空キックが起動時とログアウト時の 2 回走る。Phase 3 で UI が出来てから「未認証状態は polling を開始しない」最適化を検討
+- 🟡 軽微2: `playlist:setConfig` 経由の初回 refresh は IPC ハンドラ完了まで待つ（同期的）。プレイリストが 500 件超だと UI が数秒固まる可能性。Phase 3 で「設定保存は即時、refresh は非同期トリガー」分離を検討
+- 🟡 軽混3: `toVideoRecord` で `status: 'ended'` を固定。プレイリストに upcoming/live が含まれる場合、status が実態と乖離する。`playlist` 由来の動画は schedule タブに混ざらない設計なので実害なしだが、Phase 3 で `videos.list` を使って status 補正する余地あり
+
+### 触ってはいけない範囲の確認
+
+- ✅ migration 012 改変なし
+- ✅ `videos_fts` トリガー / cleanup ポリシー未変更
+- ✅ renderer 配下未変更
+- ✅ OAuth スコープ（`youtube.readonly`）据え置き
+- ✅ `release.yml` / `ci.yml` 未変更
+- ✅ 既存 30 分ポーリングロジック未変更
+- ✅ 他 feature ブランチ巻き戻しなし
+- ✅ `channelRepository.js` の `maxSyncStmt` 変更は `ensureChannel` 追加に伴う必須の整合性修正で、handoff 「未登録チャンネル INSERT」許可範囲内
+
+### Merge 判断（4 条件）
+
+| # | 条件 | 状態 |
+|---|------|------|
+| ① | セルフ verify | ✅ lint / test / build pass |
+| ② | 相互レビュー記録 | ✅ 本セクション |
+| ③ | 重大指摘なし | ✅ 🔴 なし |
+| ④ | ユーザー merge 指示 | ⏳ 待ち |
+
+merge OK 判断後の手順:
+1. `feature/playlist-sync-phase2` → `develop` に no-ff merge
+2. Phase 3 依頼セクションを新規追加（UI: PlaylistTab + SettingsModal 拡張 + エクスポートモーダル）
+
+### Phase 3 設計時の申し送り
+
+- IPC エラー形式 `{ error: 'CODE' }` を renderer 側で分岐表示（NOT_AUTHENTICATED / PLAYLIST_NOT_CONFIGURED / QUOTA_EXCEEDED / PLAYLIST_NOT_FOUND）
+- `playlist:setConfig` の初回 refresh が長時間ブロックしうる点をデバウンス + ローディング UI で吸収
+- `playlist:updated` イベントを購読してタブ自動更新（unsubscribe 必須）
+- 軽微3 の status 補正は Phase 3 で必要ないなら見送り（プレイリストタブだけで使うため）
+
+---
+
+## 2026-05-21 09:38 完了（プレイリスト同期 Phase 2 — Codex 作成）
+
+- 対象: `feature/playlist-sync-phase2`
+- 作成者: Codex
+- 主題: YouTube プレイリスト 1 件を取り込む fetcher + IPC + scheduler 統合
+- 触ってよい範囲:
+  - `src/main/fetchers/playlistFetcher.js`
+  - `src/main/services/playlistSyncService.js`
+  - `src/main/ipc/playlistHandlers.js`
+  - `src/main/index.js`
+  - `src/preload/index.js`
+  - `src/main/services/schedulerService.js`
+  - `src/main/repositories/channelRepository.js`
+  - `src/main/repositories/playlistRepository.js`（復活差分計算用の削除済み ID 取得のみ）
+  - `tests/main/fetchers/playlistFetcher.test.js`
+  - `tests/main/services/playlistSyncService.test.js`
+  - `tests/main/ipc/playlistHandlers.test.js`
+  - `tests/main/services/schedulerService.test.js`
+  - `tests/main/repositories/channelRepository.test.js`
+  - `tests/main/repositories/playlistRepository.test.js`
+- 触ってはいけない範囲:
+  - migration 012
+  - `videos_fts` / cleanup policy
+  - renderer UI
+  - OAuth scope
+  - `.github/workflows/release.yml` / `.github/workflows/ci.yml`
+  - 他 feature ブランチ
+- 完成条件:
+  - `playlistFetcher` が `playlists.list?mine=true` と `playlistItems.list` ページングを提供し、403 quota / 404 playlist not found を識別可能にする
+  - `playlistSyncService.refresh()` が設定確認、playlist 取得、実データ `videoRepository.upsert()`、未登録チャンネル `ensureChannel()`、diff 適用、最終同期時刻更新を行う
+  - fetcher → upsert → applyDiff の順序契約を守る
+  - IPC contract と preload の `window.api.playlist.*` を一致させる
+  - scheduler から既存 30 分ポーリングとは独立して 24h 周期の playlist 同期を起動し、`playlist:updated` を通知する
+  - 既存 319 テストを含む全テストを pass させる
+- 変更内容:
+  - `createPlaylistFetcher()` を追加。OAuth client は既存 auth client を受け取り、内部で `google.youtube({ version: 'v3', auth })` を生成する形にした
+  - `createPlaylistSyncService()` を追加。playlist item snippet から空スタブではない動画レコードを作り、`videoRepo.upsert()` 後に `playlistRepo.applyDiff()` を呼ぶ
+  - `channelRepository.ensureChannel(id, title, syncAt)` を追加し、playlist 由来の未登録チャンネルを `uploads_playlist_id=''` の最小行で INSERT する。空 uploads playlist は購読キャッシュ時刻の MAX から除外した
+  - `playlistRepository.getRemovedPlaylistVideoIds()` を追加し、削除済みから復活した動画を `restored` として数えられるようにした
+  - `playlistHandlers` と preload の `playlist` API を追加。`playlist:setConfig` は初回 refresh をトリガーし、`playlist:refresh` は未設定/未認証をエラーコードで返す
+  - `SchedulerService` に `refreshPlaylist()` / `refreshPlaylistIfDue()` を追加し、`src/main/index.js` で独立 24h timer と起動時 due check を配線した
+  - fetcher / sync service / IPC / scheduler delegation / repository helper の Vitest を追加・更新
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（39 files / 340 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（Phase 2 は main/preload の fetcher・IPC・scheduler 統合のみ。UI 実動確認は Phase 3 で実施予定）
+- レビュー観点:
+  - fetcher → upsert → applyDiff の呼び出し順が維持されているか
+  - playlist item snippet 由来の動画メタデータで `videos` 必須カラムを満たしているか
+  - `ensureChannel()` の `uploads_playlist_id=''` が既存 subscription cache 判定に悪影響を与えないか
+  - `playlist:updated` / preload contract が Phase 3 UI から使いやすい形になっているか
+  - scheduler の playlist 24h timer が既存 schedule 30 分 timer と独立しているか
+- 未解決:
+  - なし
+- 次アクション:
+  - Claude Code: `/cross-review` で Phase 2 実装をレビュー
+
+---
+
+## 2026-05-21 依頼（プレイリスト同期 Phase 2: fetcher + IPC + scheduler 統合 — Claude Code → Codex）
+
+- 対象: `develop` から `feature/playlist-sync-phase2` を切る
+- 作成者: Claude Code（設計）／実装担当: Codex
+- 主題: YouTube プレイリスト 1 件を取り込む fetcher・IPC・scheduler 統合（UI は Phase 3 で別依頼）
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`（**着手前に必読**。IPC contract と同期ロジックはここで確定済み）
+- 前提: Phase 1（commit `60e50e1`）が develop に merge 済み。`playlistRepository` / migration 012 / `buildWatchUrl` ヘルパが利用可能
+
+### 触ってよい範囲
+
+- 新規:
+  - `src/main/fetchers/playlistFetcher.js` — `playlists.list?mine=true` と `playlistItems.list` のページング取得
+  - `src/main/services/playlistSyncService.js` — fetcher 結果と `playlistRepository.applyDiff` の橋渡し（diff 計算 + 実データ upsert）
+  - `src/main/ipc/playlistHandlers.js`
+  - `tests/main/fetchers/playlistFetcher.test.js`
+  - `tests/main/services/playlistSyncService.test.js`
+  - `tests/main/ipc/playlistHandlers.test.js`
+- 変更最小限:
+  - `src/main/index.js` — `playlistHandlers` 登録 + `playlistRepository` インスタンス化
+  - `src/preload/index.js` — `window.api.playlist.*` を contextBridge で公開
+  - `src/main/services/schedulerService.js` — 24h 周期で `playlistSyncService.refresh()` をキック（既存 30 分ポーリングは触らない）
+  - `src/main/repositories/channelsRepository.js`（必要なら）— 未登録チャンネルを最小行で INSERT する関数追加
+
+### 触ってはいけない範囲
+
+- migration 012（Phase 1 完了済み）の改変
+- 既存 30 分ポーリングのロジック
+- `videos_fts` トリガー / cleanup ポリシー
+- renderer 配下すべて（UI は Phase 3）
+- OAuth スコープ（`youtube.readonly` 据え置き）
+- `release.yml` / `ci.yml`
+- 他 feature ブランチ
+
+### 完成条件
+
+1. **playlistFetcher** が以下を提供する:
+   - `listMyPlaylists(oauth2Client)` → `[{ id, title, itemCount }]`（先頭 50 件、ページングは未対応で OK。51 件目以降は無視 + ログ）
+   - `fetchPlaylistItems(oauth2Client, playlistId)` → `[{ videoId, snippet... }]`（500 件超は pageToken で全件取得、`maxResults=50`）
+   - 403 quotaExceeded / 404 playlistNotFound を識別可能なエラーで throw（既存 fetcher のエラー形式に揃える）
+
+2. **playlistSyncService.refresh()** が以下を実施する:
+   - 設定取得 → `enabled=false` または未登録ならスキップ
+   - `fetchPlaylistItems()` で現在のプレイリスト動画リストを取得
+   - **各動画について `videoRepository.upsert()` で実データを書き込む（applyDiff より前に必ず実行）**
+   - 動画のチャンネル ID が `channels` テーブル未登録なら `channelsRepository` で最小行を INSERT
+   - `playlistRepository.getPlaylistVideoIds()` と diff 計算
+   - `playlistRepository.applyDiff({ added, removed, restored })`
+   - `playlistRepository.updateLastSyncedAt(now)`
+   - 戻り値: `{ added: number, removed: number, restored: number }`
+
+3. **IPC handlers**（`playlistHandlers.js`）:
+   - `playlist:listMine` → `playlistFetcher.listMyPlaylists()` の結果を返す
+   - `playlist:setConfig` → `playlistRepository.setConfig()` を呼び、`refresh` をトリガー（初回取り込み）
+   - `playlist:getConfig` → `playlistRepository.getConfig()`
+   - `playlist:get` → `playlistRepository.listPlaylistVideos({ filter })`
+   - `playlist:refresh` → `playlistSyncService.refresh()`（手動同期、デバウンスは renderer 側で実装するため main では受けたら即実行）
+   - `playlist:cleanup` → `playlistRepository.deleteRemoved()`
+   - `playlist:exportFavorites` → `videoRepository.listFavorites()` から URL 配列を生成
+
+4. **preload** で上記 IPC を `window.api.playlist.*` として公開
+
+5. **schedulerService 統合**:
+   - 既存 30 分ポーリングとは独立した 24h タイマーで `playlistSyncService.refresh()` を呼ぶ
+   - アプリ起動直後にも 1 回呼ぶ（前回同期から 24h 経過していれば）
+   - `schedule:updated` IPC イベントは既存通り。`playlist:updated` IPC イベントを別途追加して renderer に同期完了を通知
+
+6. **テスト**:
+   - `playlistFetcher`: モック化された googleapis client で `listMyPlaylists` / `fetchPlaylistItems` の正常系、403/404、ページング（51 件超）
+   - `playlistSyncService`: in-memory DB で fetcher をモックし、初回取り込み・差分追加・削除・復活・未登録チャンネルの自動 INSERT
+   - `playlistHandlers`: 各 IPC の正常系と異常系（未設定時の `playlist:refresh` 等）
+   - 全テスト pass + 既存 319 テストも pass
+
+7. `npm run lint` / `npm run test` / `npm run build` 全パス
+
+8. **触ってはいけない範囲を変更していない**
+
+### Verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認（`npm run dev`）は Phase 3 で UI 完成後に Claude Code 側で実施。
+
+### 既知リスク・申し送り
+
+- **fetcher → applyDiff の順序契約**: fetcher が取得した動画は `videoRepository.upsert(real)` を applyDiff より前に必ず実行する。これを破ると空スタブが残る（Phase 1 レビュー軽微1 で指摘済み）
+- **未登録チャンネル**: プレイリストに含まれる動画のチャンネルが `channels` テーブル未登録の場合、最小行（`id`, `title`, `uploads_playlist_id=''`, `last_subscription_sync_at=now`）を INSERT。既存の `channelsRepository` に類似関数がなければ `ensureChannel(id, title)` を追加
+- **OAuth client**: `src/main/ipc/authHandlers.js` 等で初期化されている googleapis OAuth2 client インスタンスを再利用する。新規に作らない
+- **クォータ**: 1 同期で `playlistItems.list` 最大 10 ユニット（500件 / 50件ページ）。24h 周期なので余裕あり。403 受領時は scheduler 側で次回 24h まで再試行しない
+- **`playlists.list` キャッシュ**: spec では 24h キャッシュとしたが、Phase 2 では実装簡略化のため毎回 API 呼び出しで OK。キャッシュは Phase 3 設定モーダル実装時にまとめて検討
+- **`playlist:updated` IPC**: renderer がまだ存在しないが、Phase 3 で必要になるので Phase 2 で発火側を実装しておく
+
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- fetcher → upsert → applyDiff の順序契約が守られているか
+- 未登録チャンネル INSERT が channels の必須カラム制約を満たすか
+- 403/404 のハンドリングが既存パターンに揃っているか
+- IPC contract が preload と main で一致しているか
+- scheduler 統合で既存 30 分ポーリングのタイミングを乱していないか
+- 既存 319 テストが引き続き pass するか
+- ページング処理が無限ループしないか（pageToken なし時の終了条件）
+
+### 次アクション
+
+1. Codex: 設計確認 → 実装 → セルフ verify → ハンドオフに完了セクション追記
+2. Claude Code: `/cross-review` でレビュー
+3. ユーザー判断後に Phase 3（UI）依頼
+
+### 関連
+
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`
+- Phase 1 commit: `60e50e1`
+- Phase 1 レビュー申し送り: 同 handoff の Phase 1 クロスレビュー結果セクション参照
+
+---
+
 ## 2026-05-21 クロスレビュー結果（プレイリスト同期 Phase 1 — Claude Code 作成）
 
 - レビュアー: Claude Code
@@ -45,14 +318,15 @@ status: active
 
 ### Merge 判断（4 条件）
 
-| # | 条件 | 状態 |
-|---|------|------|
-| ① | セルフ verify | ✅ lint / test / build pass |
-| ② | 相互レビュー記録 | ✅ 本セクション |
-| ③ | 重大指摘なし | ✅ 🔴 なし |
-| ④ | ユーザー merge 指示 | ⏳ 待ち |
+| #   | 条件                | 状態                        |
+| --- | ------------------- | --------------------------- |
+| ①   | セルフ verify       | ✅ lint / test / build pass |
+| ②   | 相互レビュー記録    | ✅ 本セクション             |
+| ③   | 重大指摘なし        | ✅ 🔴 なし                  |
+| ④   | ユーザー merge 指示 | ⏳ 待ち                     |
 
 merge OK 判断後の手順:
+
 1. `feature/playlist-sync-phase1` → `develop` に no-ff merge
 2. Phase 2 依頼セクションを新規追加（fetcher + IPC + scheduler 統合）
 
@@ -211,7 +485,7 @@ npm run build
   - StatsTab の「沈黙チャンネル」セクションヘッダー横に「🔄 今すぐ同期」ボタン追加。完了後 `reloadStats` も呼ぶ
   - App.jsx に `handleSyncChannelsNow({ reloadStatsAfter })` ハンドラと `isSyncingChannels` state を追加。toast でフィードバック
   - 既存の 30分自動ポーリング・24h キャッシュは変更なし
-- テスト追加: 
+- テスト追加:
   - schedulerService: forceSubscriptionsResync で fresh cache でも subsFetcher.fetch が呼ばれる
   - StatsTab: 同期ボタン表示・クリックで onSyncNow 呼び出し・syncing=true で disabled
 - セルフ verify: ✅ lint / ✅ test（34 files / 309 passed、+3 件）/ ✅ build
@@ -363,6 +637,7 @@ npm run build
 - `docs/handoffs/archive/CLAUDE_CODE_HANDOFF-2026-05-20-pre-cleanup.md` — 2026-05-15 Phase 0 から 2026-05-20 18:42 までの全履歴を含む cleanup 前スナップショット
 
 運用方針:
+
 - このルートファイルには現在進行中の依頼・レビュー・未解決ゲートだけを残す。
 - 完了済みセクションは cleanup 時に `docs/handoffs/archive/` へ退避する。
 - 古い履歴を参照する必要がある場合は、上記アーカイブを検索する。
@@ -405,6 +680,7 @@ npm run build
 ### 対象ファイル
 
 **新規作成**
+
 - `src/main/repositories/statsRepo.js`（または `src/main/services/statsService.js`） — 集計 SQL を集約
 - `src/main/ipc/statsHandlers.js`（または `videoHandlers.js` に同居） — `stats:channelActivity` IPC
 - `src/renderer/src/hooks/useStats.js`
@@ -413,6 +689,7 @@ npm run build
 - `tests/renderer/StatsTab.test.jsx`
 
 **変更**
+
 - `src/main/index.js`（IPC 登録）
 - `src/preload/index.js`（API 公開）
 - `src/renderer/src/App.jsx`（タブ追加）
@@ -443,6 +720,7 @@ npm run build
 ```
 
 実動確認（Claude Code 側で実施予定 — Codex はセルフ verify のみで OK）:
+
 ```powershell
 npm run dev
 ```
