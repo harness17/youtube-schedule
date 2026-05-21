@@ -10,6 +10,138 @@ status: active
 
 ---
 
+## 2026-05-21 依頼（プレイリスト同期 Phase 3+4: UI 統合実装 — Claude Code → Codex）
+
+- 対象: `develop` から `feature/playlist-sync-phase3-4` を切る
+- 作成者: Claude Code（設計）／実装担当: Codex
+- 主題: プレイリスト同期の renderer UI 一式（PlaylistTab + SettingsModal 拡張 + エクスポートモーダル）
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`（**着手前に必読**。UI モックと挙動はここで確定済み）
+- 前提: Phase 2（commit `8f44409`）が develop に merge 済み。`window.api.playlist.*` IPC と `playlist:updated` / `playlist:error` イベントが利用可能
+
+### Phase 3 と 4 を統合した理由
+
+両者ともに renderer 配下の UI 実装で、PlaylistTab（取り込み結果表示）と SettingsModal（設定）は同じ UX フローの両端。IPC エラー分岐・`playlist:updated` 購読・unsubscribe 処理を 1 回で整理した方が一貫性が出る。
+
+### 触ってよい範囲
+
+- 新規:
+  - `src/renderer/hooks/usePlaylist.js` — 取得・同期・エラー状態管理、`playlist:updated` / `playlist:error` 購読
+  - `src/renderer/components/PlaylistTab.jsx` — タブ本体（一覧 + 削除済みフィルタ + 一括削除）
+  - `src/renderer/components/PlaylistSettings.jsx` — SettingsModal 内に差し込むタブパネル
+  - `src/renderer/components/PlaylistExportModal.jsx` — ⭐ エクスポート専用モーダル（コピーボタン + .txt ダウンロード）
+  - `tests/renderer/PlaylistTab.test.jsx`
+  - `tests/renderer/PlaylistSettings.test.jsx`
+  - `tests/renderer/PlaylistExportModal.test.jsx`
+  - `tests/renderer/hooks/usePlaylist.test.js`
+- 変更最小限:
+  - `src/renderer/src/App.jsx` — `playlist` タブを追加（schedule/missed/archive/favorites/new-videos と並列）
+  - `src/renderer/components/SettingsModal.jsx` — 「📂 プレイリスト同期」タブを追加して `PlaylistSettings` を差し込み、`PlaylistExportModal` 起動ボタン
+  - `src/renderer/components/ScheduleCard.jsx` — `isRemovedFromPlaylist`（バッジ）と `onDeleteFromYoutom`（行削除）prop を追加。既存タブで使われていない場合は no-op
+  - `src/renderer/src/assets/main.css`（または該当 CSS）— `playlist-*` プレフィックスでスタイル追加
+
+### 触ってはいけない範囲
+
+- main process / preload / IPC contract（Phase 2 で確定済み）
+- 既存タブ（schedule / missed / archive / favorites / new-videos）のレイアウト・動作
+- DB migration / videos_fts / cleanup
+- OAuth スコープ
+- `release.yml` / `ci.yml`
+- 他 feature ブランチ
+
+### 完成条件
+
+#### Phase 3: PlaylistTab
+
+1. ヘッダーのタブ列に **「📂 プレイリスト」タブ** が追加され、クリックで表示が切り替わる（既存 5 タブの右側）
+2. プレイリスト未設定時は **「設定からプレイリストを選択してください」+ 設定モーダルを開くボタン** を表示
+3. 設定済み時:
+   - ヘッダー: `📂 YouTom プレイリスト「<title>」(N件) / 最終同期: <相対時刻> / [🔄 同期] [⚙️ 設定]`
+   - フィルタ: `[全て] [削除済みのみ ●<count>]` ボタン
+   - 削除済みフィルタ時に `[💡 削除済みを一括削除]` ボタン表示（confirm モーダル経由）
+4. カードリストは既存 `ScheduleCard` を再利用。削除済み動画は `⚠️ プレイリストから削除済み` バッジ + 個別 🗑 ボタン
+5. ⭐ お気に入り・✓ 既読・🔔 通知ボタンは既存通り動作（既存タブと同じ）
+6. 同期中はスピナー表示、エラー時は IPC エラーコードから日本語メッセージに変換して表示
+   - `NOT_AUTHENTICATED` → 「ログインしてください」
+   - `PLAYLIST_NOT_CONFIGURED` → 「設定からプレイリストを選択してください」
+   - `QUOTA_EXCEEDED` → 「YouTube API クォータ上限に達しました。翌日 17:00 (JST) 頃にリセットされます」（既存クォータバナーと同じ文言基調）
+   - `PLAYLIST_NOT_FOUND` → 「プレイリストが削除/非公開化されている可能性があります。設定で再選択してください」
+   - その他 → 「同期に失敗しました」+ エラーコード末尾
+
+#### Phase 4: SettingsModal + Export
+
+7. SettingsModal に **「📂 プレイリスト同期」タブ** を追加（既存 ⚙️ 基本 / 📌 チャンネル / 📦 データ管理 と並列）
+8. パネル構成:
+   - 「同期を有効にする」チェックボックス
+   - 「同期するプレイリスト」ドロップダウン（`playlist:listMine` で取得、ローディング表示あり）
+   - ドロップダウン未認証時は「ログインしてください」と無効化
+   - 「YouTube でプレイリストを作成」外部リンク（`shell:openExternal` 経由で `https://www.youtube.com/feed/playlists`）
+   - 「📤 ⭐お気に入りをエクスポート」ボタン → `PlaylistExportModal` 起動
+9. ドロップダウン選択 → `playlist:setConfig` 呼び出し → IPC は即時 `{ ok: true }` 返却（Phase 2 非同期化済み）
+10. `setConfig` 後は「同期中...」を表示し、`playlist:updated` イベント受信で「完了」表示に切り替え。`playlist:error` 受信でエラー表示
+11. **エクスポートモーダル**:
+    - `playlist:exportFavorites` の結果（URL 配列）を改行区切りで `<textarea>` に表示
+    - 補足テキスト: 「YouTube プレイリストに追加するには、各動画ページの『＋ 保存』から手動で追加してください」
+    - `[📋 コピー]` ボタン（`navigator.clipboard.writeText`）
+    - `[💾 .txt でダウンロード]` ボタン（Blob + a タグで実装、ファイル名 `youtom-favorites-YYYY-MM-DD.txt`）
+    - お気に入り 0 件時は「お気に入りがありません」を表示
+
+#### 共通
+
+12. ダークモード対応（`playlist-*` クラスで既存 CSS 変数に乗せる）
+13. `playlist:updated` / `playlist:error` イベントは `usePlaylist` フック内で購読・unsubscribe（メモリリーク防止。preload の `onUpdated` は unsubscribe 関数を返すので useEffect cleanup で呼ぶ）
+14. テスト:
+    - `usePlaylist`: 取得・同期・エラー状態遷移、unsubscribe 呼び出し確認
+    - `PlaylistTab`: empty / loading / error / データあり / 削除済みフィルタ / 一括削除確認モーダル
+    - `PlaylistSettings`: ドロップダウンローディング / 未認証無効化 / setConfig 後のイベント反映
+    - `PlaylistExportModal`: お気に入りあり / 0 件 / コピー / ダウンロード
+    - 既存 343 テストが引き続き pass
+15. `npm run lint` / `npm run test` / `npm run build` 全パス
+
+### Verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認（`npm run dev`）は Claude Code 側で実施。
+
+### 既知リスク
+
+- **ScheduleCard 拡張**: 既存タブで `isRemovedFromPlaylist` / `onDeleteFromYoutom` を渡していないので、両 prop はオプション扱いで undefined のとき何も表示しない設計にする
+- **タブ列の幅**: 1280px 想定で 6 タブが収まることを確認（statistics タブが既にあるなら 7 タブ）。収まらない場合はオーバーフロー時の挙動を既存パターンに合わせる
+- **モバイル/縮小幅**: 既存設計はモバイル非対応のため考慮不要
+- **`playlist:updated` イベント発火タイミング**: scheduler の 24h 定期実行と手動同期で複数回発火する。`usePlaylist` はイベント受信時に `playlist:get` を再実行する設計で良い
+- **エクスポートのファイル名**: `.txt` ダウンロード時のファイル名は `youtom-favorites-${YYYY-MM-DD}.txt` 形式で固定
+- **`shell:openExternal` 存在確認**: 既存 `window.api.openExternal()` が利用可能（`SettingsModal.jsx` の手動追加 channel URL 説明等で使われているはず）
+
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- PlaylistTab の empty / loading / error / 削除済みフィルタの 4 状態が網羅されているか
+- IPC エラーコードのユーザー向け文言変換が抜けなく対応されているか
+- `usePlaylist` の useEffect cleanup で `playlist:updated` / `playlist:error` リスナーが unsubscribe されるか
+- `ScheduleCard` の新 prop が既存タブに影響を与えていないか（undefined のとき完全 no-op）
+- ダークモードで `playlist-*` スタイルが既存変数に正しく追従するか
+- エクスポートモーダルのコピー・ダウンロード両方が動くか（クリップボード権限など）
+- タブ列が 1280px に収まるか
+
+### 次アクション
+
+1. Codex: 設計確認 → 実装 → セルフ verify → ハンドオフに完了セクション追記
+2. Claude Code: `/cross-review` でレビュー → `npm run dev` で実動確認（プレイリスト選択 → 取り込み → タブ表示 → 削除済みフィルタ → エクスポート）
+3. ユーザー判断後に Phase 5（リリース v1.19.0）へ
+
+### 関連
+
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`
+- Phase 1 commit: `60e50e1`
+- Phase 2 commit: `8f44409`
+- Phase 2 修正コミット（軽微3件）: 同上に含まれる
+- preload API: `src/preload/index.js` の `playlist.*`
+
+---
+
 ## 2026-05-21 09:56 修正完了（Phase 2 軽微指摘 3 件 — Codex 作成）
 
 - 対象: `feature/playlist-sync-phase2`
