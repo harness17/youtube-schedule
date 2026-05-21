@@ -10,6 +10,106 @@ status: active
 
 ---
 
+## 2026-05-21 クロスレビュー結果（プレイリスト同期 Phase 1 — Claude Code 作成）
+
+- レビュアー: Claude Code
+- 対象: Codex 実装 `feature/playlist-sync-phase1`（未コミット）
+- セルフ verify 再実行: ✅ `npm run lint`（warning 0） / ✅ `npm run test`（36 files / 319 passed）
+- 完成条件 5 項目: ✅ 全て満たす
+- **🔴 重大指摘: なし**
+
+### 設計判断の良い点
+
+- 🟢 spec 指定の migration 005 が既存 011 と衝突するため 012 へリネーム。判断と理由を `My-Skill-Graph` decision に記録済み、追従可能
+- 🟢 `in_playlist` に `NOT NULL DEFAULT 0` を付与（spec より厳しいが安全側）
+- 🟢 `playlist_sync_config` の CHECK 制約を実テストで違反確認（複数行 INSERT が throw）
+- 🟢 migration backward-compat テストで「migration 003+004 適用済み相当の旧 DB」に対して既存行が温存されることを実証
+- 🟢 `applyDiff` で「同一 ID が removed + restored 両方にある場合は restored 勝ち」のエッジケースをテスト化
+- 🟢 `deleteRemoved` は `in_playlist=0 AND playlist_removed_at IS NOT NULL` の両条件を要求し、`in_playlist=1` だが何らかの理由で removed_at が残った "inconsistent" 行を保護
+- 🟢 `videoRepository` の `rowToVideo` を module-scope export 化して再利用（独立実装回避を完成条件通り遵守）
+- 🟢 `applyDiff` 全体が `db.transaction` で囲まれ、原子性確保
+
+### 🟡 軽微指摘（merge ブロッカーではない）
+
+- 🟡 軽微1: `insertStubStmt` が新規動画に `channel_id=''`, `status='ended'` の空スタブを作る。Phase 2 fetcher が実データを upsert してから applyDiff を呼ぶ前提なら `INSERT OR IGNORE` で no-op になる。ただし呼び出し順を間違えると空スタブが残るため、Phase 2 設計時に「fetcher は applyDiff より前に必ず upsert」を契約として明文化する必要あり
+- 🟡 軽微2: 完成条件で「変更最小限: `src/main/db/index.js`」と書いたが実体は `src/main/db/schema.js` だった。Codex は正しいファイルを修正した（私の handoff 側の記述ミス）。今後の handoff では実体ファイル名を確認してから書く
+- 🟡 軽微3: stub 動画の URL に `https://www.youtube.com/watch?v=${id}` を埋め込む処理が `applyDiff` 内に直接書かれている。URL 組立てが今後別箇所でも必要になるなら `src/main/services/videoUrl.js` 等に抽出余地あり（YAGNI 観点では現状で OK）
+
+### 触ってはいけない範囲の確認
+
+- ✅ 既存 migration 001〜011 改変なし
+- ✅ cleanup ロジック未変更
+- ✅ fetcher / IPC / preload / renderer 未変更
+- ✅ `release.yml` / `ci.yml` 未変更
+- ✅ 他 feature ブランチ巻き戻しなし
+
+### Merge 判断（4 条件）
+
+| # | 条件 | 状態 |
+|---|------|------|
+| ① | セルフ verify | ✅ lint / test / build pass |
+| ② | 相互レビュー記録 | ✅ 本セクション |
+| ③ | 重大指摘なし | ✅ 🔴 なし |
+| ④ | ユーザー merge 指示 | ⏳ 待ち |
+
+merge OK 判断後の手順:
+1. `feature/playlist-sync-phase1` → `develop` に no-ff merge
+2. Phase 2 依頼セクションを新規追加（fetcher + IPC + scheduler 統合）
+
+### Phase 2 設計時の申し送り
+
+- fetcher は `playlistRepo.applyDiff` を呼ぶ**前**に `videoRepo.upsert` で各動画の実データを書き込むこと（軽微1 の回避）
+- 未登録チャンネルが含まれる動画は `channels` テーブルに最小行を自動 INSERT する設計が必要（spec の Phase 1 既知リスク参照）
+
+---
+
+## 2026-05-21 09:14 完了（プレイリスト同期 Phase 1 — Codex 作成）
+
+- 対象: `feature/playlist-sync-phase1`
+- 作成者: Codex
+- 主題: YouTube プレイリスト 1 件を取り込むための DB スキーマ追加と `playlistRepository` 実装
+- 触ってよい範囲:
+  - `src/main/db/schema.js`
+  - `src/main/db/migrations/012_playlist_sync.js`
+  - `src/main/repositories/videoRepository.js`
+  - `src/main/repositories/playlistRepository.js`
+  - `tests/main/db/migrations/012_playlist_sync.test.js`
+  - `tests/main/repositories/playlistRepository.test.js`
+- 触ってはいけない範囲:
+  - 既存 migration 001〜011
+  - cleanup ロジック本体
+  - fetcher / IPC / preload / renderer UI
+  - `release.yml` / `ci.yml`
+- 完成条件:
+  - migration が `videos.in_playlist` / `playlist_added_at` / `playlist_removed_at`、関連 index、`playlist_sync_config` を追加する
+  - `playlistRepository` が config 操作、playlist 動画一覧、diff 適用、削除済み一括削除、playlist ID 集合取得を提供する
+  - `applyDiff` 全体を `better-sqlite3` transaction で包み、SQL は prepared statement を使う
+  - `videoRepository` の `rowToVideo` を export して playlist 側で再利用し、row mapper を重複実装しない
+  - 既存 migration と既存 DB データを破壊しない
+- 変更内容:
+  - 既存リポジトリには migration 005〜011 が既に存在したため、ハンドオフ上の「005_playlist_sync」相当を **`012_playlist_sync.js`** として追加
+  - `src/main/db/schema.js` に migration 012 を登録
+  - `videoRepository.js` の `rowToVideo` を top-level export に移動し、既存 repository 内の利用はそのまま維持
+  - `playlistRepository.js` を新規追加。`getConfig` / `setConfig` / `updateLastSyncedAt` / `listPlaylistVideos` / `applyDiff` / `deleteRemoved` / `getPlaylistVideoIds` を実装
+  - Phase 1 は fetcher 未実装のため、`applyDiff.added/restored` は既存行が無い場合に最小スタブ行を `INSERT OR IGNORE` し、playlist フラグを更新する
+  - migration test と repository test を追加し、空 DB、004-era DB からの昇格、config 単一行制約、追加/削除/復活、空集合、重複 ID、削除+復活同時、削除済み一括削除を確認
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（36 files / 319 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（Phase 1 は読み取り・データ層のみ。UI 実動確認は Phase 3 以降）
+- レビュー観点:
+  - ハンドオフ指定の migration 番号 005 は現行 repo の既存 migration と衝突していたため、012 採番でよいか
+  - `applyDiff` の同一 ID が `removed` と `restored` に同時指定された場合、現在 playlist に存在する扱いとして restored を勝たせる挙動でよいか
+  - スタブ行の `status='ended'` / 空 channel/title は Phase 2 fetcher が metadata upsert で補完する前提でよいか
+- 未解決:
+  - cleanup の playlist 保持ポリシー反映はハンドオフ通り Phase 2 以降
+  - fetcher / IPC / preload / UI は未実装
+- 次アクション:
+  - Claude Code が `/cross-review` で Phase 1 差分をレビューし、ユーザー merge 判断後に Phase 2 へ進む
+
+---
+
 ## 2026-05-21 依頼（プレイリスト同期 Phase 1: migration 005 + playlistRepository — Claude Code → Codex）
 
 - 対象: `develop` または `feature/playlist-sync-phase1`（推奨）

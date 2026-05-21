@@ -3,6 +3,34 @@ const UPCOMING_FUTURE_MS = 31 * 24 * 60 * 60 * 1000
 const LIVE_MAX_DURATION_MS = 24 * 60 * 60 * 1000
 const RSS_ONLY_VISIBLE_MS = 24 * 60 * 60 * 1000
 
+export function rowToVideo(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    channelId: row.channel_id,
+    channelTitle: row.channel_title,
+    title: row.title,
+    description: row.description,
+    thumbnail: row.thumbnail,
+    status: row.status,
+    scheduledStartTime: row.scheduled_start_time,
+    actualStartTime: row.actual_start_time,
+    concurrentViewers: row.concurrent_viewers,
+    url: row.url,
+    firstSeenAt: row.first_seen_at,
+    lastCheckedAt: row.last_checked_at,
+    endedAt: row.ended_at ?? null,
+    viewedAt: row.viewed_at ?? null,
+    favoriteOrder: row.favorite_order ?? null,
+    source: row.source ?? 'api',
+    duration: row.duration ?? null,
+    publishedAt: row.published_at ?? null,
+    isMembershipOnly: row.is_membership_only === 1,
+    isFavorite: row.is_favorite === 1,
+    isNotify: row.notify === 1
+  }
+}
+
 export function createVideoRepository(db) {
   const upsertStmt = db.prepare(`
     INSERT INTO videos (
@@ -193,34 +221,6 @@ export function createVideoRepository(db) {
       if (result.changes > 0) orderIndex += 1
     }
   })
-
-  function rowToVideo(row) {
-    if (!row) return null
-    return {
-      id: row.id,
-      channelId: row.channel_id,
-      channelTitle: row.channel_title,
-      title: row.title,
-      description: row.description,
-      thumbnail: row.thumbnail,
-      status: row.status,
-      scheduledStartTime: row.scheduled_start_time,
-      actualStartTime: row.actual_start_time,
-      concurrentViewers: row.concurrent_viewers,
-      url: row.url,
-      firstSeenAt: row.first_seen_at,
-      lastCheckedAt: row.last_checked_at,
-      endedAt: row.ended_at ?? null,
-      viewedAt: row.viewed_at ?? null,
-      favoriteOrder: row.favorite_order ?? null,
-      source: row.source ?? 'api',
-      duration: row.duration ?? null,
-      publishedAt: row.published_at ?? null,
-      isMembershipOnly: row.is_membership_only === 1,
-      isFavorite: row.is_favorite === 1,
-      isNotify: row.notify === 1
-    }
-  }
 
   function escapeLikeQuery(raw) {
     const trimmed = String(raw ?? '').trim()
