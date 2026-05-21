@@ -1,12 +1,100 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-20
+最終更新: 2026-05-21
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-21 依頼（プレイリスト同期 Phase 1: migration 005 + playlistRepository — Claude Code → Codex）
+
+- 対象: `develop` または `feature/playlist-sync-phase1`（推奨）
+- 作成者: Claude Code（設計）／実装担当: Codex
+- 主題: YouTube プレイリスト 1 件を取り込むための DB スキーマ追加と repository 実装（読み取り専用機能。fetcher / IPC / UI は Phase 2 以降で別依頼）
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`（**着手前に必読**。SQL・カラム・保持ポリシーはすべてここで確定済み）
+
+### 触ってよい範囲
+
+- 新規: `src/main/db/migrations/005_playlist_sync.js`（既存 migration ファイル命名規則に合わせる。確認: `src/main/db/migrations/` 配下）
+- 新規: `src/main/repositories/playlistRepository.js`
+- 新規: `tests/main/repositories/playlistRepository.test.js`
+- 新規: `tests/main/db/migrations/005_playlist_sync.test.js`
+- 変更最小限: `src/main/db/index.js`（migration 配列に 005 を追加するだけ）
+
+### 触ってはいけない範囲
+
+- 既存 migration 001〜004 の改変
+- 既存 `videos` テーブルのデータ削除を伴う ALTER
+- `videos_fts` トリガー
+- `cleanup` ロジック本体（Phase 2 で別途修正）
+- 他の未マージ feature ブランチ
+- `release.yml` / `ci.yml`
+
+### 完成条件
+
+1. **migration 005** が以下を実施する:
+   - `videos` テーブルに `in_playlist INTEGER DEFAULT 0`、`playlist_added_at INTEGER`、`playlist_removed_at INTEGER` を追加
+   - `idx_videos_in_playlist`、`idx_videos_playlist_removed` インデックス作成
+   - `playlist_sync_config` テーブル新規作成（CHECK 制約で id=1 単一行）
+2. **playlistRepository** が以下の関数を提供する（命名は既存 repo に合わせる）:
+   - `getConfig()` → `{ playlistId, playlistTitle, lastSyncedAt, enabled } | null`
+   - `setConfig({ playlistId, playlistTitle, enabled })` → void
+   - `updateLastSyncedAt(timestamp)` → void
+   - `listPlaylistVideos({ filter: 'all' | 'removed' })` → `videos[]`（既存 videos の row mapper を再利用）
+   - `applyDiff({ added: videoId[], removed: videoId[], restored: videoId[] })` → void（トランザクション内で UPSERT / フラグ更新）
+   - `deleteRemoved()` → `{ deleted: number }`（`playlist_removed_at IS NOT NULL` の行を物理削除）
+   - `getPlaylistVideoIds()` → `Set<string>`（diff 計算用に in_playlist=1 の ID 集合を返す）
+3. **テスト**:
+   - migration 005 を空 DB に適用 → スキーマ確認
+   - migration 005 を既存 003+004 適用済み DB に適用 → 既存データ温存確認
+   - `applyDiff` の追加/削除/復活シナリオ（境界: 空集合、重複 ID、復活と削除同時）
+   - `deleteRemoved` が `in_playlist=1` の行を消さないこと
+   - `getConfig` が未登録時に null を返すこと
+   - `setConfig` が単一行制約で複数行を作らないこと
+4. `npm run lint` / `npm run test` / `npm run build` 全パス
+5. **触ってはいけない範囲を変更していない**
+
+### Verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認は Phase 3 以降で UI が出来てから Claude Code 側で実施するため、Phase 1 は不要。
+
+### 既知リスク
+
+- **既存 DB 互換性:** `ALTER TABLE ADD COLUMN` で既存行は DEFAULT 0 が入る。これは `is_favorite` と同じパターンで既存実装あり、参考: `migration 003`
+- **トランザクション境界:** `applyDiff` は1つのトランザクションで全件処理する。途中失敗時は全ロールバック
+- **row mapper の重複:** 既存 `videoRepository` の row mapper を import 再利用する（独立実装しない）
+- **`channels` テーブル外部キー:** プレイリストに含まれる動画のチャンネルが未登録の場合、`videos.channel_id` が孤立する可能性。Phase 2 fetcher 側で `channels` を必要に応じて自動 INSERT する想定。Phase 1 はカラム追加のみで FK 整合は問わない
+
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- migration 005 が既存 DB を破壊しないか
+- `playlistRepository` の SQL に SQL インジェクション余地がないか（プリペアド使用）
+- トランザクション境界が `applyDiff` 全体を包んでいるか
+- 既存 `videoRepository` の row mapper を再利用しているか（重複実装していないか）
+- テストが境界値（空集合・復活・削除同時）を網羅しているか
+- `playlist_sync_config` の CHECK 制約が単一行を保証しているか
+
+### 次アクション
+
+1. Codex: スキーマ確認 → migration 005 実装 → playlistRepository 実装 → テスト追加 → セルフ verify → 完了セクション追記
+2. Claude Code: `/cross-review` でレビュー
+3. ユーザー判断後に Phase 2（fetcher + IPC + scheduler 統合）を別依頼で着手
+
+### 関連
+
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`
+- 既存 migration: `src/main/db/migrations/`
+- 既存 repo パターン: `src/main/repositories/videoRepository.js` / `statsRepository.js`
 
 ---
 
