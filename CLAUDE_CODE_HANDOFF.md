@@ -1,6 +1,6 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-17
+最終更新: 2026-05-21
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
@@ -10,458 +10,366 @@ status: active
 
 ---
 
-## 2026-05-17 11:25 追記（cross-agent-harness profile 方式へ更新 — Codex 作成）
+## 2026-05-21 依頼（プレイリスト同期 Phase 1: migration 005 + playlistRepository — Claude Code → Codex）
 
-- 対象: `master`
+- 対象: `develop` または `feature/playlist-sync-phase1`（推奨）
+- 作成者: Claude Code（設計）／実装担当: Codex
+- 主題: YouTube プレイリスト 1 件を取り込むための DB スキーマ追加と repository 実装（読み取り専用機能。fetcher / IPC / UI は Phase 2 以降で別依頼）
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`（**着手前に必読**。SQL・カラム・保持ポリシーはすべてここで確定済み）
+
+### 触ってよい範囲
+
+- 新規: `src/main/db/migrations/005_playlist_sync.js`（既存 migration ファイル命名規則に合わせる。確認: `src/main/db/migrations/` 配下）
+- 新規: `src/main/repositories/playlistRepository.js`
+- 新規: `tests/main/repositories/playlistRepository.test.js`
+- 新規: `tests/main/db/migrations/005_playlist_sync.test.js`
+- 変更最小限: `src/main/db/index.js`（migration 配列に 005 を追加するだけ）
+
+### 触ってはいけない範囲
+
+- 既存 migration 001〜004 の改変
+- 既存 `videos` テーブルのデータ削除を伴う ALTER
+- `videos_fts` トリガー
+- `cleanup` ロジック本体（Phase 2 で別途修正）
+- 他の未マージ feature ブランチ
+- `release.yml` / `ci.yml`
+
+### 完成条件
+
+1. **migration 005** が以下を実施する:
+   - `videos` テーブルに `in_playlist INTEGER DEFAULT 0`、`playlist_added_at INTEGER`、`playlist_removed_at INTEGER` を追加
+   - `idx_videos_in_playlist`、`idx_videos_playlist_removed` インデックス作成
+   - `playlist_sync_config` テーブル新規作成（CHECK 制約で id=1 単一行）
+2. **playlistRepository** が以下の関数を提供する（命名は既存 repo に合わせる）:
+   - `getConfig()` → `{ playlistId, playlistTitle, lastSyncedAt, enabled } | null`
+   - `setConfig({ playlistId, playlistTitle, enabled })` → void
+   - `updateLastSyncedAt(timestamp)` → void
+   - `listPlaylistVideos({ filter: 'all' | 'removed' })` → `videos[]`（既存 videos の row mapper を再利用）
+   - `applyDiff({ added: videoId[], removed: videoId[], restored: videoId[] })` → void（トランザクション内で UPSERT / フラグ更新）
+   - `deleteRemoved()` → `{ deleted: number }`（`playlist_removed_at IS NOT NULL` の行を物理削除）
+   - `getPlaylistVideoIds()` → `Set<string>`（diff 計算用に in_playlist=1 の ID 集合を返す）
+3. **テスト**:
+   - migration 005 を空 DB に適用 → スキーマ確認
+   - migration 005 を既存 003+004 適用済み DB に適用 → 既存データ温存確認
+   - `applyDiff` の追加/削除/復活シナリオ（境界: 空集合、重複 ID、復活と削除同時）
+   - `deleteRemoved` が `in_playlist=1` の行を消さないこと
+   - `getConfig` が未登録時に null を返すこと
+   - `setConfig` が単一行制約で複数行を作らないこと
+4. `npm run lint` / `npm run test` / `npm run build` 全パス
+5. **触ってはいけない範囲を変更していない**
+
+### Verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認は Phase 3 以降で UI が出来てから Claude Code 側で実施するため、Phase 1 は不要。
+
+### 既知リスク
+
+- **既存 DB 互換性:** `ALTER TABLE ADD COLUMN` で既存行は DEFAULT 0 が入る。これは `is_favorite` と同じパターンで既存実装あり、参考: `migration 003`
+- **トランザクション境界:** `applyDiff` は1つのトランザクションで全件処理する。途中失敗時は全ロールバック
+- **row mapper の重複:** 既存 `videoRepository` の row mapper を import 再利用する（独立実装しない）
+- **`channels` テーブル外部キー:** プレイリストに含まれる動画のチャンネルが未登録の場合、`videos.channel_id` が孤立する可能性。Phase 2 fetcher 側で `channels` を必要に応じて自動 INSERT する想定。Phase 1 はカラム追加のみで FK 整合は問わない
+
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- migration 005 が既存 DB を破壊しないか
+- `playlistRepository` の SQL に SQL インジェクション余地がないか（プリペアド使用）
+- トランザクション境界が `applyDiff` 全体を包んでいるか
+- 既存 `videoRepository` の row mapper を再利用しているか（重複実装していないか）
+- テストが境界値（空集合・復活・削除同時）を網羅しているか
+- `playlist_sync_config` の CHECK 制約が単一行を保証しているか
+
+### 次アクション
+
+1. Codex: スキーマ確認 → migration 005 実装 → playlistRepository 実装 → テスト追加 → セルフ verify → 完了セクション追記
+2. Claude Code: `/cross-review` でレビュー
+3. ユーザー判断後に Phase 2（fetcher + IPC + scheduler 統合）を別依頼で着手
+
+### 関連
+
+- 設計仕様: `docs/superpowers/specs/2026-05-21-youtom-playlist-sync-design.md`
+- 既存 migration: `src/main/db/migrations/`
+- 既存 repo パターン: `src/main/repositories/videoRepository.js` / `statsRepository.js`
+
+---
+
+## 2026-05-21 00:16 機能追加（チャンネル「今すぐ同期」ボタン — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: subscriptions.list の 24h キャッシュをバイパスして即座にチャンネル同期削除を反映するボタン
+- ユーザー要望: 「沈黙チャンネルで対象を排除した後、反映されるタイミングが分からないと不便」+「ボタンは沈黙チャンネルにも追加」
+- 変更:
+  - `SchedulerService.resolveChannels` / `doRefresh` に `forceSubscriptionsResync` オプションを追加。true の場合 `lastSync` キャッシュチェックをスキップして subscriptions.list を即時取得
+  - 新 IPC `channels:syncNow` を `videoHandlers.js` に追加（`scheduler.refresh({ forceSubscriptionsResync: true })` を呼んで `schedule:updated` を送信）
+  - preload に `syncChannelsNow()` を公開
+  - SettingsModal の「📌 チャンネル」タブ「優先チャンネル」セクションヘッダー下に「🔄 今すぐ同期」ボタン追加（disabled when 同期中/未認証）
+  - StatsTab の「沈黙チャンネル」セクションヘッダー横に「🔄 今すぐ同期」ボタン追加。完了後 `reloadStats` も呼ぶ
+  - App.jsx に `handleSyncChannelsNow({ reloadStatsAfter })` ハンドラと `isSyncingChannels` state を追加。toast でフィードバック
+  - 既存の 30分自動ポーリング・24h キャッシュは変更なし
+- テスト追加: 
+  - schedulerService: forceSubscriptionsResync で fresh cache でも subsFetcher.fetch が呼ばれる
+  - StatsTab: 同期ボタン表示・クリックで onSyncNow 呼び出し・syncing=true で disabled
+- セルフ verify: ✅ lint / ✅ test（34 files / 309 passed、+3 件）/ ✅ build
+- 実動確認: ユーザーが Electron 閉じてからセルフ verify 実行、未確認の動作確認は次回 npm run dev で
+
+---
+
+## 2026-05-20 23:52 ユーザー指示反映（沈黙判定を投稿活動ベースに変更 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: 沈黙判定は「配信のみ」ではなく「投稿活動全般（配信＋動画投稿）」を基準にする
+- ユーザーフィードバック: 「投稿が指定日以内にあったら対象にしていい」— 動画投稿しか出していないチャンネルでも、最近の投稿があれば「生きている」と判断し、60日超活動なしのチャンネルだけを沈黙対象にしたい
+- 対応:
+  - `silentChannelsStmt` の活動時刻計算を `LIVE_ACTIVITY_AT`（actual/scheduled のみ）から `ANY_ACTIVITY_AT = COALESCE(v.actual_start_time, v.scheduled_start_time, v.published_at, 0)` に変更
+  - 結果: 動画投稿のみのチャンネルも投稿日で評価される。直近60日に投稿があれば沈黙対象外、60日超なしなら沈黙対象
+  - 投稿実績ゼロ（subscriptions だけ同期で videos レコードなし）は引き続き除外
+  - UI note: 「直近60日以上、配信・動画投稿のないチャンネル」に再変更
+  - empty state: 「60日以上活動のないチャンネルはありません」に変更
+  - テスト更新: `excludes channels that have never livestreamed from silent list` を `includes channels with any old activity (upload or livestream) in silent list` にリネーム。UC_OLD_UPLOAD の期待を `not.toContain` → `toContain` に反転、UC_NO_DATA（動画レコードなし）が除外されることも確認
+  - 推し見落とし / 配信頻度ランキング は引き続き配信のみ
+- セルフ verify: ✅ lint / ✅ test（34 files / 306 passed）/ ✅ build
+- レビュー観点: セクションごとに活動時刻の定義が違う（沈黙=投稿全般 / 他=配信のみ）ため、コード上のコメントで意図を明確化
+
+---
+
+## 2026-05-20 23:46 ユーザー指示反映（沈黙チャンネルから配信実績ゼロを除外 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: 沈黙チャンネルセクションが「配信したこと無いチャンネル」まで対象にして実用にならなかった問題の修正
+- ユーザーフィードバック: 「動画投稿しているサイトは対象外にして。配信したこと無いチャンネルまで対象にするとメチャクチャになる」
+- 対応:
+  - `silentChannelsStmt` の HAVING を `last_activity_at IS NULL OR last_activity_at = 0 OR last_activity_at <= @threshold` から **`last_activity_at > 0 AND last_activity_at <= @threshold`** に変更
+  - 結果: 「過去に1回でも配信実績があるチャンネル」のうち「最新配信が60日以上前」のみを対象にする
+  - ORDER BY からも `last_activity_at IS NULL DESC` 条件を削除（NULL ケースが HAVING で除外されるため不要）
+  - UI note 文言: 「過去に配信したが直近60日以上配信していないチャンネル」に変更してニュアンスを明確化
+  - テスト更新: `excludes regular video uploads` の UC_UPLOAD 期待を `toContain` → `not.toContain` に反転。さらに `excludes channels that have never livestreamed from silent list` テストを追加（200日前の動画投稿のみ vs 200日前の配信実績で挙動差を確認）
+- セルフ verify: ✅ lint / ✅ test（34 files / 306 passed、+1 件）/ ✅ build
+- レビュー観点: 配信実績ゼロのチャンネルは「沈黙」ではなく「そもそも対象外」という意味づけが UI 文言と一致しているか
+
+---
+
+## 2026-05-20 23:25 ユーザー指示反映（配信のみフィルタ化 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: インサイトタブの 3 セクションを「配信（ライブ・プレミア）のみ」に絞る
+- ユーザーフィードバック: 配信頻度ランキングに通常の動画投稿が含まれていた。「配信なら配信のみにしてほしい」、対象は3セクション全部
+- 対応:
+  - `statsRepository.js` の WHERE 句で `(v.actual_start_time IS NOT NULL OR v.scheduled_start_time IS NOT NULL)` を追加
+  - 活動時刻の基準を `MAX(actual_start_time, published_at)` から `COALESCE(actual_start_time, scheduled_start_time, 0)` に変更（配信に限定したため published_at は不要）
+  - StatsTab.jsx の note 文言を「配信のみ」に統一: 「直近30日の未視聴配信」「60日以上配信実績のないチャンネル」「直近90日の配信件数（ライブ・プレミアのみ）」
+  - empty state も「60日以上配信していないチャンネルはありません」に変更
+  - テスト更新: published_at 依存テストを削除、`scheduled_start_time` のみで未開始配信が活動扱いになるテストと、通常動画投稿が除外されるテストを追加
+- セルフ verify: ✅ lint / ✅ test（34 files / 305 passed）/ ✅ build
+- レビュー観点: 配信判定が actual/scheduled の有無依存なので、もし将来 RSS から取得した動画にも scheduled_start_time が誤って付与されるケースが出たら誤検知の可能性あり（現状の `videoStatus.js` ではないため問題なし）
+
+---
+
+## 2026-05-20 20:45 ユーザー指示反映（タブ名変更・サブナビ追加 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: 実動確認後のユーザーフィードバック反映
+- ユーザーフィードバック:
+  - 当初の「視聴行動グラフ」イメージとは違うが、現実装はチャンネル整理機能として有用
+  - 「統計」名は実態（推し見落とし/沈黙/頻度ランキング）と合わないため変更
+  - 沈黙チャンネルにも YouTube リンクを追加してほしい
+  - サブナビを追加して、どの項目があるか分かるようにしてほしい
+- 対応:
+  - タブ名: `📊 統計` → `💡 インサイト`（App.jsx）
+  - StatsTab に **サブナビバー**（推し見落とし / 沈黙チャンネル / 配信頻度ランキング）を追加、各セクションは排他表示に変更。サブナビボタンには件数バッジ表示
+  - 沈黙チャンネル行の title 部分を `yt-stats-row-link` ボタン化、クリックで `https://www.youtube.com/channel/{id}` を openExternal
+  - main.css に `.yt-stats-subnav` `.yt-stats-row-link` 系スタイル追加
+  - StatsTab.test.jsx をサブナビ切替テストに更新（3→ 3 件、内訳変更）
+- セルフ verify: ✅ lint / ✅ test（34 files / 304 passed、+1 件）/ ✅ build
+- 残課題: 「視聴行動グラフ」（推しチャンネル別視聴率、月別視聴本数推移）は別スプリント候補として inbox/strategies に温存予定
+
+---
+
+## 2026-05-20 19:10 クロスレビュー結果（統計タブ実装 — Claude Code 作成）
+
+- レビュアー: Claude Code
+- 対象: Codex 作成の統計タブ実装（未コミット）
+- セルフ verify 再実行: ✅ `npm run lint` / ✅ `npm run test`（34 files / 303 passed）/ ✅ `npm run build`
+- IPC 三点一致: ✅
+  - preload `getChannelActivityStats()` → ipc `stats:channelActivity` → repo `getChannelActivity()`
+  - preload `openExternal`, `deleteChannel` も既存定義あり
+- 完成条件 8項目: ✅ 全て満たす
+- レビュー所見:
+  - 🟢 設定モーダル「📌 チャンネル」タブとの役割重複なし。設定は能動的管理、統計は結果ベース整理判断で補完関係
+  - 🟢 集計 SQL は `deleted_at IS NULL` で論理削除チャンネルを除外しており適切
+  - 🟢 `MAX(actual_start, published_at)` の組み合わせ判定で RSS/API/ライブ差分を吸収
+  - 🟢 ダークモード対応・loading/error/empty 3状態網羅
+  - 🟢 既存 IPC（`channels:setPinned`/`channels:delete`）再利用、新規 IPC は集計用1件に限定
+  - 🟡 軽微1: 削除・推し解除に確認ダイアログなし。`handleStatsDeleteChannel` は元に戻せないが、再追加で復活可能なので merge ブロッカーではない。今後の懸念事項として記録
+  - 🟡 軽微2: `unwatchedPinned` の SQL は `MAX(actual_start, published_at) >= 30日前` で、status=`upcoming`/`live` の動画も含まれる。完成条件 ① の文面（「直近30日に公開した動画」）より広いが、「推し見落としチェック」の趣旨としては upcoming/live も拾うのが妥当。仕様意図と一致と判断
+  - 🟡 軽微3: SQL の `MAX(COALESCE(...), COALESCE(...))` 形式は actual_start_time / published_at の個別 index を活かせず scan になる。現状の DB サイズなら問題なし。将来 1万件超で遅延が出たら計算列 + index 追加で対応
+- 🔴 重大指摘: **なし**
+- 設計判断の良い点:
+  - 「推し見落とし」を ScheduleCard で表示することで既存のお気に入り/お知らせ操作と一貫
+  - 「沈黙チャンネル」を pinned/manual/other で分類し、整理対象を絞り込みやすい
+  - 「配信頻度ランキング」のクリックで YouTube チャンネルページへ遷移、整理判断の確認動線として機能
+- merge 判断: ユーザー指示待ち（4条件のうち ①②③ クリア、④ ユーザー判断）
+
+---
+
+## 2026-05-20 18:59 完了（統計タブ実装 — Codex 作成）
+
+- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
 - 作成者: Codex
-- 主題: 旧 `cross-agent-review.md` 参照から、汎用 `cross-agent-harness.md` + YouTom 固有 `project-collaboration-profile.md` 方式へ更新
-- 変更ファイル:
-  - `.claude/rules/cross-agent-harness.md`
-  - `.claude/rules/handoff-protocol.md`
-  - `.claude/rules/project-collaboration-profile.md`
-  - `.claude/skills/codex-handoff/SKILL.md`
-  - `.claude/skills/cross-review/SKILL.md`
-  - `.agents/skills/implement-task/SKILL.md`
-  - `AGENTS.md`
-  - `CLAUDE.md`
-  - `CLAUDE_CODE_HANDOFF.md`
-- レビュー担当: Claude Code
-- 触ってよい範囲: ハーネス文書・ルール・スキルのみ
-- 触ってはいけない範囲: アプリ本体、`credentials_D.json`、`backup/`
+- 主題: チャンネル整理支援ダッシュボード「📊 統計」タブの限定実装
+- 触ったファイル:
+  - `src/main/repositories/statsRepository.js`（新規）— `stats:channelActivity` 用の集計 SQL
+  - `src/main/ipc/statsHandlers.js`（新規）— `stats:channelActivity` IPC handler
+  - `src/main/index.js` — stats repository / handler 登録
+  - `src/preload/index.js` — `getChannelActivityStats()` 公開
+  - `src/renderer/hooks/useStats.js`（新規）— 統計データ取得 hook
+  - `src/renderer/components/StatsTab.jsx`（新規）— 統計タブ UI
+  - `src/renderer/src/App.jsx` — 「📊 統計」タブ追加、StatsTab 接続
+  - `src/renderer/src/assets/main.css` — 統計タブ用スタイル
+  - `tests/main/repositories/statsRepository.test.js`（新規）— 境界値・分類テスト
+  - `tests/renderer/StatsTab.test.jsx`（新規）— 空状態 / データあり smoke test
+  - `CLAUDE_CODE_HANDOFF.md` — 本完了セクション追記
+- 実装で判断した点:
+  - 手動追加チャンネル判定は `channels.source` ではなく migration 011 の `channels.is_manual` を使用。`channels.source` カラムは存在しない。
+  - 活動日時は `MAX(COALESCE(actual_start_time, 0), COALESCE(published_at, 0))` を各動画の基準にして、ライブ実績と RSS/API の投稿日差分を吸収。
+  - 推し見落としは直近30日を `>= now - 30d`、沈黙は60日以上を `<= now - 60d`、頻度ランキングは直近90日を `>= now - 90d` として境界値を含める。
+  - 配信頻度ランキングは handoff 指示通り DB 上の件数を母数とし、その旨を UI の note / tooltip に表示。
+  - 削除済みチャンネル（`channels.deleted_at IS NOT NULL`）は統計対象から除外。
 - セルフ verify:
   - ✅ `npm run lint`
-  - ✅ `npm run test`（268 passed）
+  - ✅ `npm run test`（34 files / 303 passed）
   - ✅ `npm run build`
-- 実動確認: N/A（ハーネス文書のみ）
+- 実動確認: N/A（handoff 指示どおり Codex はセルフ verify のみ。Electron 実動確認は Claude Code 側予定）
 - レビュー観点:
-  - YouTom profile の担当境界が Electron / IPC / SQLite / quota に合っているか
-  - 旧 `cross-agent-review.md` を参照し続ける箇所が残っていないか
-  - secret / credential を stage していないか
-
-### 次アクション
-
-- Claude Code が profile と handoff の実運用性をレビューする。
-
----
-
-## 2026-05-17 — Phase 2c-1 完了・API 検証結果（Claude）
-
-- 対象: feature/manual-membership-video
-- 作成者: ClaudeCode
-- 主題: Phase 2c-1（手動メン限動画登録）Task 1-10 の完了報告と API 検証結果
-
-### 実装完了（Task 1-9）
-
-migration 010・resolveVideoId・is_membership_only 配線・addManualVideo・videos:addManual IPC・スケジューラ追跡・設定 UI（📺 メンバー限定タブ）・🔒 バッジ・メン限非表示トグルをすべて実装。lint clean / 268 テスト pass / build 成功。
-
-### Task 10 検証結果
-
-- **手動登録の実機確認: ✅ 動作**。ユーザーが実機で動画を手動登録し表示を確認。その過程で 2 件のバグを発見・修正済み（メン限バッジの折り返し、見逃しタブのバッジ件数がメン限非表示時もメン限を数える不整合）
-- **`search.list` のメン限可視性検証: ⛔ 未検証**。検証にはメンバー限定の「予約配信」が現存するチャンネルが必要だが、検証時点で対象が見つからず実施不可
-
-### Plan 2c-2 への申し送り
-
-`search.list eventType:upcoming` がメン限予約配信を返すかは未検証のまま。Plan 2c-2（メン限チャンネル自動巡回）に着手する際は、まず対象（メン限予約配信のあるチャンネル）が手元にある状態で `search.list` 検証を再実施すること。返さないことが判明した場合、自動巡回はクォータ 100 ユニット/回を消費して空振りするだけになるため、Plan 2c-2 は「登録チャンネルの定期手動更新補助」など別方針へ切り替えを検討する。
-
-### 特記：相互レビュー未実施
-
-Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 回連続即失敗（ブローカー再起動でも回復せず）。フロント Task 7-9 も Claude が直接実装した。merge ゲート② 相互レビューは未実施で、ユーザーがそれを承知の上で merge を判断した。codex-companion の不調は別途調査が必要。
-
-### 次アクション
-
-- `feature/manual-membership-video` を develop へ merge
-- v1.16.0 リリース判断はユーザーに仰ぐ
+  - `statsRepository` の集計 SQL が想定データ量で十分か、特に `MAX(COALESCE(actual_start_time, 0), COALESCE(published_at, 0))` 式の index 利用と FULL SCAN 許容範囲。
+  - 統計タブの「推し解除」「手動追加削除」が設定モーダルのチャンネル管理と役割重複しすぎていないか。
+  - 誤操作防止として削除/推し解除に確認ダイアログを足すべきか。
+  - ダークモードのコントラストと 1280px 幅でのタブ列収まり。
+- 未解決:
+  - `CLAUDE_CODE_HANDOFF.md` には作業開始前から、過去セクションを `docs/handoffs/archive/` へ退避する未コミット差分と `docs/handoffs/` untracked が存在。今回の完了追記では巻き戻していない。
+- 次アクション:
+  - Claude Code: `/cross-review` で統計タブ実装をレビューし、必要なら実動確認（`npm run dev`）で UI 操作を確認。
 
 ---
 
-## 2026-05-16 — Phase 2c-1 Task 7-9 依頼（Claude → Codex）
+## アーカイブ
 
-- 対象: feature/manual-membership-video
-- 作成者: ClaudeCode
-- 主題: メン限動画手動登録のフロントエンド（設定 UI・🔒 バッジ・表示フィルタ）
-- レビュー担当: ClaudeCode
-- 実装プラン: `docs/superpowers/plans/2026-05-16-phase2c-1-manual-membership.md` の **Task 7・8・9**
-- 触ってよい範囲:
-  - `src/renderer/components/SettingsModal.jsx`
-  - `src/renderer/components/ScheduleCard.jsx`
-  - `src/renderer/hooks/useTabState.js`
-  - `src/renderer/src/App.jsx`
-- 触ってはいけない範囲: `src/main/`（Claude が Task 1-6 で実装済み、契約確定）
-- セルフ verify: ❌ 未実施
-- 実動確認: N/A（Claude が後で Playwright 実施）
+過去セクションはセクション過多を避けるため、以下へ退避済み。
 
-### 前提（Claude 実装済みのバックエンド契約）
+- `docs/handoffs/archive/CLAUDE_CODE_HANDOFF-2026-05-20-pre-cleanup.md` — 2026-05-15 Phase 0 から 2026-05-20 18:42 までの全履歴を含む cleanup 前スナップショット
 
-- `window.api.addManualVideo(input)` が使える。返り値は `{ ok: true, video }` または `{ ok: false, error }`
-  - error コード: `INVALID_INPUT` / `NOT_AUTHENTICATED` / `NOT_FOUND` / `FETCH_FAILED`
-- 動画 `item` に `item.isMembershipOnly`（boolean）が乗る（`rowToVideo` 経由）
-- `window.api.getSetting` / `setSetting` は汎用キーで使える
-
-### レビュー観点
-
-- プラン Task 7-9 の完成条件を満たしているか
-- error コードの日本語変換がプラン通りか
-- 既存テスト 268 件を壊していないか
-- Prettier 準拠（singleQuote / no semi / printWidth 100）
-
-### 完成条件（スプリントコントラクト）
-
-- 設定に「📺 メンバー限定」タブ＋ URL/ID 手動追加 UI（成功・各エラー表示）
-- `ScheduleCard` にメン限動画の 🔒 バッジ
-- メン限動画を一覧から隠すトグル（`hideMembershipVideos`、electron-store 永続化）
-- `npm run lint && npm run test && npm run build` がすべて pass
-- Merge は Claude が行う
-
-### Git について
-
-- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
-- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
-- 範囲外ファイルを作らない
-
-### 次アクション
-
-- Codex が Task 7-9 を実装 → セルフ verify → Claude がレビュー & コミット
+運用方針:
+- このルートファイルには現在進行中の依頼・レビュー・未解決ゲートだけを残す。
+- 完了済みセクションは cleanup 時に `docs/handoffs/archive/` へ退避する。
+- 古い履歴を参照する必要がある場合は、上記アーカイブを検索する。
 
 ---
 
-## 2026-05-16 — ScheduleCard 再生時間・日付表示依頼（Claude → Codex）
+## 2026-05-20 19:00 依頼（チャンネル整理支援ダッシュボード「📊 統計」タブの実装 — Claude Code → Codex）
 
-- 対象: feature/archive-date-duration-display
-- 作成者: ClaudeCode
-- 主題: レビュー指摘対応。カードに再生時間表示を追加し、時刻未取得カードに投稿日を出す
-- レビュー担当: ClaudeCode
-- 触ってよい範囲:
-  - `src/renderer/components/ScheduleCard.jsx`
-  - `tests/renderer/`（ScheduleCard のテストがあれば追従、無ければ新規追加可）
-- 触ってはいけない範囲: `src/main/`（Claude が migration 009・listArchive を実装済み、契約確定）
+- 作成者: Claude Code（設計）／実装担当: Codex
+- ブランチ: `develop`（または `feature/stats-tab` を切ってもよい）
+- worktree: `H:/ClaudeCode/Youtube/youtube-schedule`
 
-### 前提（Claude 実装済みのバックエンド契約）
+### 目的
 
-- `videos` レコードに `duration`（秒, number|null）と `publishedAt`（epoch ms, number|null）が乗る
-- `rowToVideo` が両方を返すので、カードの `item` には `item.duration` と `item.publishedAt` がある
+ユーザーが推しチャンネル・手動追加チャンネル・お気に入りを「結果を見ながら整理する」ための専用タブを追加する。設定モーダルの「📌 チャンネル」タブ（能動的に追加・推す場）と役割を分け、本タブは「活動量を見て整理判断する場」とする。
 
-### 修正内容
+### 背景
 
-**1. 再生時間の表示**
+- 既存タブ構成（App.jsx）: `schedule` / `missed` / `archive` / `favorites` / `new-videos`（簡易モード時）
+- 推しチャンネル（`channels.is_pinned=1`）、お気に入り動画（`videos.is_favorite=1`）、手動追加チャンネル（`channels.source='manual'` 想定 — 既存スキーマを確認）、`viewed_at` / `notify` / `published_at` / `ended_at` の集計から、ユーザーの整理判断に役立つ指標を出す
+- 既存の `videos_fts` / cleanup ポリシー（30日/90日/お気に入り永久）には触らない
 
-- `item.duration`（秒）が number のとき、カードに再生時間を表示する
-- 形式: `1:23:45`（時:分:秒）。1 時間未満は `45:30`（分:秒）。秒は常に 2 桁ゼロ埋め、分は時がある場合のみ 2 桁ゼロ埋め
-- 例: 3723 → `1:02:03`、930 → `15:30`、45 → `0:45`
-- `duration` が null/未定義のときは何も出さない
-- 表示位置: 時刻・カウントダウン行（現在 290-303 行付近）の中か隣に、控えめに（例: `⏱ 1:23:45`）
+### 完成条件
 
-**2. 時刻行の日付ロジック改善**
+1. ヘッダーのタブ列に **「📊 統計」タブ** が追加され、クリックで表示が切り替わる
+2. タブ内に **3セクション** が縦に並ぶ:
+   - **① 推し見落としチェック**: `is_pinned=1` のチャンネルが直近30日に公開した動画のうち `viewed_at IS NULL` のものを ScheduleCard ベースで一覧表示。空なら「見逃しなし ✨」の empty state
+   - **② 沈黙チャンネル**: 各チャンネルの最終 `published_at`（または最終 `actual_start`）から **60日以上経過** したチャンネルを「📌 推し / 🖐 手動追加 / その他」に分類。各分類ごとに件数バッジ + チャンネル名・最終配信日・アクションボタン（推し解除 / 手動追加削除）の行リスト
+   - **③ 配信頻度ランキング**: 全チャンネルの直近90日の公開動画数（または `live`/`upcoming`/`ended` 全て含む配信数）を多い順に最大20件表示。推しバッジ付き、行クリックで YouTube チャンネルページを開く
+3. アクションボタンは既存 IPC（`channels:setPinned` 等）を再利用。新規 IPC は **集計用1件** に限定する: `stats:channelActivity()` → `{ unwatchedPinned, silentChannels, frequencyRanking }`
+4. データ取得は `useStats.js` hook 経由。タブ切替時にロード、`schedule:updated` で再取得
+5. 既存4タブ（schedule / missed / archive / favorites）の動作・スタイルを変更しない
+6. ダークモード対応
+7. Vitest テストを以下に追加:
+   - 集計クエリの境界値テスト（29日 / 30日 / 31日、59日 / 60日 / 61日、89日 / 90日 / 91日）
+   - 推し / 手動追加 / その他の分類テスト
+   - StatsTab レンダリング smoke test（空状態 / データあり）
+8. `npm run lint` / `npm run test` / `npm run build` 全パス
 
-現在の時刻行ロジック（290-303 行付近）:
-- `isLive` → `配信中（{actualStartTime}〜）`
-- `item.scheduledStartTime` あり → `{scheduledStartTime}〜`
-- それ以外 → `時刻未取得`
+### 対象ファイル
 
-問題: 配信済みライブ（ended で actualStartTime あり）や通常アップロードが「時刻未取得」になる。
+**新規作成**
+- `src/main/repositories/statsRepo.js`（または `src/main/services/statsService.js`） — 集計 SQL を集約
+- `src/main/ipc/statsHandlers.js`（または `videoHandlers.js` に同居） — `stats:channelActivity` IPC
+- `src/renderer/src/hooks/useStats.js`
+- `src/renderer/src/components/StatsTab.jsx`
+- `tests/main/statsRepo.test.js`
+- `tests/renderer/StatsTab.test.jsx`
 
-新ロジック（`isLive` でない場合）:
-- `item.actualStartTime` あり → `配信 {日付}`（実際に配信された）
-- 上記なし & `item.scheduledStartTime` あり → `{日付}〜`（予約）
-- 上記なし & `item.publishedAt` あり → `投稿 {日付}`（アップロード動画）
-- いずれも無し → `時刻未取得`
+**変更**
+- `src/main/index.js`（IPC 登録）
+- `src/preload/index.js`（API 公開）
+- `src/renderer/src/App.jsx`（タブ追加）
+- `src/renderer/src/components/ScheduleCard.jsx`（再利用可能なら触らない、props 追加が必要なら最小限）
 
-日付フォーマットは既存の `formatTime(value, showDateInTime)` を流用してよい（`formatTime` は ISO 文字列も epoch number も `new Date()` で受けられる）。`isLive` の分岐は現状維持。
+### 触ってよい範囲
 
-### レビュー観点
+- 上記「対象ファイル」のリスト
+- `App.jsx` のタブ切替ロジック（既存タブの定義は変更しない、追加のみ）
+- 既存スタイルの再利用（CSS Modules / Tailwind / styled — 既存方針に合わせる）
 
-- duration フォーマットが仕様通り（時:分:秒 / 分:秒、ゼロ埋め）
-- 時刻行が配信済みライブ・アップロード動画で適切な日付を出す
-- 既存テスト 246 件を壊さない
-- Prettier 準拠
+### 触ってはいけない範囲
 
-### 完成条件（スプリントコントラクト）
+- 既存 DB migration（`migrations/001..004`）の改変
+- 既存 IPC handler の signature 変更
+- `videos_fts` トリガー / cleanup ポリシー
+- 既存タブのレイアウト / 並び
+- `release.yml` / `ci.yml`
+- 別 feature/branch の未マージ変更
+- 未 push のローカルコミット `64fc89f`（SignPath メモ） / `2c1c4d1`（クォータリセット修正）を巻き戻さない
 
-- 再生時間取得済みの動画にカードで `1:23:45` 形式の再生時間が出る
-- 通常アップロード動画のカードに「投稿 {日付}」が出る（`時刻未取得` にならない）
-- 配信済みライブのカードに「配信 {日付}」が出る
-- `npm run lint && npm run test && npm run build` がすべて pass
+### verify コマンド
 
-### Git について
+```powershell
+npm run lint
+npm run test
+npm run build
+```
 
-- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
-- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
-- 範囲外ファイルを作らない
+実動確認（Claude Code 側で実施予定 — Codex はセルフ verify のみで OK）:
+```powershell
+npm run dev
+```
 
-### レビュー結果（2026-05-16, Claude）
+### 既知リスク
 
-- 公開可否: 🟢 重大指摘なし
-- `formatDuration`: `Number.isFinite` ガード、h:mm:ss / m:ss 切替、ゼロ埋め仕様通り
-- 時刻行: isLive→actualStartTime→scheduledStartTime→publishedAt の cascade、PropTypes 更新済み
-- lint clean / 252 テスト pass（ScheduleCard テスト 25 件）/ build 成功
-- 軽微指摘: なし
+- **チャンネルの「手動追加」フラグ**: スキーマに `channels.source` カラムがあるか未確認。なければ `subscriptions.list` 由来かどうかを別経路で判定する必要あり。実装着手時に `src/main/db/migrations/` と `channelsRepo.js` を読んで確認すること
+- **`videos.published_at` vs `actual_start`**: 沈黙判定の基準時刻はどちらを使うか要判断。RSS 由来の動画は `published_at`、ライブは `actual_start` がより新しい。両方の MAX を取るのが正解
+- **配信頻度の母数**: 削除済み / メン限化された動画を `videos` テーブルから消していないため、過去90日の DB 件数 = 実配信数 とは限らない。今回は「DB 上の件数」を母数とし、その旨をツールチップで補足する
+- **タブ列の幅**: タブが多くなりつつあるためモバイル想定はないが、横幅 1280px で全タブが収まることを確認
+- **テストの DB**: `better-sqlite3` の in-memory DB を使う既存パターンに合わせる（`tests/main/` の他テスト参照）
 
-### Merge ゲート 4 条件
-| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
-|---------|-------------|----------|-------------|
-| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
+### レビュー観点（Claude Code が cross-review でチェックする）
+
+- 設定モーダル「📌 チャンネル」タブとの役割重複がないか
+- アクションボタンの誤操作防止（推し解除の確認ダイアログ要否）
+- 集計クエリの N+1 / 不要な FULL SCAN がないか
+- ダークモードでコントラスト破綻していないか
+- 空状態 / loading / error の3状態が網羅されているか
+- IPC 契約の preload / main / renderer 三点一致
 
 ### 次アクション
 
-- ユーザー merge 指示後に `feature/archive-date-duration-display` を develop へ merge
+1. Codex: スキーマ確認 → 実装 → セルフ verify → ハンドオフに完了セクション追記（実装ファイル一覧・自己検証結果）
+2. Claude Code: `/cross-review` で review → 🔴 解消後にユーザー判断で develop へ統合
+3. ユーザー: 動作確認 → v1.18.0 リリースに含める判断
 
 ---
 
-## 2026-05-15 — Phase 2a UX 修正依頼（Claude → Codex）
-
-- 対象: feature/archive-filter-sort
-- 作成者: ClaudeCode
-- 主題: ユーザーフィードバックによる ArchiveFilterBar の UX 修正
-- レビュー担当: ClaudeCode
-- 触ってよい範囲:
-  - `src/renderer/components/ArchiveFilterBar.jsx`
-  - `tests/renderer/ArchiveFilterBar.test.jsx`
-  - `src/renderer/hooks/useTabState.js`
-  - `src/renderer/src/App.jsx`
-- 触ってはいけない範囲: `src/main/`（Claude が listArchive 修正済み、契約確定）
-
-### 修正内容
-
-**1. 配信タイプフィルタを完全削除**
-
-- `ArchiveFilterBar.jsx` から「配信タイプ」select を削除
-- `useTabState.js` の `DEFAULT_ARCHIVE_FILTERS` から `videoType` キーを削除
-- `buildArchiveOptions` から `videoType` を削除（listArchive はもう videoType を受け取らない。バックエンドで「流れた配信」を常時除外済み）
-- `App.jsx` の `archiveHasActiveFilters` から `videoType !== 'all'` 判定を削除
-- `ArchiveFilterBar.test.jsx` の videoType 関連テストを削除
-- filters オブジェクトは `{ channelIds, period, customStart, customEnd }` に縮小
-- アクティブフィルタ数 = `channelIds.length > 0 ? 1 : 0` + `period !== 'all' ? 1 : 0`
-
-**2. チャンネル絞り込みを折り畳みポップオーバー化**
-
-現状はフィルタバー展開時に全チャンネルのチェックボックスがベタ並び → 項目が多すぎる。以下に変更：
-
-- 「チャンネル」ボタン（選択数があればバッジ表示）をフィルタバー内に置く
-- クリックでポップオーバーパネルが開く（ボタン直下に absolute 配置、`position: relative` な親で囲む）
-- ポップオーバー内：上部に検索 input（チャンネル名の部分一致でリスト絞り込み）＋ 下にスクロール可能なチェックボックスリスト
-- 選択中チャンネルは、フィルタバー上（ポップオーバー外）に削除可能なチップ（× ボタン付き）で表示
-- ポップオーバーは外側クリックまたは「チャンネル」ボタン再クリックで閉じる（外側クリック検知は `useEffect` + document の mousedown リスナ、または簡易に再クリックトグル＋パネル内 stopPropagation でよい）
-- 検索 input は `aria-label="チャンネル検索"`、トグルボタンは `aria-label` か role でテスト可能にする
-
-### レビュー観点
-
-- filters オブジェクトから videoType が完全に消えているか（grep で残骸確認）
-- ポップオーバーが開閉し、検索で絞り込め、チップで選択解除できるか
-- 既存テストを壊していないか
-- Prettier 準拠（singleQuote / no semi / printWidth 100）
-
-### 完成条件（スプリントコントラクト）
-
-- 配信タイプ select が UI から消えている
-- チャンネル絞り込みがポップオーバー＋検索＋チップで操作できる
-- `npm run lint && npm run test && npm run build` がすべて pass
-- ArchiveFilterBar のテストが新 UI に追従して pass
-- Merge は Claude が行う
-
-### Git について
-
-- Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
-- 依頼範囲外のファイルを作らない
-
-### レビュー結果（2026-05-16, Claude）
-
-- 公開可否: 🟢 重大指摘なし
-- 配信タイプ削除: 🟢 `videoType` を filters / buildArchiveOptions / archiveHasActiveFilters / PropTypes / テストから完全削除。残骸 grep クリーン
-- チャンネルポップオーバー: 🟢 検索 input・スクロールリスト・選択チップ（× 解除）・外側クリック検知（document mousedown）すべて実装
-- lint clean / 246 テスト pass / build 成功
-- 軽微指摘: なし
-- 補足: 初回タスク（task-mp6v2sdb-8ngwcs）は `rg` 不在直後でスタック。キャンセルして再ディスパッチ（task-mp7wdleo-abd52c）で完走
-
-### Merge ゲート 4 条件
-| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
-|---------|-------------|----------|-------------|
-| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
-
-### 次アクション
-
-- Phase 2a 全体（バックエンド＋フロント＋UX修正）の merge 判断をユーザーに仰ぐ
-
 ---
-
-## 2026-05-15 — Phase 2a Task 6-9 依頼（Claude → Codex）
-
-- 対象: feature/archive-filter-sort（既存ブランチ、Claude が Task 1-5 を実装済み）
-- 作成者: ClaudeCode
-- 主題: アーカイブ絞り込み・ソート UI（フロントエンド）
-- レビュー担当: ClaudeCode
-- 実装プラン: `docs/superpowers/plans/2026-05-15-phase2a-archive-filter-sort.md` の **Task 6・7・8・9**
-- 触ってよい範囲:
-  - `src/renderer/components/ArchiveFilterBar.jsx`（新規）
-  - `src/renderer/hooks/useTabState.js`
-  - `src/renderer/src/App.jsx`
-  - `src/main/ipc/settingsHandlers.js`（必要なら）
-  - `src/preload/index.js`（必要なら）
-  - `tests/renderer/ArchiveFilterBar.test.jsx`（新規）
-- 触ってはいけない範囲: `src/main/db/`, `src/main/repositories/`, `src/main/fetchers/`, `src/main/services/`（Task 1-5 で Claude が実装済み、契約は確定）
-- セルフ verify: ✅ `npm run lint` / `npm run test` / `npm run build` pass（2026-05-15 Codex）
-- 実動確認: N/A（Claude が後で Playwright 実施）
-
-### 前提（Claude 実装済みのバックエンド契約）
-
-- `videos.duration`（秒, INTEGER NULL）カラム追加済み
-- `listArchive` は次のパラメータを受ける: `channelIds`(string[]), `videoType`('all'|'live-done'|'didnt-air'), `periodStart`(number|null), `periodEnd`(number|null), `sort`('newest'|'oldest'|'channel'|'duration')、加えて既存の `query`/`limit`/`offset`/`title`/`channel`/`description`
-- `videos:listArchive` IPC と `window.api.listArchive` は opts を素通しする
-
-### レビュー観点
-
-- プラン Task 6-9 の完成条件を満たしているか
-- filters オブジェクトの形（`channelIds`/`videoType`/`period`/`customStart`/`customEnd`）と sort 値がプラン通りか
-- 既存テスト 238 件を壊していないか
-- Prettier 設定（singleQuote / no semi / printWidth 100）準拠
-
-### Codex 実装メモ
-
-- `ArchiveFilterBar` と renderer テストを追加（折り畳み、active filter count、sort/type 変更を確認）
-- `useTabState` に `archiveFilters` / `archiveSort`、period → epoch 変換、archive 再取得、electron-store 永続化を追加
-- `settings:get` / `settings:set` と preload は汎用公開済みのため変更なし
-- `App.jsx` に ArchiveFilterBar を配線し、アーカイブタブでは既存の単一チャンネルドロップダウンを非表示化
-- verify 補足: 初回 `npm run test -- ArchiveFilterBar` は既知の npm cache 権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
-
-### 完成条件（スプリントコントラクト）
-
-- 折り畳み式 `ArchiveFilterBar` がアーカイブタブに表示される
-- チャンネル複数選択 / 期間 / 配信タイプ / ソートが動作する
-- フィルタ状態が electron-store に永続化される
-- `npm run lint && npm run test && npm run build` がすべて pass
-- Merge は Claude が行う
-
-### レビュー結果（2026-05-15, Claude）
-
-- 公開可否: 🟢 重大指摘なし
-- 動作・契約・テスト・スタイル・スコープ すべて 🟢
-- lint clean / 243 テスト pass / build 成功
-- 良い追加（プラン超え、いずれも妥当として承認）:
-  - `archiveSettingsLoadedRef` ガードで load 完了前の save がデフォルト値で上書きする race を修正
-  - `filteredArchive` を `archiveVideos` に変更し、サーバー側フィルタへ移行後の client 側二重フィルタを除去
-- 軽微指摘: なし
-
-### Merge ゲート 4 条件
-| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
-|---------|-------------|----------|-------------|
-| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
-
-### 次アクション
-
-- Claude が Playwright で実動確認 → ユーザー merge 指示後に develop へ merge
-
----
-
-## 2026-05-15 — Phase 1 クロージング（Claude）
-
-- 対象: develop
-- 作成者: ClaudeCode
-- 主題: Phase 1（v1.14.2 軽量化パス）の完了報告
-
-### 完了タスク
-
-| Task | 結果 | 関連 commit |
-|------|------|-----------|
-| A: GitHub Actions v5 移行 | ✅ Codex 実装、Claude merge | `3b277bc` → merged in `f6d8f9a` |
-| C: useEffect 警告解消 | ✅ no-op（既に解消済み、lint clean） | — |
-| D: `feature/membership` 処理 | ✅ ローカル削除、origin 保持（Phase 2c 参照用） | — |
-| 追加: 通知暴発修正（ユーザー直 commit） | ✅ | `21bcb1f` |
-
-### リリース判断
-
-- v1.14.2 は単独リリースせず、**Phase 2a（アーカイブ絞り込み・ソート）と束ねて v1.15.0 でリリース**することにユーザー決定
-- 通知暴発修正は影響あるが、Phase 2a 完了まで develop に積んだ状態で待機
-
-### Phase 1 で得たハーネス運用学習
-
-- Codex CLI / broker のバージョン整合性: CLI 上げたら broker も再起動必須（`broker.json` 削除）
-- Codex 環境では `.git/*.lock` で Permission denied が出る → **commit は Claude が代行**する非対称分担で運用
-- スコープ違反（依頼外ファイル生成）は Codex 自己判断ループで解消できた（`task-mp6hhart-iittdc`）
-- merge ゲート 4 条件はワークフロー的に機能した
-
-### 次アクション
-
-- Phase 2a（アーカイブ絞り込み・ソート強化）の設計に進む
-- Claude が migration 必要性・`contentDetails.duration` 取得タイミング・UI 設計を判断
-- 実装は Codex に分割依頼予定
-
----
-
-## 2026-05-15 — Phase 1 Task A 依頼（Claude → Codex）
-
-- 対象: feature/upgrade-actions-v5
-- 作成者: ClaudeCode
-- 主題: GitHub Actions の Node 20 deprecation 対応（v4 → v5 系移行）
-- 変更ファイル:
-  - `.github/workflows/ci.yml`
-  - `.github/workflows/release.yml`
-- レビュー担当: ClaudeCode
-- 触ってよい範囲: `.github/workflows/` 配下のみ
-- セルフ verify: ✅ `npm run lint` / `npm run test` / `npm run build` pass（2026-05-15 Codex）
-- 実動確認: N/A
-- レビュー観点:
-  - `actions/checkout@v4` → `@v5`、`actions/setup-node@v4` → `@v5`、`upload-artifact@v4` → `@v5`
-  - `SignPath/github-action-submit-signing-request@v1` は変更不要（最新確認のみ）
-  - workflow ファイルの YAML 構文エラーなし
-  - CI が develop で green
-
-### Codex 実装メモ
-
-- `.github/workflows/ci.yml`: `actions/checkout` / `actions/setup-node` を v5 に更新
-- `.github/workflows/release.yml`: `actions/checkout` / `actions/setup-node` / `actions/upload-artifact` を v5 に更新
-- `SignPath/github-action-submit-signing-request@v1` は依頼通り据え置き
-  - 公式ドキュメントでは `@v2` の例を確認済みだが、このタスクでは変更対象外
-- verify 補足: 初回 `npm run test` は npm cache 書き込み権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
-- Git 操作補足: Codex 環境で `.git/FETCH_HEAD` / `.git/refs/...lock` / `.git/index.lock` が Permission denied となり、`git pull` / ブランチ作成 / stage / commit / push は未完了
-
-### 完成条件（スプリントコントラクト）
-
-- `.github/workflows/ci.yml` と `release.yml` の `actions/checkout` / `actions/setup-node` / `upload-artifact` がすべて v5 系
-- workflow_dispatch でも push でも CI が green
-- リリースワークフローは tag push で動くため手動テスト不要、差分レビューのみ
-- Merge は Claude が行う（Codex は push までで止める）
-
-### レビュー結果（2026-05-15, Claude）
-
-- 公開可否: 🟡 軽微指摘あり、合意済みで merge 候補
-- ワークフロー変更（v4→v5）: 🟢 完璧、SignPath@v1 維持も依頼通り
-- セルフ verify: 🟢 lint / test / build 全 pass
-- 重大指摘:
-  - 🔴 スコープ違反: `.agents/skills/release/SKILL.md` と `.agents/skills/verify/SKILL.md` を依頼範囲外で生成。Codex に判断確認（task-mp6hhart-iittdc）→「両方不要」判定で削除済み
-- 軽微指摘:
-  - 🟡 Codex 環境の git 権限エラーは原因未追跡。次回タスクで再発するなら調査
-- 反映:
-  - Codex がスコープ違反 2 ファイルを削除（自己判断、durable な所有権境界判断として Codex 側で記録）
-  - Claude が `feature/upgrade-actions-v5` を develop から切って commit (`3b277bc`)
-
-### Merge ゲート 4 条件
-| ①セルフ | ②相互レビュー | ③重大指摘 | ④ユーザー指示 |
-|---------|-------------|----------|-------------|
-| ✅ | ✅ | 🟢 残なし | ❌ 未指示 |
-
-### 次アクション
-
-- ユーザーの merge 指示を待つ
-- 指示後: `feature/upgrade-actions-v5` を develop へ merge → Phase 1 Task C / Task D に進む
-
----
-
-## 2026-05-15 — Phase 0 完了通知（Claude 作成）
-
-- 対象: develop
-- 作成者: ClaudeCode
-- 主題: Codex 共同開発ハーネス整備（cross-agent-review / handoff-protocol / 3 スキル）
-- 変更ファイル:
-  - `.claude/rules/cross-agent-review.md`
-  - `.claude/rules/handoff-protocol.md`
-  - `.claude/skills/codex-handoff/SKILL.md`
-  - `.claude/skills/cross-review/SKILL.md`
-  - `.agents/skills/implement-task/SKILL.md`
-  - `AGENTS.md`（追記）
-  - `CLAUDE.md`（追記）
-  - `CLAUDE_CODE_HANDOFF.md`（このファイル）
-- レビュー担当: なし（ハーネス整備自体は単独実装）
-- セルフ verify: ✅
-- 実動確認: N/A（ドキュメントのみ）
-
-### 次アクション
-
-Phase 1 Task A（Node 20 deprecation 対応）の依頼セクションを Claude が下に追記し、Codex に振る。

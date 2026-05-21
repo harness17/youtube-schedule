@@ -396,6 +396,203 @@ body {
   cursor: grabbing;
 }
 
+/* ===== STATS TAB ===== */
+.yt-stats {
+  display: grid;
+  gap: 14px;
+}
+
+.yt-stats-subnav {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.yt-stats-subnav-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sub);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.yt-stats-subnav-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.yt-stats-subnav-btn.is-active {
+  background: var(--upcoming);
+  color: #fff;
+}
+
+.yt-stats-subnav-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--sub);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.yt-stats-subnav-btn.is-active .yt-stats-subnav-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.yt-stats-section {
+  min-width: 0;
+}
+
+.yt-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.yt-stats-row-link {
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.yt-stats-row-link:hover .yt-stats-row-title {
+  text-decoration: underline;
+}
+
+.yt-stats-empty {
+  padding: 18px 12px;
+  text-align: center;
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.yt-stats-group {
+  margin-bottom: 10px;
+}
+
+.yt-stats-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.yt-stats-badge {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--sub);
+  font-size: 11px;
+  text-align: center;
+}
+
+.yt-stats-row,
+.yt-stats-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.yt-stats-row--muted {
+  color: var(--sub);
+  background: transparent;
+}
+
+.yt-stats-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.yt-stats-row-title,
+.yt-stats-rank-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.yt-stats-row-meta,
+.yt-stats-note {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.yt-stats-note {
+  margin: -4px 0 8px;
+}
+
+.yt-stats-ranking {
+  display: grid;
+  gap: 6px;
+}
+
+.yt-stats-rank-row {
+  cursor: pointer;
+  text-align: left;
+}
+
+.yt-stats-rank-row:hover {
+  background: var(--surface2);
+}
+
+.yt-stats-rank-index {
+  width: 26px;
+  color: var(--sub);
+  font-size: 12px;
+  text-align: right;
+}
+
+.yt-stats-rank-title {
+  flex: 1;
+}
+
+.yt-stats-pin {
+  margin-right: 4px;
+}
+
+.yt-stats-rank-count {
+  color: var(--upcoming);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ===== STATUS BANNERS ===== */
 .status-banners {
   margin-bottom: 10px;

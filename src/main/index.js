@@ -25,6 +25,7 @@ import { openDatabase, closeDatabase } from './db/connection.js'
 import { runMigrations } from './db/migrate.js'
 import { createVideoRepository } from './repositories/videoRepository.js'
 import { createChannelRepository } from './repositories/channelRepository.js'
+import { createStatsRepository } from './repositories/statsRepository.js'
 import { createRssFetchLogRepository } from './repositories/rssFetchLogRepository.js'
 import { createMetaRepository } from './repositories/metaRepository.js'
 import { createSchedulerService } from './services/schedulerService.js'
@@ -38,6 +39,7 @@ import { registerAuthHandlers } from './ipc/authHandlers.js'
 import { registerVideoHandlers } from './ipc/videoHandlers.js'
 import { registerSettingsHandlers } from './ipc/settingsHandlers.js'
 import { registerAppHandlers } from './ipc/appHandlers.js'
+import { registerStatsHandlers } from './ipc/statsHandlers.js'
 
 // ===== シングルインスタンス保証 ================================================
 // 多重起動時は既存ウィンドウをフォアグラウンドに出して即終了する
@@ -60,7 +62,7 @@ if (!gotTheLock) {
 // 値ではなく関数（getter）を渡すことで常に最新の参照を取得できるようにする
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
-let videoRepo, channelRepo, rssLogRepo, metaRepo
+let videoRepo, channelRepo, statsRepo, rssLogRepo, metaRepo
 let scheduler
 let currentAuthClient = null
 let refreshTimer
@@ -136,6 +138,7 @@ function initDatabase() {
   })
   videoRepo = createVideoRepository(db)
   channelRepo = createChannelRepository(db)
+  statsRepo = createStatsRepository(db)
   rssLogRepo = createRssFetchLogRepository(db)
   metaRepo = createMetaRepository(db)
 }
@@ -205,6 +208,11 @@ function registerAllHandlers(getMainWindow) {
     getIsFullMode: () => Boolean(currentAuthClient),
     getDbBroken: () => dbBroken,
     getMainWindow
+  })
+
+  registerStatsHandlers({
+    getStatsRepo: () => statsRepo,
+    getDbBroken: () => dbBroken
   })
 
   // 設定・インポートエクスポートハンドラ

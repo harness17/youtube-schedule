@@ -179,4 +179,17 @@ export function registerVideoHandlers({
     if (!repo) return false
     return repo.delete(id)
   })
+
+  // ---- 今すぐ同期（subscriptions.list キャッシュをバイパス） -------------------
+  ipcMain.handle('channels:syncNow', async () => {
+    const scheduler = getScheduler()
+    if (!scheduler) return { error: 'NOT_INITIALIZED' }
+    try {
+      await scheduler.refresh({ forceSubscriptionsResync: true })
+      getMainWindow()?.webContents.send('schedule:updated')
+      return { ok: true }
+    } catch {
+      return { error: 'SYNC_FAILED' }
+    }
+  })
 }
