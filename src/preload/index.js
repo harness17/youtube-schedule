@@ -49,11 +49,16 @@ contextBridge.exposeInMainWorld('api', {
     get: (opts) => ipcRenderer.invoke('playlist:get', opts),
     refresh: () => ipcRenderer.invoke('playlist:refresh'),
     cleanup: () => ipcRenderer.invoke('playlist:cleanup'),
-    exportFavorites: () => ipcRenderer.invoke('playlist:exportFavorites'),
+    deleteOne: (videoId) => ipcRenderer.invoke('playlist:deleteOne', videoId),
     onUpdated: (cb) => {
       const listener = (_, result) => cb(result)
       ipcRenderer.on('playlist:updated', listener)
       return () => ipcRenderer.off('playlist:updated', listener)
+    },
+    onError: (cb) => {
+      const listener = (_, payload) => cb(payload)
+      ipcRenderer.on('playlist:error', listener)
+      return () => ipcRenderer.off('playlist:error', listener)
     }
   },
   exportSettings: () => ipcRenderer.invoke('settings:export'),

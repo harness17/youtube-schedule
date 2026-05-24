@@ -138,6 +138,16 @@ describe('ScheduleCard', () => {
     expect(screen.getByTitle('お気に入り解除')).toBeInTheDocument()
   })
 
+  it('showCollectionBadges=true かつ isFavorite=true のときお気に入りバッジを表示する', () => {
+    render(<ScheduleCard item={{ ...mockItem, isFavorite: true }} showCollectionBadges={true} />)
+    expect(screen.getByText('⭐ お気に入り')).toBeInTheDocument()
+  })
+
+  it('isInPlaylist=true のときプレイリスト在中バッジを表示する', () => {
+    render(<ScheduleCard item={mockItem} isInPlaylist={true} showCollectionBadges={true} />)
+    expect(screen.getByText('📂 プレイリスト在中')).toBeInTheDocument()
+  })
+
   it('isPinned=true のとき 📌 ボタンが「優先解除」タイトルで表示される', () => {
     render(<ScheduleCard item={mockItem} isPinned={true} />)
     expect(screen.getByTitle('優先解除')).toBeInTheDocument()
@@ -186,5 +196,25 @@ describe('ScheduleCard', () => {
   it('isViewed=false のとき「見た」バッジは表示されない', () => {
     render(<ScheduleCard item={mockItem} isViewed={false} />)
     expect(screen.queryByText('見た')).not.toBeInTheDocument()
+  })
+
+  it('isRemovedFromPlaylist=true のとき削除済みバッジと削除ボタンを表示する', () => {
+    const onDeleteFromYoutom = vi.fn()
+    render(
+      <ScheduleCard
+        item={mockItem}
+        isRemovedFromPlaylist={true}
+        onDeleteFromYoutom={onDeleteFromYoutom}
+      />
+    )
+    expect(screen.getByText('⚠️ プレイリストから削除済み')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTitle('YouTom から削除'))
+    expect(onDeleteFromYoutom).toHaveBeenCalledWith(mockItem.id)
+  })
+
+  it('削除済み prop 未指定時は既存カードと同じく削除ボタンを表示しない', () => {
+    render(<ScheduleCard item={mockItem} />)
+    expect(screen.queryByTitle('YouTom から削除')).not.toBeInTheDocument()
   })
 })

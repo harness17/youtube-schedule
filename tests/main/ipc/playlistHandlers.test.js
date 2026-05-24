@@ -29,14 +29,10 @@ describe('playlistHandlers', () => {
       playlistRepo: {
         setConfig: vi.fn(),
         getConfig: vi.fn().mockReturnValue({ playlistId: 'PL1', enabled: true }),
+        clearAllPlaylistFlags: vi.fn().mockReturnValue({ cleared: 0 }),
         listPlaylistVideos: vi.fn().mockReturnValue([{ id: 'V1' }]),
-        deleteRemoved: vi.fn().mockReturnValue({ deleted: 2 })
-      },
-      videoRepo: {
-        listFavorites: vi.fn().mockReturnValue([
-          { id: 'V1', url: 'https://www.youtube.com/watch?v=V1' },
-          { id: 'V2', url: '' }
-        ])
+        deleteRemoved: vi.fn().mockReturnValue({ deleted: 2 }),
+        deleteOne: vi.fn().mockReturnValue({ deleted: 1 })
       },
       playlistFetcher: {
         listMyPlaylists: vi.fn().mockResolvedValue([{ id: 'PL1', title: 'One', itemCount: 1 }])
@@ -59,7 +55,7 @@ describe('playlistHandlers', () => {
   it('registers the expected IPC channels', () => {
     expect([...handlers.keys()].sort()).toEqual([
       'playlist:cleanup',
-      'playlist:exportFavorites',
+      'playlist:deleteOne',
       'playlist:get',
       'playlist:getConfig',
       'playlist:listMine',
@@ -109,6 +105,37 @@ describe('playlistHandlers', () => {
     })
   })
 
+  it('clears playlist flags when saving a different playlist id', async () => {
+    await expect(
+      invoke('playlist:setConfig', { playlistId: 'PL2', playlistTitle: 'Two', enabled: true })
+    ).resolves.toEqual({ ok: true })
+
+    expect(deps.playlistRepo.clearAllPlaylistFlags).toHaveBeenCalledTimes(1)
+    expect(deps.playlistRepo.setConfig).toHaveBeenCalledWith({
+      playlistId: 'PL2',
+      playlistTitle: 'Two',
+      enabled: true
+    })
+  })
+
+  it('does not clear playlist flags when saving the same playlist id', async () => {
+    await expect(
+      invoke('playlist:setConfig', { playlistId: 'PL1', playlistTitle: 'One updated' })
+    ).resolves.toEqual({ ok: true })
+
+    expect(deps.playlistRepo.clearAllPlaylistFlags).not.toHaveBeenCalled()
+  })
+
+  it('does not clear playlist flags on initial config registration', async () => {
+    deps.playlistRepo.getConfig.mockReturnValue(null)
+
+    await expect(
+      invoke('playlist:setConfig', { playlistId: 'PL1', playlistTitle: 'One' })
+    ).resolves.toEqual({ ok: true })
+
+    expect(deps.playlistRepo.clearAllPlaylistFlags).not.toHaveBeenCalled()
+  })
+
   it('does not refresh when config is saved as disabled', async () => {
     await expect(
       invoke('playlist:setConfig', { playlistId: 'PL1', enabled: false })
@@ -137,10 +164,24 @@ describe('playlistHandlers', () => {
     })
   })
 
-  it('cleans removed videos and exports favorite URLs', async () => {
+  it('cleans removed videos', async () => {
     expect(await invoke('playlist:cleanup')).toEqual({ deleted: 2 })
-    expect(await invoke('playlist:exportFavorites')).toEqual({
-      urls: ['https://www.youtube.com/watch?v=V1', 'https://www.youtube.com/watch?v=V2']
+  })
+
+  it('deletes one removed playlist video by id', async () => {
+    expect(await invoke('playlist:deleteOne', 'V1')).toEqual({ deleted: 1 })
+    expect(deps.playlistRepo.deleteOne).toHaveBeenCalledWith('V1')
+  })
+
+  it('returns NOT_INITIALIZED when deleting one video without repository', async () => {
+    registerPlaylistHandlers({
+      getPlaylistRepo: () => null,
+      getPlaylistFetcher: () => deps.playlistFetcher,
+      getPlaylistSyncService: () => deps.playlistSyncService,
+      getAuthClient: () => deps.authClient,
+      getMainWindow: () => mainWindow
     })
+
+    expect(await invoke('playlist:deleteOne', 'V1')).toEqual({ error: 'NOT_INITIALIZED' })
   })
 })

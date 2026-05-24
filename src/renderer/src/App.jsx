@@ -7,6 +7,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
 import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
 import StatsTab from '../components/StatsTab.jsx'
+import PlaylistTab from '../components/PlaylistTab.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
 import SettingsModal from '../components/SettingsModal.jsx'
 import Toast from '../components/Toast.jsx'
@@ -199,7 +200,10 @@ export default function App() {
     if (authLoading) return
     if (isAuthenticated && activeTab === 'feed') {
       handleTabChange('schedule')
-    } else if (!isAuthenticated && ['schedule', 'missed', 'archive', 'stats'].includes(activeTab)) {
+    } else if (
+      !isAuthenticated &&
+      ['schedule', 'missed', 'archive', 'stats', 'playlist'].includes(activeTab)
+    ) {
       handleTabChange('feed')
     }
     // handleTabChange はタブごとのロードを含むため、モード境界だけで実行する
@@ -605,7 +609,8 @@ export default function App() {
             { key: 'missed', label: '見逃し', mode: 'full' },
             { key: 'archive', label: 'アーカイブ', mode: 'full' },
             { key: 'stats', label: '💡 インサイト', mode: 'full' },
-            { key: 'favorites', label: '⭐ お気に入り', mode: 'both' }
+            { key: 'favorites', label: '⭐ お気に入り', mode: 'both' },
+            { key: 'playlist', label: '📂 プレイリスト', mode: 'full' }
           ]
             .filter(
               (tab) =>
@@ -1020,6 +1025,23 @@ export default function App() {
             })()
           )}
         </div>
+      )}
+
+      {/* ── プレイリストタブ（YouTube から YouTom への取り込み専用） ── */}
+      {activeTab === 'playlist' && (
+        <PlaylistTab
+          active={activeTab === 'playlist'}
+          darkMode={darkMode}
+          isAuthenticated={isAuthenticated}
+          searchQuery={searchQuery}
+          hideMembershipVideos={hideMembershipVideos}
+          pinnedChannelIds={pinnedChannelIds}
+          onToggleWatch={handleToggleNotify}
+          onToggleFavorite={handleToggleFavorite}
+          onMarkViewed={handleMarkViewed}
+          onTogglePin={handleTogglePin}
+          onToast={setToast}
+        />
       )}
 
       {showSettings && (
