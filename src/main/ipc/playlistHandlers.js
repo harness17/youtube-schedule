@@ -1,5 +1,4 @@
 import { ipcMain } from 'electron'
-import { buildWatchUrl } from '../services/videoUrl.js'
 
 function errorCode(err, fallback) {
   return err?.code ?? fallback
@@ -7,7 +6,6 @@ function errorCode(err, fallback) {
 
 export function registerPlaylistHandlers({
   getPlaylistRepo,
-  getVideoRepo,
   getPlaylistFetcher,
   getPlaylistSyncService,
   getAuthClient,
@@ -28,6 +26,16 @@ export function registerPlaylistHandlers({
     const service = getPlaylistSyncService()
     if (!repo || !service) return { error: 'NOT_INITIALIZED' }
     try {
+      const currentConfig = repo.getConfig()
+      const playlistChanged =
+        currentConfig?.playlistId != null &&
+        payload.playlistId != null &&
+        currentConfig.playlistId !== payload.playlistId
+
+      if (playlistChanged) {
+        repo.clearAllPlaylistFlags()
+      }
+
       repo.setConfig({
         playlistId: payload.playlistId,
         playlistTitle: payload.playlistTitle ?? null,
@@ -87,11 +95,9 @@ export function registerPlaylistHandlers({
     return repo.deleteRemoved()
   })
 
-  ipcMain.handle('playlist:exportFavorites', () => {
-    const repo = getVideoRepo()
-    if (!repo) return { urls: [] }
-    return {
-      urls: repo.listFavorites().map((video) => video.url || buildWatchUrl(video.id))
-    }
+  ipcMain.handle('playlist:deleteOne', (_, videoId) => {
+    const repo = getPlaylistRepo()
+    if (!repo) return { error: 'NOT_INITIALIZED' }
+    return repo.deleteOne(videoId)
   })
 }

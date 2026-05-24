@@ -68,6 +68,16 @@ export function createPlaylistRepository(db) {
     DELETE FROM videos
     WHERE in_playlist = 0 AND playlist_removed_at IS NOT NULL
   `)
+  const deleteOneRemovedStmt = db.prepare(`
+    DELETE FROM videos
+    WHERE id = @id AND in_playlist = 0 AND playlist_removed_at IS NOT NULL
+  `)
+  const clearAllPlaylistFlagsStmt = db.prepare(`
+    UPDATE videos
+    SET in_playlist = 0,
+        playlist_added_at = NULL,
+        playlist_removed_at = NULL
+  `)
   const playlistVideoIdsStmt = db.prepare(`SELECT id FROM videos WHERE in_playlist = 1`)
   const removedPlaylistVideoIdsStmt = db.prepare(`
     SELECT id FROM videos WHERE playlist_removed_at IS NOT NULL
@@ -117,6 +127,14 @@ export function createPlaylistRepository(db) {
     deleteRemoved() {
       const result = deleteRemovedStmt.run()
       return { deleted: result.changes }
+    },
+    deleteOne(videoId) {
+      const result = deleteOneRemovedStmt.run({ id: videoId })
+      return { deleted: result.changes }
+    },
+    clearAllPlaylistFlags() {
+      const result = clearAllPlaylistFlagsStmt.run()
+      return { cleared: result.changes }
     },
     getPlaylistVideoIds() {
       return new Set(playlistVideoIdsStmt.all().map((row) => row.id))

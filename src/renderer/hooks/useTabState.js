@@ -275,6 +275,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
     setMissedVideos((prev) => (viewed ? prev.filter((v) => v.id !== id) : prev))
     setArchiveVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
     setFavoriteVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+    return patch.viewedAt
   }
 
   /** お気に入り切り替え。scheduleタブ（live/upcoming）は useSchedule の updateVideo 経由で更新 */
@@ -287,6 +288,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       setArchiveVideos((prev) => prev.map(patchFn))
       setFavoriteVideos((prev) => (newVal ? prev.map(patchFn) : prev.filter((v) => v.id !== id)))
     }
+    return newVal
   }
 
   function reorderFavorites(activeId, overId, scopeIds = null) {
@@ -349,6 +351,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       setArchiveVideos((prev) => prev.map(patchFn))
       setFavoriteVideos((prev) => prev.map(patchFn))
     }
+    return newVal
   }
 
   // ===== フィルタリング =========================================================

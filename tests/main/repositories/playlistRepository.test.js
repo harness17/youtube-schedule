@@ -127,4 +127,58 @@ describe('PlaylistRepository', () => {
     expect(videoRepo.getById('removed')).toBeNull()
     expect(videoRepo.getById('inconsistent')).not.toBeNull()
   })
+
+  it('deleteOne deletes only the requested removed row and never deletes active videos', () => {
+    videoRepo.upsert(sampleVideo({ id: 'active' }))
+    videoRepo.upsert(sampleVideo({ id: 'removed' }))
+    playlistRepo.applyDiff({ added: ['active', 'removed'] }, NOW)
+    playlistRepo.applyDiff({ removed: ['removed'] }, NOW + 1000)
+
+    expect(playlistRepo.deleteOne('active')).toEqual({ deleted: 0 })
+    expect(videoRepo.getById('active')).not.toBeNull()
+
+    expect(playlistRepo.deleteOne('missing')).toEqual({ deleted: 0 })
+    expect(playlistRepo.deleteOne('removed')).toEqual({ deleted: 1 })
+    expect(videoRepo.getById('removed')).toBeNull()
+  })
+
+  it('clearAllPlaylistFlags resets playlist columns and preserves favorite and notify flags', () => {
+    videoRepo.upsert(sampleVideo({ id: 'active' }))
+    videoRepo.upsert(sampleVideo({ id: 'removed' }))
+    playlistRepo.applyDiff({ added: ['active', 'removed'] }, NOW)
+    playlistRepo.applyDiff({ removed: ['removed'] }, NOW + 1000)
+    videoRepo.setFavorite('active')
+    videoRepo.toggleNotify('removed')
+
+    expect(playlistRepo.clearAllPlaylistFlags()).toEqual({ cleared: 2 })
+
+    const rows = db
+      .prepare(
+        `
+          SELECT id, in_playlist, playlist_added_at, playlist_removed_at, is_favorite, notify
+          FROM videos
+          ORDER BY id
+        `
+      )
+      .all()
+
+    expect(rows).toEqual([
+      {
+        id: 'active',
+        in_playlist: 0,
+        playlist_added_at: null,
+        playlist_removed_at: null,
+        is_favorite: 1,
+        notify: 0
+      },
+      {
+        id: 'removed',
+        in_playlist: 0,
+        playlist_added_at: null,
+        playlist_removed_at: null,
+        is_favorite: 0,
+        notify: 1
+      }
+    ])
+  })
 })

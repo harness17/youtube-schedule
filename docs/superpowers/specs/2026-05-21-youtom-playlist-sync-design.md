@@ -1,19 +1,21 @@
-# YouTom プレイリスト同期 設計仕様
+# YouTom プレイリスト取り込み 設計仕様
 
 - 作成日: 2026-05-21
 - 作成者: Claude Code（ユーザーとブレインストーミング）
 - 対象リリース: v1.19.0 以降候補
-- ステータス: design approved, implementation pending
+- ステータス: scope reduced to import-only, implementation in progress
 
 ## 目的
 
 YouTube 上のユーザー作成プレイリスト 1 つを「YouTom プレイリスト」として取り込み、YouTom 内で参照・整理する。
-YouTom 上のお気に入り (`is_favorite=1`) は、書き込みスコープを使わずに YouTube プレイリストへ手動反映できるエクスポート機能で補完する。
+機能スコープは **YouTube プレイリスト → YouTom 取り込み専用** とし、YouTom から YouTube への反映導線は持たない。
 
 ## 非目標
 
 - OAuth スコープを `youtube.readonly` から拡張すること
 - YouTube 側プレイリストへの自動書き込み（`playlistItems.insert`）
+- YouTom のお気に入りを YouTube プレイリストへ手動反映するエクスポート機能
+- お気に入りタブとプレイリストタブの統合
 - 複数プレイリスト同時同期
 - 既存タブ（`schedule` / `missed` / `archive` / `favorites` / `new-videos`）の挙動変更
 
@@ -34,24 +36,23 @@ IPC（playlist:get / playlist:refresh / playlist:cleanup）
    ↓
 PlaylistTab（通常表示 / 削除済みフィルタ / 一括削除）
 
-SettingsModal「📂 プレイリスト同期」タブ:
+SettingsModal「📂 プレイリスト」タブ:
   - playlists.list?mine=true で自分のプレイリスト一覧取得（24h キャッシュ）
   - ドロップダウン選択
   - 「YouTube でプレイリストを作成」外部リンク誘導
-  - ⭐ お気に入りエクスポート（動画 URL 改行区切りリスト）
 ```
 
 ## コンポーネント
 
-| 種別 | パス | 役割 |
-|------|------|------|
-| service | `src/main/services/playlistFetcher.js` | `playlistItems.list` ページング取得・diff |
-| repo | `src/main/repositories/playlistRepository.js` | `in_playlist` / `playlist_removed_at` 操作、設定行管理 |
-| IPC | `src/main/ipc/playlistHandlers.js` | `playlist:get` / `playlist:refresh` / `playlist:cleanup` / `playlist:listMine` / `playlist:setConfig` / `playlist:exportFavorites` |
-| hook | `src/renderer/hooks/usePlaylist.js` | 取得・再同期トリガー |
-| UI | `src/renderer/components/PlaylistTab.jsx` | 同期結果の表示、削除済みフィルタ、一括削除 |
-| UI | `src/renderer/components/SettingsModal.jsx`（拡張） | プレイリスト同期タブ追加、エクスポートモーダル |
-| scheduler | `src/main/services/schedulerService.js`（拡張） | 24h 周期でプレイリスト同期もキック |
+| 種別      | パス                                                | 役割                                                                                                                         |
+| --------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| service   | `src/main/services/playlistFetcher.js`              | `playlistItems.list` ページング取得・diff                                                                                    |
+| repo      | `src/main/repositories/playlistRepository.js`       | `in_playlist` / `playlist_removed_at` 操作、設定行管理                                                                       |
+| IPC       | `src/main/ipc/playlistHandlers.js`                  | `playlist:get` / `playlist:refresh` / `playlist:cleanup` / `playlist:deleteOne` / `playlist:listMine` / `playlist:setConfig` |
+| hook      | `src/renderer/hooks/usePlaylist.js`                 | 取得・再同期トリガー                                                                                                         |
+| UI        | `src/renderer/components/PlaylistTab.jsx`           | 同期結果の表示、削除済みフィルタ、一括削除                                                                                   |
+| UI        | `src/renderer/components/SettingsModal.jsx`（拡張） | プレイリスト設定タブ追加                                                                                                     |
+| scheduler | `src/main/services/schedulerService.js`（拡張）     | 24h 周期でプレイリスト同期もキック                                                                                           |
 
 ## データ設計（migration 005）
 
@@ -98,10 +99,10 @@ D = videos WHERE in_playlist=1 の動画ID集合
 
 ## クォータ設計
 
-| API | ユニット/回 | 用途 | 頻度 |
-|-----|------------|------|------|
-| `playlists.list?mine=true` | 1 | 設定モーダル開いた時 | 24h キャッシュ |
-| `playlistItems.list` | 1 / 50件 | 同期 1 回 | 自動 24h + 手動 |
+| API                        | ユニット/回 | 用途                 | 頻度            |
+| -------------------------- | ----------- | -------------------- | --------------- |
+| `playlists.list?mine=true` | 1           | 設定モーダル開いた時 | 24h キャッシュ  |
+| `playlistItems.list`       | 1 / 50件    | 同期 1 回            | 自動 24h + 手動 |
 
 最悪ケース：プレイリスト 500 件 → 10 ページ → 10 ユニット/同期。
 1 日最大 10 ユニット（自動）+ 任意手動。既存スケジューラ消費（数百ユニット/日）に対し誤差。
@@ -110,24 +111,24 @@ D = videos WHERE in_playlist=1 の動画ID集合
 
 ## 同期タイミング
 
-| トリガー | 頻度 | 取得 |
-|---------|------|------|
-| 自動 | 24h（SchedulerService に組込み） | 全件 diff |
-| 手動 | プレイリストタブ「🔄 同期」ボタン（デバウンス 3 秒） | 全件 diff |
-| 初回 | 設定で選択直後 | 全件取り込み |
+| トリガー | 頻度                                                 | 取得         |
+| -------- | ---------------------------------------------------- | ------------ |
+| 自動     | 24h（SchedulerService に組込み）                     | 全件 diff    |
+| 手動     | プレイリストタブ「🔄 同期」ボタン（デバウンス 3 秒） | 全件 diff    |
+| 初回     | 設定で選択直後                                       | 全件取り込み |
 
 ## エラー処理
 
-| 状況 | 挙動 |
-|------|------|
-| 403 quotaExceeded | 既存クォータバナーに「プレイリスト同期もリセット待ち」併記 |
+| 状況                 | 挙動                                                                      |
+| -------------------- | ------------------------------------------------------------------------- |
+| 403 quotaExceeded    | 既存クォータバナーに「プレイリスト同期もリセット待ち」併記                |
 | 404 playlistNotFound | UI で「プレイリストが削除/非公開化された可能性」エラー → 設定で再選択誘導 |
-| ネットワークエラー | 既存リトライ機構に乗せる |
-| 認証エラー | 既存 `auth:check` フローに合流 |
+| ネットワークエラー   | 既存リトライ機構に乗せる                                                  |
+| 認証エラー           | 既存 `auth:check` フローに合流                                            |
 
 ## UI
 
-### 新規タブ「📂 プレイリスト」（App.jsx に追加）
+### 独立タブ「📂 プレイリスト」（App.jsx のタブ列最後尾）
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -149,7 +150,7 @@ D = videos WHERE in_playlist=1 の動画ID集合
   - `onDeleteFromYoutom: (id) => void`（行ごと削除）
 - 「削除済みを一括削除」は確認モーダル経由で `playlist_removed_at IS NOT NULL` の行を物理削除
 
-### 設定モーダル「📂 プレイリスト同期」タブ（新規）
+### 設定モーダル「📂 プレイリスト」タブ
 
 ```
 ☑ 同期を有効にする
@@ -160,19 +161,11 @@ D = videos WHERE in_playlist=1 の動画ID集合
 プレイリストが無い場合:
 [📂 YouTube でプレイリストを作成] (外部リンク)
  作成後にこの画面の選択肢を更新してください
-
-[📤 ⭐お気に入りをエクスポート]
 ```
 
 - ドロップダウンは `playlists.list?mine=true` 結果（24h キャッシュ）
 - 「YouTube で作成」は `https://www.youtube.com/feed/playlists` を外部ブラウザで開く
-- エクスポートはモーダル開いて以下を表示：
-  ```
-  https://www.youtube.com/watch?v=XXX
-  https://www.youtube.com/watch?v=YYY
-  ...
-  ```
-- 補足テキスト + コピーボタン + `.txt` ダウンロード
+- お気に入りエクスポートは設計過程で検討したが、自動双方向同期にならず手動運用の負担が大きいため削除した
 
 ### ダークモード
 
@@ -180,28 +173,28 @@ D = videos WHERE in_playlist=1 の動画ID集合
 
 ## IPC コントラクト
 
-| チャンネル | 引数 | 戻り値 | 役割 |
-|-----------|------|--------|------|
-| `playlist:listMine` | なし | `[{ id, title, itemCount }]` | 設定モーダル選択肢 |
-| `playlist:setConfig` | `{ playlistId, playlistTitle, enabled }` | `{ ok: true }` | 設定保存 |
-| `playlist:getConfig` | なし | `{ playlistId, playlistTitle, lastSyncedAt, enabled } \| null` | 現在設定取得 |
-| `playlist:get` | `{ filter: 'all' \| 'removed' }` | `[video...]` | タブ表示用 |
-| `playlist:refresh` | なし | `{ added, removed, restored }` | 手動同期 |
-| `playlist:cleanup` | なし | `{ deleted: number }` | 削除済み一括削除 |
-| `playlist:exportFavorites` | なし | `{ urls: string[] }` | エクスポート |
+| チャンネル           | 引数                                     | 戻り値                                                         | 役割                   |
+| -------------------- | ---------------------------------------- | -------------------------------------------------------------- | ---------------------- |
+| `playlist:listMine`  | なし                                     | `[{ id, title, itemCount }]`                                   | 設定モーダル選択肢     |
+| `playlist:setConfig` | `{ playlistId, playlistTitle, enabled }` | `{ ok: true }`                                                 | 設定保存               |
+| `playlist:getConfig` | なし                                     | `{ playlistId, playlistTitle, lastSyncedAt, enabled } \| null` | 現在設定取得           |
+| `playlist:get`       | `{ filter: 'all' \| 'removed' }`         | `[video...]`                                                   | タブ表示用             |
+| `playlist:refresh`   | なし                                     | `{ added, removed, restored }`                                 | 手動同期               |
+| `playlist:cleanup`   | なし                                     | `{ deleted: number }`                                          | 削除済み一括削除       |
+| `playlist:deleteOne` | `videoId`                                | `{ deleted: number }`                                          | 削除済み動画の個別削除 |
 
 ## テスト方針
 
 ### Vitest 追加対象
 
-| 対象 | 観点 |
-|------|------|
-| `playlistRepository` | UPSERT、削除フラグ立ち、復活、削除済み一括削除、空 DB |
-| `playlistFetcher` | ページング、diff（追加/削除/復活）、403/404 ハンドリング |
-| `playlistHandlers` | IPC 入出力、設定未登録時の挙動 |
-| `PlaylistTab` | empty / loading / error / データあり / 削除済みフィルタ |
-| `SettingsModal` プレイリストタブ | ドロップダウン選択、エクスポートモーダル |
-| migration 005 | 既存 DB の ALTER 適用、ロールバック可能性確認 |
+| 対象                             | 観点                                                     |
+| -------------------------------- | -------------------------------------------------------- |
+| `playlistRepository`             | UPSERT、削除フラグ立ち、復活、削除済み一括削除、空 DB    |
+| `playlistFetcher`                | ページング、diff（追加/削除/復活）、403/404 ハンドリング |
+| `playlistHandlers`               | IPC 入出力、設定未登録時の挙動                           |
+| `PlaylistTab`                    | empty / loading / error / データあり / 削除済みフィルタ  |
+| `SettingsModal` プレイリストタブ | ドロップダウン選択、作成リンク                           |
+| migration 005                    | 既存 DB の ALTER 適用、ロールバック可能性確認            |
 
 ### 実動確認（Claude Code 側）
 
@@ -210,7 +203,6 @@ D = videos WHERE in_playlist=1 の動画ID集合
 - プレイリストタブで一覧表示
 - YouTube 側で動画削除 → 手動同期 → バッジ表示
 - 削除済みフィルタ・一括削除
-- エクスポート文字列の妥当性
 - ダークモード崩れ確認
 
 ## リスク・未確定事項
@@ -218,18 +210,18 @@ D = videos WHERE in_playlist=1 の動画ID集合
 - **`playlists.list?mine=true` のレスポンスサイズ:** プレイリスト数 100 超のユーザーで `maxResults` 制限に当たる可能性。MVP では先頭 50 件のみ表示・上限超過時に「YouTube で直接 URL を確認してください」案内を出す
 - **動画メタデータの欠落:** プレイリストに含まれる動画が登録チャンネル外の場合、`videos.channel_id` が未登録チャンネルを指す。`channels` テーブルへの自動 INSERT が必要かは migration 005 設計時に確認
 - **メン限・限定公開動画:** プレイリストに含まれていても API から取得できないケースがある。skip + ログでよい
-- **エクスポート時のお気に入り 0 件:** UI に「お気に入りがありません」表示で対応
+- **YouTom から YouTube へ反映できないことの期待値:** `youtube.readonly` を維持するため、取り込み専用であることを UI とリリースノートで明示する
 - **`new-videos` 簡易モードとの両立:** 簡易モード時にプレイリストタブを表示するかは UX 判断必要（MVP では通常モードのみ表示）
 
 ## 段階リリース案
 
-| Phase | 内容 |
-|-------|------|
-| Phase 1 | migration 005 + playlistRepository + 単体テスト |
-| Phase 2 | playlistFetcher + IPC + scheduler 統合 |
-| Phase 3 | PlaylistTab + 削除済みフィルタ + 一括削除 UI |
-| Phase 4 | SettingsModal プレイリストタブ + エクスポート |
-| Phase 5 | 実動確認 + リリースノート + v1.19.0 タグ |
+| Phase   | 内容                                             |
+| ------- | ------------------------------------------------ |
+| Phase 1 | migration 005 + playlistRepository + 単体テスト  |
+| Phase 2 | playlistFetcher + IPC + scheduler 統合           |
+| Phase 3 | PlaylistTab + 削除済みフィルタ + 一括削除 UI     |
+| Phase 4 | SettingsModal プレイリストタブ + 取り込み専用 UX |
+| Phase 5 | 実動確認 + リリースノート + v1.19.0 タグ         |
 
 各 Phase は Codex 実装 → Claude Code レビュー（`/cross-review`）→ ユーザー merge 判断。
 
