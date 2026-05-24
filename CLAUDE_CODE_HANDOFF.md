@@ -1,12 +1,159 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-21
+最終更新: 2026-05-22
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-22 検証完了（Phase 2c-1 Task 10 Step 2: search.list メン限可視性 — Claude Code 作成）
+
+- 作成者: Claude Code
+- 主題: Phase 2c-1 で未検証だった「`search.list` がメンバー限定コンテンツを返すか」の実機検証
+- 経緯: 2026-05-17 の Phase 2c-1 完了報告で Task 10 Step 2 は「⛔ 未検証」（メン限予約配信のあるチャンネルが当時見つからず）。今回ユーザーが現在ライブ中のメン限配信を提供し、検証を実施できた。
+
+### 検証方法
+
+- ユーザーの OAuth トークン（`youtube.readonly`）で一時スクリプトから API を直接呼び出し（検証後スクリプトは削除済み）
+- 対象: メン限配信動画 `MJCn-L5HnO8`（Patra Channel / 周防パトラ、チャンネル `UCeLzT-7b2PBcunJplmWtoDg`、uploads playlist `UUeLzT-7b2PBcunJplmWtoDg`）— 検証時点でライブ中
+- クォータ消費: `videos.list` 1 + `search.list` ×4 + `channels.list` 1 + `playlistItems.list` ×2 = 約 403 ユニット（一回限り）
+
+### 検証結果
+
+| API 呼び出し | 対象メン限動画を返したか |
+|---|---|
+| `videos.list`（動画 ID 指定） | ✅ **返す**。title・channelId・liveStreamingDetails すべて取得可。`privacyStatus` は `public`（メン限ゲートは privacy とは別扱い） |
+| `search.list eventType=live` | ❌ 返さない（結果 0 件。ライブ中のメン限配信が唯一の live なのに 0 件） |
+| `search.list eventType=upcoming` | ❌ 返さない（freechat 枠 1 件のみヒット、メン限は含まれず） |
+| `search.list eventType=completed` | ❌ 返さない（通常配信 5 件のみ） |
+| `search.list`（eventType 無し・order=date） | ❌ 返さない |
+| `playlistItems.list`（uploads playlist・100 件取得） | ❌ 返さない（全件 `privacyStatus: public`。メン限は含まれず） |
+
+### 結論（Plan 2c-2 への確定申し送り）
+
+- **メン限コンテンツは YouTube Data API の discovery / listing 系エンドポイントから完全に除外される**。`search.list`（全 eventType）も `playlistItems.list`（uploads playlist）も、メンバー本人のトークンでメン限を一切返さない。Step 2 は「未検証」から「**検証完了・否定**」に確定。
+- メン限動画を取得できるのは `videos.list`（動画 ID を既に知っている場合）のみ。ID を発見する経路が API に存在しない。RSS も公開フィードのためメン限は含まれない。
+- したがって **Plan 2c-2「メン限チャンネル自動巡回」はどの形でも成立しない**（`search.list` 方式も uploads playlist 巡回方式も discovery が不可能）。
+- → **ユーザーが URL/ID を手動入力する現行 Phase 2c-1 方式が、メン限追跡の唯一の現実解**。Plan 2c-2 は自動巡回を破棄して再設計が必要（着手前にユーザー判断を仰ぐ）。
+
+### Changes
+
+- コード変更なし（検証のみ）。`CLAUDE_CODE_HANDOFF.md` に本セクションを追記。
+- 一時スクリプト `tmp_verify_membership_search.mjs` は作成・実行後に削除済み。
+
+---
+
+## 2026-05-21 クロスレビュー結果（プレイリスト同期 Phase 3+4 — Claude Code 作成）
+
+- レビュアー: Claude Code
+- 対象: Codex 実装 `feature/playlist-sync-phase3-4`（未コミット）
+- セルフ verify 再実行: ✅ `npm run lint` / ✅ `npm run test`（44 files / 363 passed）
+- 完成条件大部分: ✅ 充足（PlaylistTab / PlaylistSettings / PlaylistExportModal / usePlaylist 全て実装、テスト追加、ダークモード対応）
+- **🔴 重大指摘: 2 件**（いずれも私の Phase 2 設計漏れが起因。Codex は handoff 制約「main/preload は触らない」を正しく遵守した結果）
+
+### 🔴 重大1: 個別 🗑 ボタンが一括削除モーダルを開く（UX 違反）
+
+- `PlaylistTab.jsx` L160: `onDeleteFromYoutom={item.isRemovedFromPlaylist ? () => setConfirmingCleanup(true) : undefined}`
+- spec 「カード単位の 🗑 ボタンで個別削除」が「全削除済み一括削除」を開く実装になっている
+- ユーザーが「この動画だけ消したい」と思って 🗑 を押すと「削除済みを全部消す？」と聞かれる体験
+- **原因**: Phase 2 IPC contract に `playlist:deleteOne(videoId)` を入れ忘れた私の設計漏れ。Codex は「main/preload 触らない」制約下でこの実装にせざるを得なかった
+- **修正案**: 別 mini-handoff で main/preload 側に IPC 追加 → renderer 側で繋ぎ込み
+
+### 🔴 重大2: `playlist:error` イベントが renderer に届かない
+
+- main process は `playlist:error` を emit する（`playlistHandlers` の setConfig 失敗・`playlistPolling` のキック失敗時）
+- preload は `onUpdated` のみ公開。`onError` 未公開
+- `usePlaylist` は `window.api.playlist.onError?.(...)` で optional chaining しているため、コール自体は安全だが**バックグラウンドエラーが UI に表示されない**
+- 影響: 24h スケジューラの失敗（クォータ超過・プレイリスト削除等）、`setConfig` 後の非同期 refresh 失敗が無音
+- **原因**: Phase 2 軽微2 修正時に main 側で `playlist:error` 発火を追加したが、preload の onError 公開を忘れた私の設計漏れ
+- **修正案**: 別 mini-handoff で preload に `onError` 公開を追加
+
+### 🟢 良好な実装
+
+- `PLAYLIST_ERROR_MESSAGES` 定数で IPC エラーコードの日本語マッピングを集約
+- `usePlaylist` の useEffect cleanup で `unsubscribeUpdated()` / `unsubscribeError()` を呼ぶ（メモリリーク防止）
+- `markRemoved` で active 動画と削除済み動画の境界を明示
+- `PlaylistExportModal` でコピー・ダウンロード両対応、お気に入り 0 件時のメッセージあり
+- 未認証 / 未設定の empty state が分岐済み
+- propTypes で props 契約を文書化
+
+### Merge 判断（4 条件）
+
+| # | 条件 | 状態 |
+|---|------|------|
+| ① | セルフ verify | ✅ lint / test / build pass |
+| ② | 相互レビュー記録 | ✅ 本セクション |
+| ③ | 重大指摘なし | ❌ **🔴 2 件あり** |
+| ④ | ユーザー merge 指示 | ⏳ 重大指摘解消後に判断 |
+
+### 次アクション（推奨）
+
+Phase 3+4 ブランチをそのまま merge せず、IPC 拡張の Phase 2.5 を挟む:
+
+1. **Phase 2.5（IPC 拡張）**:
+   - `playlist:deleteOne(videoId)` IPC handler 追加（`playlistRepository.deleteOne(videoId)` 必要）
+   - preload に `deleteOne` と `onError` 公開
+   - main / preload / テスト
+2. **Phase 3+4 補修**:
+   - `usePlaylist` に `deleteOne` 呼び出し追加
+   - `PlaylistTab` の 🗑 を個別削除（confirm モーダル「この動画を YouTom から削除しますか？」）に変更
+3. 統合 verify → 同 Phase 3+4 ブランチに合流 → merge
+
+Phase 2.5 は私（Claude Code）の設計漏れに起因するので、依頼 handoff の冒頭にその旨を記録すること。
+
+---
+
+## 2026-05-21 15:49 完了（プレイリスト同期 Phase 3+4 — Codex 作成）
+
+- 対象: `feature/playlist-sync-phase3-4`
+- 作成者: Codex
+- 主題: プレイリスト同期 renderer UI 一式（PlaylistTab + SettingsModal 拡張 + エクスポートモーダル）の統合実装
+- 触ってよい範囲:
+  - `src/renderer/hooks/usePlaylist.js`
+  - `src/renderer/components/PlaylistTab.jsx`
+  - `src/renderer/components/PlaylistSettings.jsx`
+  - `src/renderer/components/PlaylistExportModal.jsx`
+  - `src/renderer/components/ScheduleCard.jsx`
+  - `src/renderer/components/SettingsModal.jsx`
+  - `src/renderer/src/App.jsx`
+  - `src/renderer/src/assets/main.css`
+  - `tests/renderer/**`
+- 触ってはいけない範囲:
+  - main process / preload / IPC contract / DB migration / OAuth scope / CI・release 設定
+- 完成条件:
+  - 「📂 プレイリスト」タブを full mode のタブ列に追加し、設定済み/未設定/同期中/エラー/削除済みフィルタを表示する。
+  - SettingsModal に「📂 プレイリスト同期」タブを追加し、プレイリスト選択、同期有効化、外部リンク、⭐エクスポートを扱う。
+  - `ScheduleCard` の `isRemovedFromPlaylist` / `onDeleteFromYoutom` は optional で、未指定時は既存タブに影響しない。
+  - IPC エラーコードを日本語メッセージへ変換して表示する。
+  - `playlist:updated` / `playlist:error` 購読は cleanup で unsubscribe する実装にする。
+  - 既存テストと build を壊さない。
+- 変更内容:
+  - `usePlaylist` を追加し、`playlist:getConfig` / `playlist:get(all)` / `playlist:get(removed)` / `playlist:refresh` / `playlist:cleanup` と `playlist:updated` / `playlist:error` イベントを統合。`rowToVideo` が playlist removed field を返さないため、removed 一覧の ID と照合して `isRemovedFromPlaylist` を renderer 側で付与。
+  - `PlaylistTab` を追加。未設定 empty state、設定済みヘッダー、手動同期、削除済みフィルタ、一括削除 confirm、既存 `ScheduleCard` 再利用を実装。
+  - `PlaylistSettings` を追加。`playlist:listMine` の選択肢、未認証無効化、`playlist:setConfig` 後の「同期中...」表示、イベント反映、YouTube playlist 外部リンク、エクスポート起動を実装。
+  - `PlaylistExportModal` を追加。`playlist:exportFavorites` の URL 改行表示、0件表示、コピー、`youtom-favorites-YYYY-MM-DD.txt` ダウンロードを実装。
+  - `ScheduleCard` に削除済みバッジと optional 削除ボタンを追加。既存タブから prop 未指定時は no-op。
+  - `SettingsModal` と `App.jsx` に playlist UI を接続し、`playlist-*` CSS を追加。
+  - renderer tests を追加・更新（PlaylistTab / PlaylistSettings / PlaylistExportModal / usePlaylist / ScheduleCard）。
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（44 files / 363 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - 未実施。依頼どおり Codex はセルフ verify のみ。Electron 実動確認は Claude Code 側。
+- レビュー観点:
+  - `window.api.playlist.onError` は renderer 側で購読・cleanup する実装にしたが、現ブランチの `src/preload/index.js` には `onError` 公開が見当たらない。main/preload は触らない条件のため、実動確認時に `playlist:error` が renderer へ届くか要確認。
+  - 現 IPC contract は個別削除 channel を持たず `playlist:cleanup` のみ。カード上の 🗑 は削除済み confirm を開き、実削除は一括 cleanup になる。
+  - `rowToVideo` が `playlist_removed_at` を返さないため、UI の削除済み判定は `all` と `removed` の 2 回取得で補完している。
+  - ダークモードは `playlist-*` クラスで既存 CSS 変数に追従。実画面で SettingsModal の 6 タブ幅と PlaylistTab ヘッダー幅を確認する。
+- 未解決:
+  - 上記 `onError` preload 公開有無と個別削除 contract は Claude Code 側レビュー対象。
+- 次アクション:
+  - Claude Code が `/cross-review` と `npm run dev` 実動確認（設定選択 → 初回同期 → タブ表示 → 削除済みフィルタ → エクスポート）を行う。
 
 ---
 
