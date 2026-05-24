@@ -19,14 +19,21 @@
 - 主題: <一文>
 - 触ってよい範囲: <files / directories>
 - 触ってはいけない範囲: <unrelated files / user changes>
+- 削除すべきファイル: <置き換え対象 / 廃止コンポーネント。なければ「なし」と明記>
 - 完成条件:
   - <normal behavior>
   - <preconditions / auth / usage>
   - <error handling>
   - <no-regression checks>
+- IPC 契約（該当する場合）:
+  - main handler: <channel と signature>
+  - preload exposure: <window.api.* の path>
+  - renderer 呼び出し: <hook / component>
+  - event 発火・購読ペア: <send 側 / on 側。request/response 型 IPC で event ペアが無い場合は `N/A: 理由` を明記>
 - 変更内容:
   - <summary>
 - セルフ verify: <command and result>
+  - `npm run test` が dev サーバ起動中の EPERM で停止した場合、targeted vitest は **暫定の原因切り分け用** に留める。merge 前は dev サーバを停止して `npm run test` 全体を再実行する。再実行で通らない限り merge ゲート ① は未達扱いとし handoff に明記
 - 実動確認: <method and result or N/A>
 - レビュー観点:
   - <risk-focused checks>
