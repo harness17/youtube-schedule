@@ -106,6 +106,11 @@ describe('ChannelRepository', () => {
     expect(repo.getLastSyncTime()).toBe(1_700_000_000_000)
   })
 
+  it('getLastSyncTime ignores playlist-only channels with empty uploadsPlaylistId', () => {
+    repo.ensureChannel('UC_PLAYLIST', 'Playlist Channel', 1_700_000_100_000)
+    expect(repo.getLastSyncTime()).toBe(0)
+  })
+
   it('togglePin flips is_pinned and listAll sorts pinned first', () => {
     repo.syncSubscriptions(
       [

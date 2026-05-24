@@ -28,11 +28,18 @@ import { createChannelRepository } from './repositories/channelRepository.js'
 import { createStatsRepository } from './repositories/statsRepository.js'
 import { createRssFetchLogRepository } from './repositories/rssFetchLogRepository.js'
 import { createMetaRepository } from './repositories/metaRepository.js'
+import { createPlaylistRepository } from './repositories/playlistRepository.js'
 import { createSchedulerService } from './services/schedulerService.js'
 import { createRssFetcher } from './fetchers/rssFetcher.js'
 import { createSubscriptionsFetcher } from './fetchers/subscriptionsFetcher.js'
 import { createPlaylistItemsFetcher } from './fetchers/playlistItemsFetcher.js'
+import { createPlaylistFetcher } from './fetchers/playlistFetcher.js'
 import { createVideoDetailsFetcher } from './fetchers/videoDetailsFetcher.js'
+import {
+  createPlaylistSyncService,
+  PLAYLIST_SYNC_INTERVAL_MS
+} from './services/playlistSyncService.js'
+import { startPlaylistPolling as startPlaylistPollingTimer } from './services/playlistPolling.js'
 import { readLegacyScheduleCache, clearLegacyScheduleCache, getSetting } from './store.js'
 import { createLogger } from './logger.js'
 import { registerAuthHandlers } from './ipc/authHandlers.js'
@@ -40,6 +47,7 @@ import { registerVideoHandlers } from './ipc/videoHandlers.js'
 import { registerSettingsHandlers } from './ipc/settingsHandlers.js'
 import { registerAppHandlers } from './ipc/appHandlers.js'
 import { registerStatsHandlers } from './ipc/statsHandlers.js'
+import { registerPlaylistHandlers } from './ipc/playlistHandlers.js'
 
 // ===== シングルインスタンス保証 ================================================
 // 多重起動時は既存ウィンドウをフォアグラウンドに出して即終了する
@@ -62,10 +70,11 @@ if (!gotTheLock) {
 // 値ではなく関数（getter）を渡すことで常に最新の参照を取得できるようにする
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
-let videoRepo, channelRepo, statsRepo, rssLogRepo, metaRepo
-let scheduler
+let videoRepo, channelRepo, statsRepo, rssLogRepo, metaRepo, playlistRepo
+let scheduler, playlistApiFetcher, playlistSyncService
 let currentAuthClient = null
 let refreshTimer
+let playlistRefreshTimer
 let dbBroken = false
 let logger
 
@@ -141,11 +150,27 @@ function initDatabase() {
   statsRepo = createStatsRepository(db)
   rssLogRepo = createRssFetchLogRepository(db)
   metaRepo = createMetaRepository(db)
+  playlistRepo = createPlaylistRepository(db)
 }
 
 // ===== スケジューラー初期化 =====================================================
 function initScheduler(authClient) {
   currentAuthClient = authClient
+  const videoDetailsFetcher = createVideoDetailsFetcher()
+  playlistApiFetcher = createPlaylistFetcher({
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
+    logger
+  })
+  playlistSyncService = createPlaylistSyncService({
+    playlistRepo,
+    videoRepo,
+    channelRepo,
+    playlistFetcher: playlistApiFetcher,
+    videoDetailsFetcher,
+    authClient,
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
+    logger
+  })
   scheduler = createSchedulerService({
     videoRepo,
     channelRepo,
@@ -154,7 +179,8 @@ function initScheduler(authClient) {
     subsFetcher: createSubscriptionsFetcher(),
     rssFetcher: createRssFetcher({ timeoutMs: 3000 }),
     playlistFetcher: createPlaylistItemsFetcher(),
-    videoFetcher: createVideoDetailsFetcher(),
+    playlistSyncService,
+    videoFetcher: videoDetailsFetcher,
     authClient,
     ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
     logger
@@ -183,6 +209,20 @@ function startPolling(mainWindow) {
   refreshTimer = setInterval(kick, REFRESH_INTERVAL_MS)
 }
 
+function startPlaylistPolling(mainWindow) {
+  startPlaylistPollingTimer({
+    authClient: currentAuthClient,
+    scheduler,
+    mainWindow,
+    logger,
+    intervalMs: PLAYLIST_SYNC_INTERVAL_MS,
+    getTimer: () => playlistRefreshTimer,
+    setTimer: (timer) => {
+      playlistRefreshTimer = timer
+    }
+  })
+}
+
 // ===== IPC ハンドラ登録 =========================================================
 // ゲッター関数を注入することで、ハンドラが登録された時点では未初期化でも
 // 呼び出し時に常に最新の値を参照できる
@@ -192,10 +232,12 @@ function registerAllHandlers(getMainWindow) {
     onLoginSuccess: async (client) => {
       initScheduler(client)
       startPolling(getMainWindow())
+      startPlaylistPolling(getMainWindow())
     },
     onLogoutSuccess: async () => {
       initScheduler(null)
       startPolling(getMainWindow())
+      startPlaylistPolling(getMainWindow())
     }
   })
 
@@ -215,6 +257,15 @@ function registerAllHandlers(getMainWindow) {
     getDbBroken: () => dbBroken
   })
 
+  registerPlaylistHandlers({
+    getPlaylistRepo: () => playlistRepo,
+    getVideoRepo: () => videoRepo,
+    getPlaylistFetcher: () => playlistApiFetcher,
+    getPlaylistSyncService: () => playlistSyncService,
+    getAuthClient: () => currentAuthClient,
+    getMainWindow
+  })
+
   // 設定・インポートエクスポートハンドラ
   registerSettingsHandlers({
     getVideoRepo: () => videoRepo,
@@ -229,6 +280,7 @@ function registerAllHandlers(getMainWindow) {
     isDev: is.dev,
     onResetDatabase: async () => {
       if (refreshTimer) clearInterval(refreshTimer)
+      if (playlistRefreshTimer) clearInterval(playlistRefreshTimer)
       closeDatabase(db)
       const fs = await import('node:fs/promises')
       const dbPath = join(app.getPath('userData'), 'schedule.db')
@@ -287,6 +339,7 @@ app.whenReady().then(async () => {
   }
   initScheduler(client)
   startPolling(getMainWindow())
+  startPlaylistPolling(getMainWindow())
 })
 
 // ===== アプリ終了処理 ===========================================================
@@ -298,5 +351,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   if (refreshTimer) clearInterval(refreshTimer)
+  if (playlistRefreshTimer) clearInterval(playlistRefreshTimer)
   closeDatabase(db)
 })

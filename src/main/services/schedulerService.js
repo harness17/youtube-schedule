@@ -101,6 +101,7 @@ export function createSchedulerService({
   subsFetcher,
   rssFetcher,
   playlistFetcher,
+  playlistSyncService = null,
   videoFetcher,
   authClient,
   ytFactory,
@@ -398,6 +399,17 @@ export function createSchedulerService({
     backfillArchiveMeta,
     addManualVideo,
     getQuotaStatus,
+    refreshPlaylist() {
+      return (
+        playlistSyncService?.refresh() ?? Promise.resolve({ skipped: true, reason: 'disabled' })
+      )
+    },
+    refreshPlaylistIfDue() {
+      return (
+        playlistSyncService?.refreshIfDue() ??
+        Promise.resolve({ skipped: true, reason: 'disabled' })
+      )
+    },
     async refresh(opts = {}) {
       if (inFlight) {
         logger.info('scheduler.refresh.deduplicated', {})

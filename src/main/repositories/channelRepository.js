@@ -14,6 +14,12 @@ export function createChannelRepository(db) {
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title
   `)
+  const ensureChannelStmt = db.prepare(`
+    INSERT INTO channels (id, title, uploads_playlist_id, last_subscription_sync_at)
+    VALUES (@id, @title, '', @syncAt)
+    ON CONFLICT(id) DO UPDATE SET
+      title = COALESCE(excluded.title, channels.title)
+  `)
   const upsertManualStmt = db.prepare(`
     INSERT INTO channels (id, title, uploads_playlist_id, is_manual)
     VALUES (@id, @title, @uploadsPlaylistId, 1)
@@ -33,7 +39,7 @@ export function createChannelRepository(db) {
   // 24h キャッシュが無効化され subscriptions.list を呼び続けるため、含める。
   const maxSyncStmt = db.prepare(`
     SELECT MAX(last_subscription_sync_at) AS ts FROM channels
-    WHERE uploads_playlist_id IS NOT NULL
+    WHERE uploads_playlist_id IS NOT NULL AND uploads_playlist_id != ''
   `)
   const togglePinStmt = db.prepare(
     `UPDATE channels SET is_pinned = CASE is_pinned WHEN 1 THEN 0 ELSE 1 END WHERE id = ?`
@@ -84,6 +90,10 @@ export function createChannelRepository(db) {
     },
     upsertSeen(id, title) {
       upsertSeenStmt.run({ id, title: title ?? null })
+    },
+    ensureChannel(id, title, syncAt = Date.now()) {
+      ensureChannelStmt.run({ id, title: title ?? id, syncAt })
+      return rowToChannel(getByIdStmt.get(id))
     },
     addManual({ id, title, uploadsPlaylistId }) {
       upsertManualStmt.run({

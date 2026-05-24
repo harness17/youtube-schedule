@@ -64,7 +64,11 @@ export default function ScheduleCard({
   showViewedButton = false,
   isViewed = false,
   showStatusBadge = false,
-  showDateInTime = false
+  showDateInTime = false,
+  showCollectionBadges = false,
+  isInPlaylist = false,
+  isRemovedFromPlaylist = false,
+  onDeleteFromYoutom
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -237,6 +241,15 @@ export default function ScheduleCard({
               見た
             </span>
           )}
+          {showCollectionBadges && item.isFavorite && (
+            <span className="playlist-favorite-badge">⭐ お気に入り</span>
+          )}
+          {showCollectionBadges && isInPlaylist && (
+            <span className="playlist-in-badge">📂 プレイリスト在中</span>
+          )}
+          {isRemovedFromPlaylist && (
+            <span className="playlist-removed-badge">⚠️ プレイリストから削除済み</span>
+          )}
           {showStatusBadge && isUpcoming && (
             <span
               style={{
@@ -404,6 +417,15 @@ export default function ScheduleCard({
               ✓{item.viewedAt ? ' 済' : ''}
             </button>
           )}
+          {isRemovedFromPlaylist && onDeleteFromYoutom && (
+            <button
+              title="YouTom から削除"
+              onClick={() => onDeleteFromYoutom(item.id)}
+              className="yt-action-btn playlist-delete-card-btn"
+            >
+              🗑
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -441,5 +463,9 @@ ScheduleCard.propTypes = {
   showViewedButton: PropTypes.bool,
   isViewed: PropTypes.bool,
   showStatusBadge: PropTypes.bool,
-  showDateInTime: PropTypes.bool
+  showDateInTime: PropTypes.bool,
+  showCollectionBadges: PropTypes.bool,
+  isInPlaylist: PropTypes.bool,
+  isRemovedFromPlaylist: PropTypes.bool,
+  onDeleteFromYoutom: PropTypes.func
 }
