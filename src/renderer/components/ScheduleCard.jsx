@@ -380,17 +380,7 @@ export default function ScheduleCard({
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '2px' }}>
           <button
             onClick={() => window.api.openExternal(item.url)}
-            style={{
-              padding: '4px 12px',
-              fontSize: '11px',
-              background: darkMode ? 'rgba(255,34,68,0.15)' : 'rgba(220,0,20,0.1)',
-              color: darkMode ? '#ff5566' : '#cc001a',
-              border: `1px solid ${darkMode ? 'rgba(255,34,68,0.35)' : 'rgba(220,0,20,0.28)'}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontWeight: '500'
-            }}
+            className="yt-action-btn yt-action-btn--open"
           >
             ▶ 開く
           </button>
