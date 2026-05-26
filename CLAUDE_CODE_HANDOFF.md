@@ -10,6 +10,129 @@ status: active
 
 ---
 
+## 2026-05-26 23:45 完了（全体点検による更新安定化＋UI小整理 — Codex 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- 作成者: Codex
+- 主題: 全体レビューとして、手動更新/バックグラウンド更新の失敗時に UI 状態が固まるリスクを潰し、動画カードのボタンCSSと未定義CSS変数を整理
+
+### 触った範囲
+
+- `src/main/index.js`
+- `src/preload/index.js`
+- `src/renderer/hooks/useSchedule.js`
+- `src/renderer/components/ScheduleCard.jsx`
+- `src/renderer/src/assets/main.css`
+- `tests/renderer/hooks/useSchedule.test.js`（新規）
+
+### IPC 契約
+
+- main event 発火: `schedule:error`（`{ error: 'REFRESH_FAILED' }`）
+- preload exposure: `window.api.onScheduleError(cb)`
+- renderer 購読: `useSchedule`
+- 既存 `schedule:updated` は維持。手動 refresh は event 遅延/欠落でも `load()` を直接呼ぶようにして loading を解除する。
+
+### 変更内容
+
+- `useSchedule.refresh()` が `schedule:refresh` の `{ error }` 結果を見て `loading=false` に戻すよう修正。
+- 手動 refresh 成功後に `load()` を直接実行し、`schedule:updated` event だけに依存しないようにした。
+- `schedule:error` を preload から renderer に公開し、バックグラウンド更新失敗を `useSchedule.error` に反映。
+- `schedule:error` の payload を raw `err.message` ではなく汎用コード `REFRESH_FAILED` に変更。
+- `ScheduleCard` の「開く」ボタンを `.yt-action-btn--open` に寄せ、inline style を削減。
+- `.yt-drag-handle` の未定義 `--sub-text` を既存トークン `--sub` に修正。
+- `useSchedule` の mount / refresh 成功 / refresh 失敗 / event reload / error event の回帰テストを追加。
+
+### セルフ verify
+
+- ✅ `npx vitest run tests/renderer/hooks/useSchedule.test.js tests/renderer/ScheduleCard.test.jsx`（2 files / 33 passed）
+- ✅ `npm run lint`
+- ✅ `npm run test`（44 files / 387 passed）
+- ✅ `npm run build`
+- ✅ `git diff --check`
+
+### 実動確認
+
+- `npm run dev` は承認付きで実行し、Electron プロセス生成までは確認。
+- 20秒確認枠でタイムアウトしたため画面目視までは未確認。残った YouTom Electron プロセスは停止済み。
+
+### レビュー観点
+
+- `schedule:error` の IPC 4 点対称（send / preload / renderer / test）が適切か。
+- 手動 refresh 成功時の `load()` 直接実行により、既存 `schedule:updated` event と二重 reload しても副作用がないか。
+- `.yt-action-btn--open` が既存の dark/light 表示と一致しているか（実機目視推奨）。
+
+### 未解決
+
+- Electron 画面の目視確認は未完了。
+
+### 次アクション
+
+- Claude Code: 上記観点で cross-review。
+- ユーザー: 必要に応じて `npm run dev` を長めに起動してヘッダー/カードボタン/更新操作を目視確認。
+
+---
+
+## 2026-05-26 23:50 レビュー結果（Codex リファクタへの cross-review — Claude Code 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- レビューア: Claude Code
+- 観点: cross-agent-harness の merge ゲート 4 条件 + project profile のレビュー必須チェック項目
+
+### Merge ゲート確認
+
+- ✅ ① セルフ verify: `npm run lint` / `npm run test`（44 files / 387 passed）/ `npm run build` 全部 pass
+- ✅ ② 相互レビュー記録: 本セクションで記録
+- ✅ ③ 重大指摘なし（後述）
+- ⏳ ④ ユーザー merge 指示: 待ち
+
+### IPC 4 点対称チェック（schedule:error）
+
+- main 発火: `src/main/index.js:212` `mainWindow?.webContents.send('schedule:error', { error: 'REFRESH_FAILED' })` ✓
+- preload exposure: `src/preload/index.js:30` `onScheduleError(cb)` ✓
+- renderer 購読: `src/renderer/hooks/useSchedule.js:64` `window.api.onScheduleError?.(...)` ✓
+- 購読解除ペア: useEffect cleanup で `offError?.()` ✓
+- テスト: `tests/renderer/hooks/useSchedule.test.js` `onScheduleError` モック + 5 ケース ✓
+
+### 指摘
+
+🟢 **良好**
+
+- `schedule:error` payload を `err.message`（内部情報漏洩リスクあり）から `REFRESH_FAILED` の汎用コードに変更 — グローバル `security-coding.md` の「エラー漏洩防止」に整合
+- `.yt-drag-handle` の未定義 CSS 変数 `--sub-text` → `--sub` 修正は真のバグ修正（CSS 変数フォールバックで色が inherit になっていた）
+- `useSchedule.refresh()` で `schedule:updated` event だけに依存せず `await load()` を直接呼ぶ変更で、event 遅延・欠落時に loading 表示が固まるリスクが解消
+- `ScheduleCard` の「開く」ボタン inline style → `.yt-action-btn--open` 化は、既存の `.yt-action-btn--notify` / `--fav` / `--viewed` と同じパターンで一貫性あり
+
+🟡 **軽微（merge ブロッカーではない）**
+
+- `useSchedule.refresh()` 成功時、`await load()` と main 側 `schedule:updated` event 経由の `load()` が二重で走る（`videoHandlers.js` の `schedule:refresh` handler が成功時に event を send するため）。動作は正しいが `getSchedule` / `getFeed` の IPC 呼び出しが 1 回多い。気になる場合は refresh 中フラグでイベント駆動の load を抑制する案あり。本 PR では deferred で良い
+- `imminentPoller` は失敗時に `schedule:error` を発火しない（`tick()` が `{ error: 'FETCH_FAILED' }` を返すのみ）。バックグラウンド処理として現状のログ留めで十分だが、UI 通知統一を目指すなら follow-up
+
+🔴 **重大** — なし
+
+### 既存機能の回帰確認
+
+- 既存タブ（schedule / missed / archive / favorites / playlist）に影響する変更なし
+- `schedule:get` / `schedule:refresh` の戻り値契約は維持（success `{ ok: true }`、失敗 `{ error: 'REFRESH_FAILED' }`）
+- `useSchedule.test.js` の 5 ケース（mount / refresh success / refresh error / updated event / error event）で IPC 契約の振る舞いを固定化
+
+### Merge 判断
+
+🟢 **Merge 可** — 重大指摘なし、verify pass、IPC 4 点対称、テスト追加済み。ユーザー指示を待って `develop` へ merge。
+
+### ユーザーへの実機確認推奨項目（merge 前）
+
+- `npm run dev` 起動後に：
+  - 「↺ 更新」ボタンを押下 → スピナーが消えて新データが描画される
+  - ヘッダー / 動画カードの「開く」ボタンの色味がダーク / ライト両方で従来通り
+  - ライブ予定動画の 5 分前頃に🔔ありの状態で待機 → 開始から 1 分以内にデスクトップ通知が出る（imminent poller）
+
+### 次アクション
+
+1. ユーザー: 実機確認 → merge 判断
+2. Merge 後: `develop` へ反映 → リリース判断は別セッション
+
+---
+
 ## 2026-05-26 23:35 完了（ライブ通知遅延の改善＋全体点検 — Claude Code 作成）
 
 - 対象: `feature/imminent-live-poller-and-cleanup`

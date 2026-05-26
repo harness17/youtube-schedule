@@ -322,6 +322,19 @@ body {
   color: #2a9a58;
 }
 
+.yt-action-btn--open {
+  padding-inline: 12px;
+  background: rgba(220, 0, 20, 0.1);
+  border-color: rgba(220, 0, 20, 0.28);
+  color: #cc001a;
+  font-weight: 500;
+}
+[data-theme='dark'] .yt-action-btn--open {
+  background: rgba(255, 34, 68, 0.15);
+  border-color: rgba(255, 34, 68, 0.35);
+  color: #ff5566;
+}
+
 /* ===== HEADER BUTTONS ===== */
 .yt-header-btn {
   padding: 7px 16px;
@@ -445,7 +458,7 @@ body {
   justify-content: center;
   height: 100%;
   min-height: 48px;
-  color: var(--sub-text);
+  color: var(--sub);
   font-size: 20px;
   cursor: grab;
   border-radius: 6px;

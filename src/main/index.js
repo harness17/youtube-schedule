@@ -210,7 +210,7 @@ function startPolling(mainWindow) {
     } catch (err) {
       logger?.error('scheduler.kick.error', { error: err })
       mainWindow?.webContents.send('schedule:error', {
-        message: err?.message ?? String(err)
+        error: 'REFRESH_FAILED'
       })
     }
   }
