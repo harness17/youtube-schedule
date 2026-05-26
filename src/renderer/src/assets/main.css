@@ -322,6 +322,69 @@ body {
   color: #2a9a58;
 }
 
+/* ===== HEADER BUTTONS ===== */
+.yt-header-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  transition:
+    background 0.12s,
+    opacity 0.12s;
+}
+
+.yt-header-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.yt-header-btn--refresh {
+  background: rgba(220, 0, 20, 0.1);
+  color: #cc001a;
+  border: 1px solid rgba(220, 0, 20, 0.3);
+}
+[data-theme='dark'] .yt-header-btn--refresh {
+  background: rgba(255, 34, 68, 0.18);
+  color: #ff4466;
+  border-color: rgba(255, 34, 68, 0.4);
+}
+
+.yt-header-btn--icon {
+  padding: 7px 10px;
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.yt-header-mode {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: var(--btn-bg);
+  color: var(--sub);
+  border: 1px solid var(--border);
+}
+
+.yt-header-mode--auth {
+  background: rgba(60, 180, 100, 0.1);
+  color: #148a3b;
+  border-color: rgba(60, 180, 100, 0.25);
+}
+[data-theme='dark'] .yt-header-mode--auth {
+  background: rgba(60, 180, 100, 0.16);
+  color: #9ee6b8;
+  border-color: rgba(60, 180, 100, 0.35);
+}
+
+.yt-header-mode--clickable {
+  cursor: pointer;
+}
+
 /* ===== NAV (ScheduleList) ===== */
 .yt-nav {
   display: flex;

@@ -121,7 +121,7 @@ export default function App() {
   useNotificationCheck({
     upcoming,
     live,
-    isAuthenticated: true,
+    isAuthenticated,
     initialLoaded,
     reminderMinutes
   })
@@ -299,8 +299,6 @@ export default function App() {
   const subColor = darkMode ? '#7878a0' : '#6060a0'
   const inputBg = darkMode ? '#16161e' : '#ffffff'
   const inputBorder = darkMode ? '#2a2a38' : '#dddde8'
-  const subBtnBg = darkMode ? '#1e1e2c' : '#ebebf5'
-  const subBtnColor = darkMode ? '#8888b0' : '#555570'
   const archiveHasActiveFilters =
     archiveFilters.channelIds.length > 0 || archiveFilters.period !== 'all'
 
@@ -435,59 +433,21 @@ export default function App() {
         </div>
         <span
           onClick={!isAuthenticated ? () => openSettings('connection') : undefined}
-          style={{
-            padding: '4px 8px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            color: isAuthenticated ? (darkMode ? '#9ee6b8' : '#148a3b') : subColor,
-            background: isAuthenticated
-              ? darkMode
-                ? 'rgba(60,180,100,0.16)'
-                : 'rgba(60,180,100,0.1)'
-              : subBtnBg,
-            border: `1px solid ${
-              isAuthenticated
-                ? darkMode
-                  ? 'rgba(60,180,100,0.35)'
-                  : 'rgba(60,180,100,0.25)'
-                : inputBorder
-            }`,
-            cursor: !isAuthenticated ? 'pointer' : 'default'
-          }}
+          className={`yt-header-mode${isAuthenticated ? ' yt-header-mode--auth' : ' yt-header-mode--clickable'}`}
         >
           {isAuthenticated ? 'フルモード' : '簡易モード'}
         </span>
         <button
           onClick={refresh}
           disabled={loading}
-          style={{
-            padding: '7px 16px',
-            background: darkMode ? 'rgba(255,34,68,0.18)' : 'rgba(220,0,20,0.1)',
-            color: darkMode ? '#ff4466' : '#cc001a',
-            border: `1px solid ${darkMode ? 'rgba(255,34,68,0.4)' : 'rgba(220,0,20,0.3)'}`,
-            borderRadius: '8px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
-            fontSize: '12px',
-            fontWeight: '600',
-            fontFamily: 'inherit'
-          }}
+          className="yt-header-btn yt-header-btn--refresh"
         >
           {loading ? '更新中...' : '↺ 更新'}
         </button>
         <button
           onClick={() => openSettings('display')}
           title="設定"
-          style={{
-            padding: '7px 10px',
-            background: subBtnBg,
-            color: subBtnColor,
-            border: `1px solid ${inputBorder}`,
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            lineHeight: 1
-          }}
+          className="yt-header-btn yt-header-btn--icon"
         >
           ⚙️
         </button>

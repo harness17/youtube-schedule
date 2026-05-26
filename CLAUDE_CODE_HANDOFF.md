@@ -1,12 +1,73 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-24
+最終更新: 2026-05-26
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-26 23:35 完了（ライブ通知遅延の改善＋全体点検 — Claude Code 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- 作成者: Claude Code
+- 主題: 配信開始通知の最大遅延を 30 分 → 1 分に短縮する直前ポーラーを追加。並行して dead code 整理と App.jsx ヘッダー UI の CSS 一元化
+
+### 変更したファイル
+
+- `src/main/services/imminentPoller.js`（新規）
+- `src/main/services/schedulerService.js`（`toVideoRecord` を named export 化）
+- `src/main/index.js`（ポーラーの起動・停止配線）
+- `src/renderer/src/App.jsx`（`isAuthenticated` を実値で渡すように修正／ヘッダーボタン inline style を CSS class に置換／未使用 const を削除）
+- `src/renderer/src/assets/main.css`（`.yt-header-btn` / `.yt-header-mode` CSS クラスを追加）
+- `tests/main/services/imminentPoller.test.js`（新規・12 件）
+
+### 実装概要
+
+- `createImminentPoller`: 1 分間隔で `videoRepo.listVisible()` から `status==='live'` または `scheduledStartTime` が `now-5min ～ now+20min` の `upcoming` を抽出し、`videoFetcher.fetch` で再取得→`upsert`。status が変わった動画があれば `schedule:updated` を webContents 経由で renderer に送る。
+- クォータガード: `isQuotaError` で 403 quotaExceeded を握り潰し（schedulerService と同じ判定）、対象 0 件のときは API を呼ばない。
+- `inFlight` フラグで重複起動を防止。
+- App.jsx の `useNotificationCheck({ isAuthenticated: true })` ハードコードを実値の `isAuthenticated` に修正。これで簡易→フル遷移時にライブベースラインが正しくリセットされる。
+- ヘッダーの `更新` / `⚙️` / モード表示の inline style（darkMode ternary 含む）を CSS クラスに置換。既存の `--live-red` / `--btn-bg` / `--btn-color` / `--border` トークンに揃え、ダークモード切替が CSS 側に一本化される。
+
+### IPC 契約
+
+- 既存の `schedule:updated` を流用（main→renderer の send/on ペアは既存）。新規 IPC channel は追加していない。
+
+### クォータ試算
+
+- 1 分間隔 × 24h = 1,440 リクエスト/日 が最悪値（対象 0 件時は呼ばないので実際はもっと少ない）。
+- videos.list は 50 件まで 1 ユニット → 1 日 1,440 ユニット (上限 10,000 / 安全枠 6,000 内)。
+
+### Verify 結果
+
+- ✅ `npm run lint`（max-warnings=0）
+- ✅ `npm run test`（43 files / 382 passed、imminentPoller 12 件追加）
+- ✅ `npm run build`
+
+### 実動確認
+
+- `npm run dev` 未実行。Electron 内部実装（main プロセスのポーラー）が主のため、ブラウザ preview ツールでは検証不可。実動確認はユーザー側で次回 `npm run dev` 時に推奨：
+  - ライブ開始予定時刻の 5 分前以降にアプリを起動し、配信開始から 1 分以内に通知が出るか
+  - ヘッダーの 更新 / ⚙️ / モードバッジの色がダーク/ライトの両方で従来と同じか
+
+### レビュー観点
+
+- imminentPoller の `inFlight` ガードが二重起動を防げているか（fetch が遅延した状況での挙動）
+- `videoRepo.upsert` が `notify` / `is_favorite` を保持していること（schema.sql で UPDATE 句に含まれていないので安全だが念のため）
+- ヘッダー CSS クラス変更で旧 inline 色と完全一致しているか（実機で目視）
+
+### 未解決
+
+- なし
+
+### 次アクション
+
+- ユーザー: `npm run dev` で実動確認
+- ユーザー判断後に develop merge
 
 ---
 
