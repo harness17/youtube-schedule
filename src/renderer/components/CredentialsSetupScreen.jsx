@@ -62,7 +62,7 @@ export default function CredentialsSetupScreen({ credentialsPath }) {
         </div>
         {credentialsPath && (
           <button
-            onClick={() => window.api.openFolder(credentialsPath)}
+            onClick={() => window.api.openFolder()}
             style={{
               display: 'block',
               marginBottom: '24px',

@@ -2,6 +2,8 @@ import nodeFetch from 'node-fetch'
 
 const CHANNEL_ID_RE = /^UC[A-Za-z0-9_-]{20,30}$/
 const HANDLE_RE = /^@[^/\s]+$/
+// `endsWith('youtube.com')` だと `evil-youtube.com` も通ってしまうため厳密に列挙する
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com'])
 
 export function uploadsPlaylistIdFromChannelId(channelId) {
   return `UU${channelId.slice(2)}`
@@ -37,7 +39,11 @@ function getHandleUrl(raw) {
 
   try {
     const url = new URL(input)
-    if (url.hostname.endsWith('youtube.com') && /^\/@[^/\s]+/.test(url.pathname)) {
+    if (
+      url.protocol === 'https:' &&
+      YOUTUBE_HOSTS.has(url.hostname) &&
+      /^\/@[^/\s]+/.test(url.pathname)
+    ) {
       return url.toString()
     }
   } catch {

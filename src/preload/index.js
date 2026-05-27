@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   showNotification: (title, body) => ipcRenderer.invoke('notification:show', { title, body }),
   getVersion: () => ipcRenderer.invoke('app:version'),
-  openFolder: (filePath) => ipcRenderer.invoke('shell:openFolder', filePath),
+  openFolder: () => ipcRenderer.invoke('shell:openFolder'),
   getSetting: (key, defaultValue) => ipcRenderer.invoke('settings:get', key, defaultValue),
   setSetting: (key, value) => ipcRenderer.invoke('settings:set', key, value),
   onUpdateAvailable: (cb) => ipcRenderer.on('updater:update-available', (_, info) => cb(info)),
