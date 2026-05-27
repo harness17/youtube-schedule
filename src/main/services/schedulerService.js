@@ -25,7 +25,7 @@ function isRssCapableChannel(channel) {
   return typeof channel.id === 'string' && channel.id.startsWith('UC')
 }
 
-function toVideoRecord(v, now) {
+export function toVideoRecord(v, now) {
   const ld = v.liveStreamingDetails || {}
   return {
     id: v.id,

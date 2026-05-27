@@ -1,12 +1,196 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-24
+最終更新: 2026-05-26
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-26 23:45 完了（全体点検による更新安定化＋UI小整理 — Codex 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- 作成者: Codex
+- 主題: 全体レビューとして、手動更新/バックグラウンド更新の失敗時に UI 状態が固まるリスクを潰し、動画カードのボタンCSSと未定義CSS変数を整理
+
+### 触った範囲
+
+- `src/main/index.js`
+- `src/preload/index.js`
+- `src/renderer/hooks/useSchedule.js`
+- `src/renderer/components/ScheduleCard.jsx`
+- `src/renderer/src/assets/main.css`
+- `tests/renderer/hooks/useSchedule.test.js`（新規）
+
+### IPC 契約
+
+- main event 発火: `schedule:error`（`{ error: 'REFRESH_FAILED' }`）
+- preload exposure: `window.api.onScheduleError(cb)`
+- renderer 購読: `useSchedule`
+- 既存 `schedule:updated` は維持。手動 refresh は event 遅延/欠落でも `load()` を直接呼ぶようにして loading を解除する。
+
+### 変更内容
+
+- `useSchedule.refresh()` が `schedule:refresh` の `{ error }` 結果を見て `loading=false` に戻すよう修正。
+- 手動 refresh 成功後に `load()` を直接実行し、`schedule:updated` event だけに依存しないようにした。
+- `schedule:error` を preload から renderer に公開し、バックグラウンド更新失敗を `useSchedule.error` に反映。
+- `schedule:error` の payload を raw `err.message` ではなく汎用コード `REFRESH_FAILED` に変更。
+- `ScheduleCard` の「開く」ボタンを `.yt-action-btn--open` に寄せ、inline style を削減。
+- `.yt-drag-handle` の未定義 `--sub-text` を既存トークン `--sub` に修正。
+- `useSchedule` の mount / refresh 成功 / refresh 失敗 / event reload / error event の回帰テストを追加。
+
+### セルフ verify
+
+- ✅ `npx vitest run tests/renderer/hooks/useSchedule.test.js tests/renderer/ScheduleCard.test.jsx`（2 files / 33 passed）
+- ✅ `npm run lint`
+- ✅ `npm run test`（44 files / 387 passed）
+- ✅ `npm run build`
+- ✅ `git diff --check`
+
+### 実動確認
+
+- `npm run dev` は承認付きで実行し、Electron プロセス生成までは確認。
+- 20秒確認枠でタイムアウトしたため画面目視までは未確認。残った YouTom Electron プロセスは停止済み。
+
+### レビュー観点
+
+- `schedule:error` の IPC 4 点対称（send / preload / renderer / test）が適切か。
+- 手動 refresh 成功時の `load()` 直接実行により、既存 `schedule:updated` event と二重 reload しても副作用がないか。
+- `.yt-action-btn--open` が既存の dark/light 表示と一致しているか（実機目視推奨）。
+
+### 未解決
+
+- Electron 画面の目視確認は未完了。
+
+### 次アクション
+
+- Claude Code: 上記観点で cross-review。
+- ユーザー: 必要に応じて `npm run dev` を長めに起動してヘッダー/カードボタン/更新操作を目視確認。
+
+---
+
+## 2026-05-26 23:50 レビュー結果（Codex リファクタへの cross-review — Claude Code 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- レビューア: Claude Code
+- 観点: cross-agent-harness の merge ゲート 4 条件 + project profile のレビュー必須チェック項目
+
+### Merge ゲート確認
+
+- ✅ ① セルフ verify: `npm run lint` / `npm run test`（44 files / 387 passed）/ `npm run build` 全部 pass
+- ✅ ② 相互レビュー記録: 本セクションで記録
+- ✅ ③ 重大指摘なし（後述）
+- ⏳ ④ ユーザー merge 指示: 待ち
+
+### IPC 4 点対称チェック（schedule:error）
+
+- main 発火: `src/main/index.js:212` `mainWindow?.webContents.send('schedule:error', { error: 'REFRESH_FAILED' })` ✓
+- preload exposure: `src/preload/index.js:30` `onScheduleError(cb)` ✓
+- renderer 購読: `src/renderer/hooks/useSchedule.js:64` `window.api.onScheduleError?.(...)` ✓
+- 購読解除ペア: useEffect cleanup で `offError?.()` ✓
+- テスト: `tests/renderer/hooks/useSchedule.test.js` `onScheduleError` モック + 5 ケース ✓
+
+### 指摘
+
+🟢 **良好**
+
+- `schedule:error` payload を `err.message`（内部情報漏洩リスクあり）から `REFRESH_FAILED` の汎用コードに変更 — グローバル `security-coding.md` の「エラー漏洩防止」に整合
+- `.yt-drag-handle` の未定義 CSS 変数 `--sub-text` → `--sub` 修正は真のバグ修正（CSS 変数フォールバックで色が inherit になっていた）
+- `useSchedule.refresh()` で `schedule:updated` event だけに依存せず `await load()` を直接呼ぶ変更で、event 遅延・欠落時に loading 表示が固まるリスクが解消
+- `ScheduleCard` の「開く」ボタン inline style → `.yt-action-btn--open` 化は、既存の `.yt-action-btn--notify` / `--fav` / `--viewed` と同じパターンで一貫性あり
+
+🟡 **軽微（merge ブロッカーではない）**
+
+- `useSchedule.refresh()` 成功時、`await load()` と main 側 `schedule:updated` event 経由の `load()` が二重で走る（`videoHandlers.js` の `schedule:refresh` handler が成功時に event を send するため）。動作は正しいが `getSchedule` / `getFeed` の IPC 呼び出しが 1 回多い。気になる場合は refresh 中フラグでイベント駆動の load を抑制する案あり。本 PR では deferred で良い
+- `imminentPoller` は失敗時に `schedule:error` を発火しない（`tick()` が `{ error: 'FETCH_FAILED' }` を返すのみ）。バックグラウンド処理として現状のログ留めで十分だが、UI 通知統一を目指すなら follow-up
+
+🔴 **重大** — なし
+
+### 既存機能の回帰確認
+
+- 既存タブ（schedule / missed / archive / favorites / playlist）に影響する変更なし
+- `schedule:get` / `schedule:refresh` の戻り値契約は維持（success `{ ok: true }`、失敗 `{ error: 'REFRESH_FAILED' }`）
+- `useSchedule.test.js` の 5 ケース（mount / refresh success / refresh error / updated event / error event）で IPC 契約の振る舞いを固定化
+
+### Merge 判断
+
+🟢 **Merge 可** — 重大指摘なし、verify pass、IPC 4 点対称、テスト追加済み。ユーザー指示を待って `develop` へ merge。
+
+### ユーザーへの実機確認推奨項目（merge 前）
+
+- `npm run dev` 起動後に：
+  - 「↺ 更新」ボタンを押下 → スピナーが消えて新データが描画される
+  - ヘッダー / 動画カードの「開く」ボタンの色味がダーク / ライト両方で従来通り
+  - ライブ予定動画の 5 分前頃に🔔ありの状態で待機 → 開始から 1 分以内にデスクトップ通知が出る（imminent poller）
+
+### 次アクション
+
+1. ユーザー: 実機確認 → merge 判断
+2. Merge 後: `develop` へ反映 → リリース判断は別セッション
+
+---
+
+## 2026-05-26 23:35 完了（ライブ通知遅延の改善＋全体点検 — Claude Code 作成）
+
+- 対象: `feature/imminent-live-poller-and-cleanup`
+- 作成者: Claude Code
+- 主題: 配信開始通知の最大遅延を 30 分 → 1 分に短縮する直前ポーラーを追加。並行して dead code 整理と App.jsx ヘッダー UI の CSS 一元化
+
+### 変更したファイル
+
+- `src/main/services/imminentPoller.js`（新規）
+- `src/main/services/schedulerService.js`（`toVideoRecord` を named export 化）
+- `src/main/index.js`（ポーラーの起動・停止配線）
+- `src/renderer/src/App.jsx`（`isAuthenticated` を実値で渡すように修正／ヘッダーボタン inline style を CSS class に置換／未使用 const を削除）
+- `src/renderer/src/assets/main.css`（`.yt-header-btn` / `.yt-header-mode` CSS クラスを追加）
+- `tests/main/services/imminentPoller.test.js`（新規・12 件）
+
+### 実装概要
+
+- `createImminentPoller`: 1 分間隔で `videoRepo.listVisible()` から `status==='live'` または `scheduledStartTime` が `now-5min ～ now+20min` の `upcoming` を抽出し、`videoFetcher.fetch` で再取得→`upsert`。status が変わった動画があれば `schedule:updated` を webContents 経由で renderer に送る。
+- クォータガード: `isQuotaError` で 403 quotaExceeded を握り潰し（schedulerService と同じ判定）、対象 0 件のときは API を呼ばない。
+- `inFlight` フラグで重複起動を防止。
+- App.jsx の `useNotificationCheck({ isAuthenticated: true })` ハードコードを実値の `isAuthenticated` に修正。これで簡易→フル遷移時にライブベースラインが正しくリセットされる。
+- ヘッダーの `更新` / `⚙️` / モード表示の inline style（darkMode ternary 含む）を CSS クラスに置換。既存の `--live-red` / `--btn-bg` / `--btn-color` / `--border` トークンに揃え、ダークモード切替が CSS 側に一本化される。
+
+### IPC 契約
+
+- 既存の `schedule:updated` を流用（main→renderer の send/on ペアは既存）。新規 IPC channel は追加していない。
+
+### クォータ試算
+
+- 1 分間隔 × 24h = 1,440 リクエスト/日 が最悪値（対象 0 件時は呼ばないので実際はもっと少ない）。
+- videos.list は 50 件まで 1 ユニット → 1 日 1,440 ユニット (上限 10,000 / 安全枠 6,000 内)。
+
+### Verify 結果
+
+- ✅ `npm run lint`（max-warnings=0）
+- ✅ `npm run test`（43 files / 382 passed、imminentPoller 12 件追加）
+- ✅ `npm run build`
+
+### 実動確認
+
+- `npm run dev` 未実行。Electron 内部実装（main プロセスのポーラー）が主のため、ブラウザ preview ツールでは検証不可。実動確認はユーザー側で次回 `npm run dev` 時に推奨：
+  - ライブ開始予定時刻の 5 分前以降にアプリを起動し、配信開始から 1 分以内に通知が出るか
+  - ヘッダーの 更新 / ⚙️ / モードバッジの色がダーク/ライトの両方で従来と同じか
+
+### レビュー観点
+
+- imminentPoller の `inFlight` ガードが二重起動を防げているか（fetch が遅延した状況での挙動）
+- `videoRepo.upsert` が `notify` / `is_favorite` を保持していること（schema.sql で UPDATE 句に含まれていないので安全だが念のため）
+- ヘッダー CSS クラス変更で旧 inline 色と完全一致しているか（実機で目視）
+
+### 未解決
+
+- なし
+
+### 次アクション
+
+- ユーザー: `npm run dev` で実動確認
+- ユーザー判断後に develop merge
 
 ---
 

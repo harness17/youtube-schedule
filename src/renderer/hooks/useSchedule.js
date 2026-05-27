@@ -42,19 +42,34 @@ export function useSchedule() {
     setLoading(true)
     setError(null)
     try {
-      await window.api.refreshSchedule()
-      // schedule:updated イベントで load() が呼ばれる
+      const result = await window.api.refreshSchedule()
+      if (result?.error) {
+        setError(result.error)
+        setLoading(false)
+        return result
+      }
+      // schedule:updated イベントが遅延・欠落しても手動更新の loading を残さない
+      await load()
+      return result
     } catch (e) {
       setError(e.message ?? 'FETCH_FAILED')
       setLoading(false)
     }
-  }, [])
+  }, [load])
 
   useEffect(() => {
     load()
     // schedule:updated イベントで自動リロード
     const off = window.api.onScheduleUpdated?.(() => load())
-    return () => off?.()
+    const offError = window.api.onScheduleError?.((payload) => {
+      setError(payload?.error ?? 'FETCH_FAILED')
+      setLoading(false)
+      setInitialLoaded(true)
+    })
+    return () => {
+      off?.()
+      offError?.()
+    }
   }, [load])
 
   function updateVideo(id, patch) {

@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('schedule:updated', listener)
     return () => ipcRenderer.off('schedule:updated', listener)
   },
+  onScheduleError: (cb) => {
+    const listener = (_, payload) => cb(payload)
+    ipcRenderer.on('schedule:error', listener)
+    return () => ipcRenderer.off('schedule:error', listener)
+  },
   listMissed: () => ipcRenderer.invoke('videos:listMissed'),
   listArchive: (opts) => ipcRenderer.invoke('videos:listArchive', opts),
   addManualVideo: (input) => ipcRenderer.invoke('videos:addManual', input),

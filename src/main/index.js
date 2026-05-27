@@ -30,6 +30,7 @@ import { createRssFetchLogRepository } from './repositories/rssFetchLogRepositor
 import { createMetaRepository } from './repositories/metaRepository.js'
 import { createPlaylistRepository } from './repositories/playlistRepository.js'
 import { createSchedulerService } from './services/schedulerService.js'
+import { createImminentPoller, IMMINENT_POLL_INTERVAL_MS } from './services/imminentPoller.js'
 import { createRssFetcher } from './fetchers/rssFetcher.js'
 import { createSubscriptionsFetcher } from './fetchers/subscriptionsFetcher.js'
 import { createPlaylistItemsFetcher } from './fetchers/playlistItemsFetcher.js'
@@ -72,6 +73,7 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000
 let db
 let videoRepo, channelRepo, statsRepo, rssLogRepo, metaRepo, playlistRepo
 let scheduler, playlistApiFetcher, playlistSyncService
+let imminentPoller
 let currentAuthClient = null
 let refreshTimer
 let playlistRefreshTimer
@@ -185,6 +187,17 @@ function initScheduler(authClient) {
     ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
     logger
   })
+  imminentPoller = createImminentPoller({
+    videoRepo,
+    videoFetcher: videoDetailsFetcher,
+    getAuthClient: () => currentAuthClient,
+    ytFactory: (auth) => google.youtube({ version: 'v3', auth: auth ?? undefined }),
+    onUpdated: () => {
+      const win = BrowserWindow.getAllWindows()[0]
+      win?.webContents.send('schedule:updated')
+    },
+    logger
+  })
 }
 
 // ===== ポーリング開始 ===========================================================
@@ -197,7 +210,7 @@ function startPolling(mainWindow) {
     } catch (err) {
       logger?.error('scheduler.kick.error', { error: err })
       mainWindow?.webContents.send('schedule:error', {
-        message: err?.message ?? String(err)
+        error: 'REFRESH_FAILED'
       })
     }
   }
@@ -207,6 +220,12 @@ function startPolling(mainWindow) {
     .backfillArchiveMeta()
     .catch((err) => logger?.error('scheduler.backfill.kick.error', { error: err }))
   refreshTimer = setInterval(kick, REFRESH_INTERVAL_MS)
+  // 配信開始直前の動画だけを 1 分間隔で再チェックして live 遷移を即時検出する。
+  // 認証済みのときだけ動かす（簡易モードは RSS 経由で API キー不要のため対象外）。
+  imminentPoller?.stop()
+  if (currentAuthClient) {
+    imminentPoller?.start(IMMINENT_POLL_INTERVAL_MS)
+  }
 }
 
 function startPlaylistPolling(mainWindow) {
@@ -281,6 +300,7 @@ function registerAllHandlers(getMainWindow) {
     onResetDatabase: async () => {
       if (refreshTimer) clearInterval(refreshTimer)
       if (playlistRefreshTimer) clearInterval(playlistRefreshTimer)
+      imminentPoller?.stop()
       closeDatabase(db)
       const fs = await import('node:fs/promises')
       const dbPath = join(app.getPath('userData'), 'schedule.db')
@@ -352,5 +372,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (refreshTimer) clearInterval(refreshTimer)
   if (playlistRefreshTimer) clearInterval(playlistRefreshTimer)
+  imminentPoller?.stop()
   closeDatabase(db)
 })

@@ -78,7 +78,26 @@ npm run dev
 
 - OAuth credentials、token、secret、`.env` の混入
 - YouTube API quota を大きく増やす自動処理に上限・説明がない
-- IPC contract 変更で main / preload / renderer の片側だけが更新されている
+- IPC contract 変更で main / preload / renderer / event 発火・購読ペアのうち片側だけが更新されている
 - SQLite migration が既存 DB を壊す、または rollback / compatibility の説明がない
 - `better-sqlite3` ABI mismatch を誘発する起動・検証手順
 - `npm run lint` / `npm run test` / `npm run build` の失敗を残した merge
+- 置き換え対象の旧コンポーネント・テストが dead code として残置されている
+
+## レビュー必須チェック項目
+
+レビュー側は以下を機械的にチェックし、抜けがあれば 🔴 指摘とする。
+
+- **IPC 4 点対称**: main handler / preload exposure / renderer 呼び出し / event 発火・購読ペアの一致（event ペアが該当しない request/response 型 IPC は handoff に `N/A と理由` を明記）
+- **dead code 残置**: 置き換え対象の旧ファイル・旧テストが working tree に残っていないか
+- **handoff 完成条件の網羅**: 全項目が verify されているか
+- **テスト数の変化が意味的に妥当**: 単に「+N 件」だけでなく、削除した範囲のテストも整理されているか
+
+## ブレスト初期チェックリスト（YouTom 固有）
+
+YouTube 関連の機能を新規にブレストするとき、最初に以下を確定してから設計に入る。
+
+- **OAuth スコープ拡張の要否**: 必要なら検証申請（sensitive scope の場合）コスト・スケジュールをユーザーに提示。SignPath 再申請が進行中の現状では、scope 拡張は別フェーズで切り分ける
+- **YouTube API クォータ**: 想定アクセス頻度 × ユーザー数 × ユニット数の見積もりを行う（グローバルルール `~/.claude/rules/api-quota-design.md` 参照。repo 内に同名ファイルは置かない）
+- **取得対象の API 制限**: `playlists.list?mine=true` に "Watch Later" / "Liked Videos" が含まれない等の YouTube 仕様制限を spec 段階で確認・周知
+- **既存タブ・既存 IPC・既存 DB との影響範囲**: union 表示・タブ統合などの選択肢は早めにスクリーンショット・モックでユーザー認知を合わせる
