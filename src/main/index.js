@@ -101,7 +101,16 @@ function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // shell.openExternal は file: や custom scheme を渡すと OS コマンド実行に繋がるため
+    // IPC 側の shell:openExternal と同じ http/https allowlist で揃える
+    try {
+      const parsed = new URL(details.url)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        shell.openExternal(details.url)
+      }
+    } catch {
+      /* invalid URL は無視 */
+    }
     return { action: 'deny' }
   })
 
@@ -126,7 +135,9 @@ function setupAutoUpdater(mainWindow) {
     mainWindow.webContents.send('updater:update-downloaded', info)
   })
   autoUpdater.on('error', (err) => {
-    mainWindow.webContents.send('updater:error', err.message)
+    // err.message には内部 URL / ネットワーク詳細が混ざる可能性があるため汎用コードに丸める
+    logger?.error('autoUpdater.error', { error: err })
+    mainWindow.webContents.send('updater:error', 'UPDATE_CHECK_FAILED')
   })
 
   autoUpdater.checkForUpdates()

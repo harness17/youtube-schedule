@@ -232,9 +232,14 @@ export async function startAuthFlow() {
 
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
-      if (!req.url?.startsWith('/callback')) return
+      // /callback 以外は 404 で即時クローズする。レスポンスを返さないとソケットがハングする
+      if (!req.url?.startsWith('/callback')) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Not Found')
+        return
+      }
 
-      const url = new URL(req.url, `http://localhost:${PORT}`)
+      const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
       const code = url.searchParams.get('code')
       const error = url.searchParams.get('error')
 
@@ -263,7 +268,8 @@ export async function startAuthFlow() {
       }
     })
 
-    server.listen(PORT, () => {
+    // 127.0.0.1 明示 bind で全インターフェイス公開を避ける（LAN からの code 横取り耐性）
+    server.listen(PORT, '127.0.0.1', () => {
       shell.openExternal(authUrl)
     })
 
