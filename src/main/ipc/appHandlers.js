@@ -17,6 +17,7 @@
  */
 import { ipcMain, app, shell, Notification } from 'electron'
 import { dirname } from 'path'
+import { getCredentialsPath } from '../auth.js'
 
 export function registerAppHandlers({ getMainWindow, onResetDatabase, autoUpdater, isDev }) {
   // ---- アプリバージョン --------------------------------------------------------
@@ -24,10 +25,12 @@ export function registerAppHandlers({ getMainWindow, onResetDatabase, autoUpdate
 
   // ---- ファイルシステム操作 ----------------------------------------------------
 
-  // credentials.json のフォルダをエクスプローラーで開く
-  ipcMain.handle('shell:openFolder', async (_, filePath) => {
+  // credentials.json のフォルダをエクスプローラーで開く。
+  // renderer から任意パスを受け取らず main 側で credentialsPath を確定させて
+  // 任意フォルダオープン IPC として悪用されるリスクを排除する
+  ipcMain.handle('shell:openFolder', async () => {
     try {
-      await shell.openPath(dirname(filePath))
+      await shell.openPath(dirname(getCredentialsPath()))
       return { success: true }
     } catch {
       return { success: false }

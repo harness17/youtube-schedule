@@ -3,6 +3,7 @@ import { app, shell } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import http from 'http'
+import crypto from 'crypto'
 import { URL } from 'url'
 import { validateOAuthCredentials } from './services/credentialsValidator.js'
 
@@ -182,9 +183,12 @@ async function loadSavedCredentials() {
 }
 
 async function saveCredentials(client) {
+  // mode 0o600 でユーザー専有を明示。Windows では ACL に影響しないが、
+  // macOS/Linux 配布時に他ユーザーから refresh_token を読まれないようにする
   await fs.writeFile(
     TOKEN_PATH,
-    JSON.stringify({ refresh_token: client.credentials.refresh_token })
+    JSON.stringify({ refresh_token: client.credentials.refresh_token }),
+    { mode: 0o600 }
   )
 }
 
@@ -224,10 +228,13 @@ export async function startAuthFlow() {
   const key = await loadKeys()
   const oAuth2Client = new google.auth.OAuth2(key.client_id, key.client_secret, REDIRECT_URI)
 
+  // state は CSRF / authorization code 横取り耐性のため毎回生成し、callback で照合する
+  const expectedState = crypto.randomBytes(32).toString('base64url')
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    prompt: 'consent'
+    prompt: 'consent',
+    state: expectedState
   })
 
   return new Promise((resolve, reject) => {
@@ -242,6 +249,20 @@ export async function startAuthFlow() {
       const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
       const code = url.searchParams.get('code')
       const error = url.searchParams.get('error')
+      const state = url.searchParams.get('state')
+
+      // state 不一致は LAN や別ブラウザからの code 横取りを示唆。タイミング非依存比較
+      if (
+        !state ||
+        state.length !== expectedState.length ||
+        !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(expectedState))
+      ) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(ERROR_HTML)
+        server.close()
+        reject(new Error('state mismatch'))
+        return
+      }
 
       if (error || !code) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
