@@ -1,12 +1,103 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-26
+最終更新: 2026-05-27
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
-status: active
+status: ready_for_review
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-27 22:30 依頼（Phase B: テストカバレッジ拡充 — Claude Code 作成）
+
+- 対象: `develop` から `feature/phase-b-test-coverage` を切って作業すること
+- 作成者: Claude Code
+- 担当: **Codex（実装）**
+- 主題: 全 IPC channel と `src/main/auth.js` 公開関数に最低 1 件のテストを追加し、Phase C/A の大規模リファクタに備えた安全網を整える
+- 親 spec: `docs/superpowers/specs/2026-05-27-phase-b-test-coverage-design.md`
+- 親ロードマップ: `docs/superpowers/specs/2026-05-27-debt-repayment-roadmap.md`
+- 触ってよい範囲:
+  - `tests/main/auth.test.js`（新規）
+  - `tests/main/ipc/authHandlers.test.js`（新規）
+  - `tests/main/ipc/videoHandlers.test.js`（新規）
+  - `tests/main/ipc/settingsHandlers.test.js`（新規）
+  - `tests/main/ipc/statsHandlers.test.js`（新規）
+  - `tests/main/ipc/appHandlers.test.js`（既存に追記。openFolder の既存テストは保持）
+  - 上記テストを成立させるために必要な最小限の prod 側変更（例：state 生成ロジックを auth.js 内で関数化するなど）。**ただし prod 側変更が発生する場合は、その理由と差分の小ささを handoff の「変更内容」に明記する**
+- 触ってはいけない範囲:
+  - 既存 `tests/main/ipc/playlistHandlers.test.js`、`tests/main/services/channelInput.test.js`、`tests/main/ipc/appHandlers.test.js` の **既存テスト内容**（追記のみ可、書き換え不可）
+  - `src/main/auth.js` 以外の prod コードのリファクタ（テスト書きやすさのための prod 改変は最小限。広い責務移動は Phase C で扱う）
+  - `src/renderer/` 配下（Phase A の範囲）
+  - migration ファイル
+- 削除すべきファイル: なし
+- 完成条件:
+  - **構造ゴール**: spec 末尾の「IPC channel × test ファイル対応表」「auth.js export × test 対応表」がすべて「済」になる
+  - **テスト総数**: `npm run test` でテストファイル 45 → 50（新規 5）、テスト件数 390 → **440〜470 件**を目標
+  - **既存破壊なし**: 既存 390 件のテストが 1 件も赤くならない
+  - `npm run lint`（`--max-warnings=0`）、`npm run test`、`npm run build` がすべて pass
+  - `startAuthFlow` のテストは spec の「重め」案（http.createServer 実機 + googleapis mock）で書く。mock 複雑度が想定以上だった場合は spec 内で許容している「軽め」案（内部ロジックを export して unit test）へフォールバックしてよい。**フォールバックを採った場合は handoff にその判断と prod 側 export 追加箇所を明記する**
+- IPC 契約: N/A（IPC contract 変更なし、テスト追加のみ）
+- 変更内容（実装完了時に Codex が埋める）:
+  - 追加:
+    - `tests/main/auth.test.js`（17 tests）: `credentialsExist` / `getCredentialsPath` / `importCredentialsFromFile` / `getAuthenticatedClient` / `startAuthFlow` / `logout`
+    - `tests/main/ipc/authHandlers.test.js`（11 tests）: `auth:check` / `auth:login` / `auth:logout` / `auth:importCredentials`
+    - `tests/main/ipc/videoHandlers.test.js`（20 tests）: schedule / diag / videos / channels の各 IPC channel
+    - `tests/main/ipc/settingsHandlers.test.js`（15 tests）: settings / favorites import/export
+    - `tests/main/ipc/statsHandlers.test.js`（4 tests）: `stats:channelActivity`
+  - 追記:
+    - `tests/main/ipc/appHandlers.test.js`（既存 1 → 12 tests）: `shell:openExternal` / `notification:show` / `app:version` / `schedule:resetDatabase` / updater 系
+  - `docs/superpowers/specs/2026-05-27-phase-b-test-coverage-design.md` の達成判定表を全て `済` に更新
+  - prod 側変更: なし
+  - フォールバック採否: 不採用。`startAuthFlow` は spec の「重め」案（実 HTTP server + `googleapis` mock + `electron.shell.openExternal` spy）で実装
+  - ブランチ作成: `git switch -c feature/phase-b-test-coverage` は `.git/refs/heads/feature/phase-b-test-coverage.lock` の Permission denied で失敗。`.git` 配下への書き込みが sandbox/ACL で拒否されるため、working tree は `develop` 表示のまま変更を作成
+- セルフ verify（Codex 実行）:
+  - ✅ `npx vitest run tests/main/auth.test.js tests/main/ipc/authHandlers.test.js tests/main/ipc/videoHandlers.test.js tests/main/ipc/settingsHandlers.test.js tests/main/ipc/statsHandlers.test.js tests/main/ipc/appHandlers.test.js`（6 files / 79 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（50 files / 468 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（テスト追加のみ、UI/挙動は変わらない）
+- レビュー観点（Claude Code 側）:
+  - 対応表が spec の通り全て埋まっているか
+  - mock の漏れで偶発的に CI が pass しているケースがないか（特に `electron` mock の `app.getPath` 未定義で import エラーが出ていないか）
+  - prod 側変更が最小限に留まっているか
+  - Prettier スタイル（single quote / no semicolon / printWidth 100）に揃っているか
+  - テスト命名が「何をしたとき何になるか」で書かれているか（`tests do X when Y` 形式、`test1` 等の無意味な名前はないか）
+- 既知リスク:
+  - `vi.mock('electron', …)` の `app` / `dialog` / `shell` / `Notification` が網羅されないと import 時にエラー。spec の「実装パターン」セクションにテンプレートあり
+  - `googleapis` のモック方法は spec で具体化済み（`generateAuthUrl` / `getToken` / `setCredentials` のみスタブ）
+  - `better-sqlite3` の ABI mismatch は今後発生するなら `npm install better-sqlite3 --no-save` で復旧可（2026-05-27 セッションで確認済み）
+- 未解決:
+  - なし（spec で許容範囲を明示済み）
+- 次アクション:
+  - Codex: `feature/phase-b-test-coverage` を develop から切って実装。完了したらこのセクションの「変更内容」「セルフ verify」「フォールバック採否」を埋め、status を `ready_for_review` にして Claude Code にレビュー依頼
+  - その後 Claude Code が cross-review → ユーザー merge 指示 → v1.21.0 リリース
+
+### Cross-review 結果（2026-05-27 23:00 — Claude Code）
+
+ブランチを develop → `feature/phase-b-test-coverage` に移し、追加 5 テストファイル + appHandlers 拡張をその上に乗せた状態でレビュー。Codex が develop 上で直接作業した点は、`.git/refs/heads/` の Permission denied による失敗の代替なので不問。次回以降は worktree か `git switch -c` を必ず先に通すよう運用 note を残したい。
+
+verify 再実行: `npm run lint` ✅ / `npm run test`（50 files / 468 tests passed） ✅ / `npm run build` ✅
+
+**🔴 重大: なし**（merge ブロッカーなし）
+
+**🟡 軽微（任意 follow-up）**:
+1. `tests/main/auth.test.js`: spec の「`chmod 0o600` best-effort 呼び出しを検証」が抜けている。`getAuthenticatedClient` のテストで `fs.chmod(TOKEN_PATH, 0o600)` が呼ばれることをアサートすれば spec 完全準拠
+2. `tests/main/ipc/videoHandlers.test.js`: `schedule:get` の `dbBroken: true` / `NOT_INITIALIZED` 分岐や、`videos:addManual` の `NOT_AUTHENTICATED` 分岐などの異常系は個別テスト未実装。spec の「最低 1 件」基準は満たしているが、Phase C で IPC 層を触る前に増やすと安心
+3. `tests/main/ipc/authHandlers.test.js` line 132 の `auth:login still returns authenticated when no client is loaded after flow`: これは現状コード挙動を固定するテストだが、`startAuthFlow` が成功して client が null のとき `isAuthenticated: true` を返すのは仕様か実装上の小バグか判断が分かれる。**仕様確認が必要 → user 判断待ち**
+
+**🟢 良好**:
+- spec 通り全 IPC channel + auth.js 全公開関数に最低 1 件のテストあり、対応表「済」化と整合
+- `vi.hoisted` + `vi.mock('electron', …)` パターンが 6 ファイルで一貫
+- テスト命名「does X when Y」形式で意図が読める
+- Prettier スタイル準拠（single quote / no semi / printWidth 100）
+- `fs.mkdtemp` + `afterEach` cleanup が auth / settings テストで適切
+- `startAuthFlow` を spec の「重め」案で実装（実 HTTP server + googleapis mock + 5 ケース。fallback 不採用）
+- happy path + 異常系（state mismatch / REFRESH_FAILED / canceled dialog / validation error）両方をカバー
+- prod コードは 1 行も触っていない（spec の最小変更原則を完全遵守）
+
+判定: **merge 可**。軽微 3 件は別 commit で fix するか、Phase C 着手時に follow-up するかの user 判断待ち。
 
 ---
 
