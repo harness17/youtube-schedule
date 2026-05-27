@@ -3,12 +3,17 @@ import { app, shell } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import http from 'http'
+import crypto from 'crypto'
 import { URL } from 'url'
 import { validateOAuthCredentials } from './services/credentialsValidator.js'
 
 const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 const PORT = 3456
-const REDIRECT_URI = `http://localhost:${PORT}/callback`
+// 127.0.0.1 を使う理由: IPv6 環境で localhost が ::1 を優先することがあり、
+// IPv4 only で listen している HTTP サーバに callback が届かなくなるのを防ぐ。
+// Google Cloud Console の Authorized redirect URIs に
+// 「http://127.0.0.1:3456/callback」 が登録されている必要がある
+const REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`
 
 // パッケージ版は userData（%APPDATA%\youtube-schedule）に配置
 // → アップデートで削除されない
@@ -172,6 +177,9 @@ async function loadSavedCredentials() {
   try {
     const { refresh_token } = JSON.parse(await fs.readFile(TOKEN_PATH, 'utf-8'))
     if (!refresh_token) return null
+    // 既存 token.json は古い mode で書き込まれている可能性があるため best-effort で締め直す。
+    // Windows は POSIX mode を持たないため fs.chmod は実質 no-op
+    fs.chmod(TOKEN_PATH, 0o600).catch(() => {})
     const key = await loadKeys()
     const client = new google.auth.OAuth2(key.client_id, key.client_secret, REDIRECT_URI)
     client.setCredentials({ refresh_token })
@@ -182,9 +190,12 @@ async function loadSavedCredentials() {
 }
 
 async function saveCredentials(client) {
+  // mode 0o600 でユーザー専有を明示。Windows では ACL に影響しないが、
+  // macOS/Linux 配布時に他ユーザーから refresh_token を読まれないようにする
   await fs.writeFile(
     TOKEN_PATH,
-    JSON.stringify({ refresh_token: client.credentials.refresh_token })
+    JSON.stringify({ refresh_token: client.credentials.refresh_token }),
+    { mode: 0o600 }
   )
 }
 
@@ -224,19 +235,41 @@ export async function startAuthFlow() {
   const key = await loadKeys()
   const oAuth2Client = new google.auth.OAuth2(key.client_id, key.client_secret, REDIRECT_URI)
 
+  // state は CSRF / authorization code 横取り耐性のため毎回生成し、callback で照合する
+  const expectedState = crypto.randomBytes(32).toString('base64url')
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    prompt: 'consent'
+    prompt: 'consent',
+    state: expectedState
   })
 
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
-      if (!req.url?.startsWith('/callback')) return
-
-      const url = new URL(req.url, `http://localhost:${PORT}`)
+      // /callback 以外（/callbackfoo や /favicon.ico 等）は 404 で即時クローズ。
+      // startsWith ではなく pathname 完全一致で判定する
+      const url = req.url ? new URL(req.url, `http://127.0.0.1:${PORT}`) : null
+      if (!url || url.pathname !== '/callback') {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Not Found')
+        return
+      }
       const code = url.searchParams.get('code')
       const error = url.searchParams.get('error')
+      const state = url.searchParams.get('state')
+
+      // state 不一致は LAN や別ブラウザからの code 横取りを示唆。タイミング非依存比較
+      if (
+        !state ||
+        state.length !== expectedState.length ||
+        !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(expectedState))
+      ) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(ERROR_HTML)
+        server.close()
+        reject(new Error('state mismatch'))
+        return
+      }
 
       if (error || !code) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -263,7 +296,8 @@ export async function startAuthFlow() {
       }
     })
 
-    server.listen(PORT, () => {
+    // 127.0.0.1 明示 bind で全インターフェイス公開を避ける（LAN からの code 横取り耐性）
+    server.listen(PORT, '127.0.0.1', () => {
       shell.openExternal(authUrl)
     })
 
