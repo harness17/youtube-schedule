@@ -63,11 +63,16 @@ export function registerAuthHandlers({ onLoginSuccess, onLogoutSuccess }) {
     try {
       await startAuthFlow()
       const client = await getAuthenticatedClient()
-      if (client) {
-        // スケジューラーの初期化・ポーリング開始は index.js が行う。
-        // このファイルはトランスポート層の責務のみ持ち、サービス層に依存しない
-        await onLoginSuccess(client)
+      if (!client) {
+        // startAuthFlow が成功しても loadSavedCredentials で client が取れない稀ケース
+        // （refresh_token を含まないトークン受領 / 直後読み失敗）。
+        // スケジューラ未初期化のまま isAuthenticated: true を返すと UI 上は成功なのに
+        // 動画取得が動かない状態になるため、明示的に失敗扱いにする
+        return { isAuthenticated: false, error: 'AUTH_CLIENT_NOT_AVAILABLE' }
       }
+      // スケジューラーの初期化・ポーリング開始は index.js が行う。
+      // このファイルはトランスポート層の責務のみ持ち、サービス層に依存しない
+      await onLoginSuccess(client)
       return { isAuthenticated: true }
     } catch (err) {
       return { isAuthenticated: false, error: err.message }
