@@ -40,4 +40,23 @@ describe('channelInput', () => {
       uploadsPlaylistId: 'UU1234567890123456789012'
     })
   })
+
+  // regression: hostname.endsWith('youtube.com') 緩判定で
+  // evil-youtube.com が allowlist を通過していた問題への固定テスト
+  it('rejects look-alike hostnames like evil-youtube.com', async () => {
+    const fetchImpl = vi.fn()
+    await expect(
+      normalizeManualChannelInput({ input: 'https://www.evil-youtube.com/@handle' }, { fetchImpl })
+    ).rejects.toThrow()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  // regression: http:// 形式のハンドル URL は強制的に拒否する
+  it('rejects non-https YouTube handle URLs', async () => {
+    const fetchImpl = vi.fn()
+    await expect(
+      normalizeManualChannelInput({ input: 'http://www.youtube.com/@handle' }, { fetchImpl })
+    ).rejects.toThrow()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
 })

@@ -9,7 +9,11 @@ import { validateOAuthCredentials } from './services/credentialsValidator.js'
 
 const SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 const PORT = 3456
-const REDIRECT_URI = `http://localhost:${PORT}/callback`
+// 127.0.0.1 を使う理由: IPv6 環境で localhost が ::1 を優先することがあり、
+// IPv4 only で listen している HTTP サーバに callback が届かなくなるのを防ぐ。
+// Google Cloud Console の Authorized redirect URIs に
+// 「http://127.0.0.1:3456/callback」 が登録されている必要がある
+const REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`
 
 // パッケージ版は userData（%APPDATA%\youtube-schedule）に配置
 // → アップデートで削除されない
@@ -173,6 +177,9 @@ async function loadSavedCredentials() {
   try {
     const { refresh_token } = JSON.parse(await fs.readFile(TOKEN_PATH, 'utf-8'))
     if (!refresh_token) return null
+    // 既存 token.json は古い mode で書き込まれている可能性があるため best-effort で締め直す。
+    // Windows は POSIX mode を持たないため fs.chmod は実質 no-op
+    fs.chmod(TOKEN_PATH, 0o600).catch(() => {})
     const key = await loadKeys()
     const client = new google.auth.OAuth2(key.client_id, key.client_secret, REDIRECT_URI)
     client.setCredentials({ refresh_token })
@@ -239,14 +246,14 @@ export async function startAuthFlow() {
 
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
-      // /callback 以外は 404 で即時クローズする。レスポンスを返さないとソケットがハングする
-      if (!req.url?.startsWith('/callback')) {
+      // /callback 以外（/callbackfoo や /favicon.ico 等）は 404 で即時クローズ。
+      // startsWith ではなく pathname 完全一致で判定する
+      const url = req.url ? new URL(req.url, `http://127.0.0.1:${PORT}`) : null
+      if (!url || url.pathname !== '/callback') {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
         res.end('Not Found')
         return
       }
-
-      const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
       const code = url.searchParams.get('code')
       const error = url.searchParams.get('error')
       const state = url.searchParams.get('state')
