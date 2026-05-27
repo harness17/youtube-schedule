@@ -1,12 +1,68 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-26
+最終更新: 2026-05-27
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-27 22:30 依頼（Phase B: テストカバレッジ拡充 — Claude Code 作成）
+
+- 対象: `develop` から `feature/phase-b-test-coverage` を切って作業すること
+- 作成者: Claude Code
+- 担当: **Codex（実装）**
+- 主題: 全 IPC channel と `src/main/auth.js` 公開関数に最低 1 件のテストを追加し、Phase C/A の大規模リファクタに備えた安全網を整える
+- 親 spec: `docs/superpowers/specs/2026-05-27-phase-b-test-coverage-design.md`
+- 親ロードマップ: `docs/superpowers/specs/2026-05-27-debt-repayment-roadmap.md`
+- 触ってよい範囲:
+  - `tests/main/auth.test.js`（新規）
+  - `tests/main/ipc/authHandlers.test.js`（新規）
+  - `tests/main/ipc/videoHandlers.test.js`（新規）
+  - `tests/main/ipc/settingsHandlers.test.js`（新規）
+  - `tests/main/ipc/statsHandlers.test.js`（新規）
+  - `tests/main/ipc/appHandlers.test.js`（既存に追記。openFolder の既存テストは保持）
+  - 上記テストを成立させるために必要な最小限の prod 側変更（例：state 生成ロジックを auth.js 内で関数化するなど）。**ただし prod 側変更が発生する場合は、その理由と差分の小ささを handoff の「変更内容」に明記する**
+- 触ってはいけない範囲:
+  - 既存 `tests/main/ipc/playlistHandlers.test.js`、`tests/main/services/channelInput.test.js`、`tests/main/ipc/appHandlers.test.js` の **既存テスト内容**（追記のみ可、書き換え不可）
+  - `src/main/auth.js` 以外の prod コードのリファクタ（テスト書きやすさのための prod 改変は最小限。広い責務移動は Phase C で扱う）
+  - `src/renderer/` 配下（Phase A の範囲）
+  - migration ファイル
+- 削除すべきファイル: なし
+- 完成条件:
+  - **構造ゴール**: spec 末尾の「IPC channel × test ファイル対応表」「auth.js export × test 対応表」がすべて「済」になる
+  - **テスト総数**: `npm run test` でテストファイル 45 → 50（新規 5）、テスト件数 390 → **440〜470 件**を目標
+  - **既存破壊なし**: 既存 390 件のテストが 1 件も赤くならない
+  - `npm run lint`（`--max-warnings=0`）、`npm run test`、`npm run build` がすべて pass
+  - `startAuthFlow` のテストは spec の「重め」案（http.createServer 実機 + googleapis mock）で書く。mock 複雑度が想定以上だった場合は spec 内で許容している「軽め」案（内部ロジックを export して unit test）へフォールバックしてよい。**フォールバックを採った場合は handoff にその判断と prod 側 export 追加箇所を明記する**
+- IPC 契約: N/A（IPC contract 変更なし、テスト追加のみ）
+- 変更内容（実装完了時に Codex が埋める）:
+  - 追加テストファイルとテスト件数
+  - prod 側変更があった場合のファイルと理由
+  - フォールバック採否
+- セルフ verify（Codex 実行）:
+  - `npm run lint`
+  - `npm run test`（テスト総数を記録）
+  - `npm run build`
+- 実動確認: N/A（テスト追加のみ、UI/挙動は変わらない）
+- レビュー観点（Claude Code 側）:
+  - 対応表が spec の通り全て埋まっているか
+  - mock の漏れで偶発的に CI が pass しているケースがないか（特に `electron` mock の `app.getPath` 未定義で import エラーが出ていないか）
+  - prod 側変更が最小限に留まっているか
+  - Prettier スタイル（single quote / no semicolon / printWidth 100）に揃っているか
+  - テスト命名が「何をしたとき何になるか」で書かれているか（`tests do X when Y` 形式、`test1` 等の無意味な名前はないか）
+- 既知リスク:
+  - `vi.mock('electron', …)` の `app` / `dialog` / `shell` / `Notification` が網羅されないと import 時にエラー。spec の「実装パターン」セクションにテンプレートあり
+  - `googleapis` のモック方法は spec で具体化済み（`generateAuthUrl` / `getToken` / `setCredentials` のみスタブ）
+  - `better-sqlite3` の ABI mismatch は今後発生するなら `npm install better-sqlite3 --no-save` で復旧可（2026-05-27 セッションで確認済み）
+- 未解決:
+  - なし（spec で許容範囲を明示済み）
+- 次アクション:
+  - Codex: `feature/phase-b-test-coverage` を develop から切って実装。完了したらこのセクションの「変更内容」「セルフ verify」「フォールバック採否」を埋め、status を `ready_for_review` にして Claude Code にレビュー依頼
+  - その後 Claude Code が cross-review → ユーザー merge 指示 → v1.21.0 リリース
 
 ---
 
