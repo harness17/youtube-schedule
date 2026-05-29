@@ -10,6 +10,169 @@ status: active
 
 ---
 
+## 2026-05-29 10:46 完了（Phase C Slice 3: videoRepository query 分離 — Codex 作成）
+
+- 対象: `feature/phase-c-slice3-repo-queries`
+- 作成者: Codex
+- 主題: `videoRepository.js` の read query を `videoQueries.js` へ分離し、repository は write 操作と query composition に絞った。
+- 触ってよい範囲:
+  - `src/main/repositories/videoRepository.js`
+  - `src/main/repositories/videoQueries.js`
+  - `src/main/repositories/playlistRepository.js`
+  - `tests/main/repositories/videoQueries.test.js`
+  - `CLAUDE_CODE_HANDOFF.md`
+- 触ってはいけない範囲:
+  - SQL の意味変更
+  - read 系 public メソッド名・引数・戻り値
+  - write 操作の挙動
+  - 既存 videoRepository 系 3 テストの内容
+  - renderer / preload / IPC / DB migration / schedulerService
+- 削除すべきファイル: なし
+- 完成条件:
+  - `createVideoQueries(db)` が read API（`getById` / `getByIds` / `count` / `listVisible` / `listMissed` / `listArchive` / `listFavorites` / `listFeed` / `searchByText` / `listBackfillTargetIds` / `listManualTrackingIds`）を公開
+  - `createVideoRepository(db)` は `return { ...queries, <write群> }` で既存 API を維持
+  - `rowToVideo` / read 専用定数 / `escapeLikeQuery` は `videoQueries.js` へ移動
+  - `playlistRepository.js` の `rowToVideo` import は `./videoQueries.js` に切替。`statsRepository.js` は `videoRepository` import ではなくローカル mapper だったため変更なし
+  - 既存 3 テストは無修正で pass
+  - 新規 `videoQueries.test.js` で `listVisible`、`listArchive` フィルタ、`searchByText` LIKE エスケープを直接検証
+- IPC 契約:
+  - N/A: repository 内部の分離のみ。IPC handler / preload exposure / renderer 呼び出し / event 発火・購読ペアは変更なし
+- 変更内容:
+  - `videoQueries.js` を追加し、read statement、`rowToVideo`、`escapeLikeQuery`、read method を移動
+  - `videoRepository.js` から read statement/method を除去し、write statement/method と raw row 参照用 `getByIdStmt` を残した
+  - `playlistRepository.js` の mapper import を新 module へ変更
+  - `videoQueries.test.js` を追加
+- セルフ verify:
+  - ✅ `npx vitest run tests/main/repositories/videoQueries.test.js tests/main/repositories/videoRepository.test.js tests/main/videoRepository.membership.test.js tests/main/videoRepository.archive.test.js`（4 files / 72 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（54 files / 487 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（repository 内部リファクタのみ。UI / IPC / DB schema 変更なし）
+- レビュー観点:
+  - `videoQueries.js` の SQL・パラメータ・`rowToVideo` mapping が移動元と一致しているか
+  - `videoRepository.js` に write が残り、read は `...queries` 経由で再公開されているか
+  - `playlistRepository.js` の import 切替に漏れがなく、shim が追加されていないか
+  - 依頼外ファイル・SQL 意味変更・既存テスト修正が混ざっていないか
+- 未解決:
+  - なし
+- 次アクション:
+  - Claude Code: `/cross-review` で Phase C Slice 3 をレビュー。問題なければユーザー判断で Slice 1/2/3 を develop へ merge → v1.22.0。
+
+---
+
+## 2026-05-29 10:42 依頼（Phase C Slice 3: videoRepository query 分離 — Claude Code 作成）
+
+- 対象: **`feature/phase-c-slice2-refresh-phases` から `feature/phase-c-slice3-repo-queries` を切って作業すること**（Slice 2 の上に stack する。理由: Slice 3 を develop へ merge すれば Slice 1/2/3 が 1 回の merge で揃い、handoff ファイルの衝突も避けられる）
+- 作成者: Claude Code
+- 担当: **Codex（実装＋テスト）**
+- 親 spec: `docs/superpowers/specs/2026-05-29-phase-c-main-service-cleanup-design.md`（Slice 3）
+- 主題: `src/main/repositories/videoRepository.js` の read query を新規 module `videoQueries.js` へ分離し、repository には write 操作を残す。**SQL 文字列は逐語移動し、意味を一切変えない**。
+
+### 背景
+
+`videoRepository.js`（437 行）は read query（visible / missed / archive / favorites / feed / search / getById(s) / count / backfill 対象 / manual 追跡）と write（upsert / markViewed / toggleFavorite / setFavorite / importAsFavorite / toggleNotify / markEnded / deleteExpiredEnded / saveFavoriteOrder / backfillMeta）を同居させている。Slice 3 は read を分離する。Slice 1/2 と異なり SQL 意味変更リスクがあるため最後に回した。
+
+### スコープ
+
+1. **新規 `src/main/repositories/videoQueries.js` を作り、read 系を逐語移動する**
+   - `export function createVideoQueries(db)` が次を返す: `getById` / `getByIds` / `count` / `listVisible` / `listMissed` / `listArchive` / `listFavorites` / `listFeed` / `searchByText` / `listBackfillTargetIds` / `listManualTrackingIds`。
+   - read 専用の定数（`UPCOMING_GRACE_MS` / `UPCOMING_FUTURE_MS` / `LIVE_MAX_DURATION_MS` / `RSS_ONLY_VISIBLE_MS`）と `escapeLikeQuery`、`rowToVideo` も videoQueries へ移す。
+   - **prepared statement の SQL 文字列・パラメータ・`rowToVideo` のマッピングを 1 文字も変えない**。`listArchive` の動的 SQL 構築（where/dateExpr/orderBy）もそのまま移す。
+2. **`videoRepository.js` は write を残し、read を composition で再公開する**
+   - `createVideoRepository(db)` 内で `const queries = createVideoQueries(db)` を生成し、`return { ...queries, <write 群> }` とする。**公開 API（`videoRepo.listVisible()` 等）を不変に保ち、呼び出し側（schedulerService / imminentPoller / videoHandlers / playlistSyncService）を変更しない**。
+   - `toggleFavorite` / `toggleNotify` が update 後に参照する raw row 用 `getByIdStmt`、`setFavorite` の `getByIdForFavStmt` は write 側の内部処理なので repository に残してよい。
+3. **`rowToVideo` の import 元を更新する**
+   - `src/main/repositories/playlistRepository.js:1` の `import { rowToVideo } from './videoRepository.js'` を `'./videoQueries.js'` に変更する（唯一の外部参照。re-export shim は作らない）。
+   - `statsRepository.js` が `rowToVideo` を `videoRepository` から import していないか確認し、していれば同様に更新する（grep 上ヒットしているため要確認）。
+
+### 触ってよい範囲
+
+- `src/main/repositories/videoRepository.js`
+- `src/main/repositories/videoQueries.js`（新規）
+- `src/main/repositories/playlistRepository.js`（import 行のみ）
+- `src/main/repositories/statsRepository.js`（`rowToVideo` import がある場合のみ、import 行のみ）
+- `tests/main/repositories/videoQueries.test.js`（新規・最小）
+- `CLAUDE_CODE_HANDOFF.md`（完了追記）
+
+### 触ってはいけない範囲
+
+- SQL の意味（where 条件・JOIN・ORDER BY・パラメータ・閾値計算）
+- read 系の public メソッド名・引数シグネチャ・戻り値形（`rowToVideo` 経由のオブジェクト形）
+- write 操作の挙動
+- 既存テスト `tests/main/repositories/videoRepository.test.js` / `tests/main/videoRepository.membership.test.js` / `tests/main/videoRepository.archive.test.js` の**内容**（これらは composition 経由でそのまま pass すること。書き換え禁止）
+- renderer / preload / IPC channel / DB migration / schedulerService（Slice 2 の領域）
+
+### 削除すべきファイル
+
+なし（read を新モジュールへ移すだけ。videoRepository から移動した旧定義の残置は不可）。
+
+### 完成条件
+
+- `videoQueries.js` の read query は移動元と SQL・パラメータ・マッピングが完全一致。
+- `createVideoRepository(db)` の公開 API（read + write 全メソッド）が呼び出し側から見て不変。
+- 既存 3 つの videoRepository テストが**無修正で pass**する（SQL 意味不変の証明）。
+- `playlistRepository` / `statsRepository` の `rowToVideo` 参照が新モジュールを指し、動作する。
+- 新規 `videoQueries.test.js` が `createVideoQueries(db)` を直接構築し、代表的な read（`listVisible` の live/upcoming 抽出、`listArchive` の channel/期間/検索フィルタ、`searchByText` の LIKE エスケープ）を最小検証する。
+- DB schema / IPC contract / renderer 変更なし。
+
+### IPC 契約
+
+- N/A: repository 内部の分離のみ。IPC handler（videoHandlers）の呼び出し先メソッド名・戻り値は不変（理由: composition で API を保つ）。
+
+### verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認: 任意。SQL 意味は既存テストで担保するが、不安があれば `npm run dev` で archive/favorites/見逃しタブが表示されることを確認してよい。
+
+### 既知リスク
+
+- read を移す際に SQL 文字列やパラメータ名（`@liveThreshold` 等）を取りこぼすと既存テストが落ちる → 既存 3 テストが安全網。
+- `listArchive` は動的 SQL のため移動ミスが起きやすい。where 配列・`dateExpr`・`orderBy` マップを逐語移送する。
+- `rowToVideo` の移動で playlist/stats repository の import が壊れる → 完成条件に明記。
+
+### レビュー観点（Claude Code が後で見る）
+
+- read query が逐語移動で SQL 意味不変か（既存 3 テスト無修正 pass ＋ diff 目視）
+- composition で public API が保たれ、呼び出し側無変更か
+- write が repository に残り、read が queries に移ったか（責務分離が実際に起きているか）
+- `rowToVideo` 参照切り替えに漏れがないか
+- 依頼外の cleanup・SQL 改変が混ざっていないか
+
+### 次アクション
+
+- Codex: 上記スコープで実装＋テスト → verify → handoff に完了追記。
+- Claude Code: `/cross-review` でレビュー。問題なければ Slice 1/2/3 を揃えてユーザー判断で develop へ merge → v1.22.0。
+
+---
+
+## 2026-05-29 10:38 レビュー完了（Phase C Slice 2 — Claude Code 作成）
+
+- 対象: `feature/phase-c-slice2-refresh-phases`
+- 作成者: Claude Code
+- レビュー結論: **依頼スコープ・完成条件を全て満たす。🔴 / 🟡 なし、merge 可（ユーザー判断待ち）**
+- 確認結果:
+  - `refreshTargetPlanner.planRefreshTargets` は抽出元とロジック一致。`target` の構築 `Array.from(new Set([...newIds, ...recheckIds, ...manualIds]))` で集合・順序を維持。stale 定数は `RECHECK_STALE_MS` に閉じ込め、`>` 厳密判定・`status !== 'ended'` 条件を保持
+  - `rescueOrphanLives` は orphan 救済ブロックを逐語抽出。`rssIdSet`/`fetchedIds` フィルタ、`videoFetcher.fetch`→`upsert`→`markEnded` の I/O 副作用、`scheduler.orphanCheck` / `.summary` ログ payload が不変。authed パス内（`!authClient` 早期 return より後）の呼び出し位置も維持
+  - `doRefresh` が resolveChannels → collectVideoIds → planRefreshTargets → details fetch/upsert → rescueOrphanLives → maybeCleanup の薄い orchestrator になっている
+  - 非ゴール遵守: renderer / preload / IPC / DB migration / retention / quota 判定 / YouTube API 呼び出し回数いずれも変更なし。`resolveChannels` / `collectVideoIds` も未変更
+  - dead code 残置なし。依頼外ファイル変更なし
+- planner test 評価: forceFullRecheck 分岐、live/upcoming/stale 抽出、**境界（STALE=閾値超で対象 / FRESH=閾値ちょうどで非対象 / ENDED_STALE=ended 除外）**、new 順序、manual 合流＋dedup を網羅。良好
+- 独立 verify（Codex セルフ申告を再現）:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（53 files / 484 passed、Slice 1 比 +1 file +4 tests）
+  - ✅ `npm run build`
+- 対応した指摘: なし
+- 次アクション:
+  - ユーザー: `develop` への merge 可否を判断（merge ゲート ①②③ 充足、④ 待ち）
+  - 以降は Slice 3（`videoRepository` query 整理。SQL 意味変更リスクあり、spec の最終スライス）
+
+---
+
 ## 2026-05-29 10:34 完了（Phase C Slice 2: refresh phase 分離 — Codex 作成）
 
 - 対象: `feature/phase-c-slice2-refresh-phases`
