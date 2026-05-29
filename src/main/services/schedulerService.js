@@ -1,16 +1,13 @@
-import { deriveStatus } from './videoStatus.js'
 import { parseDuration } from '../lib/parseDuration.js'
 import { resolveVideoId } from '../lib/resolveVideoId.js'
-import { isQuotaError, nextQuotaReset } from '../lib/quotaReset.js'
+import { isQuotaError } from '../lib/quotaReset.js'
+import { planRefreshTargets } from './refreshTargetPlanner.js'
+import { createSchedulerMaintenance } from './schedulerMaintenance.js'
+import { toRssVideoRecord, toVideoRecord } from './videoRecordMapper.js'
 
 const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const RSS_PARALLEL = 10
-const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000
-const ENDED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
-const NOTIFY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
-const CLEANUP_META_KEY = 'last_cleanup_at'
 const ARCHIVE_BACKFILL_META_KEY = 'archive_backfill_done'
-const QUOTA_EXCEEDED_META_KEY = 'quota_exceeded_at'
 const RSS_FALLBACK_COOLDOWN_MS = 6 * 60 * 60 * 1000
 const RSS_FALLBACK_MAX_PER_REFRESH = 20
 const RSS_FALLBACK_META_PREFIX = 'rss_fallback_at:'
@@ -23,54 +20,6 @@ function chunk(arr, size) {
 
 function isRssCapableChannel(channel) {
   return typeof channel.id === 'string' && channel.id.startsWith('UC')
-}
-
-export function toVideoRecord(v, now) {
-  const ld = v.liveStreamingDetails || {}
-  return {
-    id: v.id,
-    channelId: v.snippet.channelId,
-    channelTitle: v.snippet.channelTitle,
-    title: v.snippet.title,
-    description: v.snippet.description ?? '',
-    thumbnail:
-      v.snippet.thumbnails?.maxres?.url ??
-      v.snippet.thumbnails?.high?.url ??
-      v.snippet.thumbnails?.medium?.url ??
-      '',
-    status: deriveStatus(v, now),
-    scheduledStartTime: ld.scheduledStartTime ? new Date(ld.scheduledStartTime).getTime() : null,
-    actualStartTime: ld.actualStartTime ? new Date(ld.actualStartTime).getTime() : null,
-    concurrentViewers: ld.concurrentViewers ? Number(ld.concurrentViewers) : null,
-    url: `https://www.youtube.com/watch?v=${v.id}`,
-    firstSeenAt: now,
-    lastCheckedAt: now,
-    duration: parseDuration(v.contentDetails?.duration),
-    publishedAt: v.snippet.publishedAt ? new Date(v.snippet.publishedAt).getTime() : null,
-    source: 'api'
-  }
-}
-
-function toRssVideoRecord(entry, channel, now) {
-  const feedTime = Date.parse(entry.published ?? entry.updated ?? '')
-  return {
-    id: entry.id,
-    channelId: channel.id,
-    channelTitle: entry.channelTitle ?? channel.title ?? channel.id,
-    title: entry.title || '(タイトル未取得)',
-    description: entry.description ?? '',
-    thumbnail: `https://i.ytimg.com/vi/${entry.id}/hqdefault.jpg`,
-    status: 'upcoming',
-    scheduledStartTime: null,
-    actualStartTime: null,
-    concurrentViewers: null,
-    url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
-    firstSeenAt: Number.isNaN(feedTime) ? now : feedTime,
-    lastCheckedAt: now,
-    duration: null,
-    publishedAt: Number.isNaN(feedTime) ? null : feedTime,
-    source: 'rss'
-  }
 }
 
 function getLastRssFallbackAt(metaRepo, channelId) {
@@ -108,6 +57,7 @@ export function createSchedulerService({
   logger = NOOP_LOGGER
 }) {
   let inFlight = null
+  const maintenance = createSchedulerMaintenance({ videoRepo, metaRepo })
 
   async function resolveChannels(yt, now, { forceSubscriptionsResync = false } = {}) {
     if (!authClient) {
@@ -212,54 +162,7 @@ export function createSchedulerService({
     )
   }
 
-  async function doRefresh({ forceFullRecheck = false, forceSubscriptionsResync = false } = {}) {
-    const now = Date.now()
-    const yt = ytFactory(authClient)
-
-    const channels = await resolveChannels(yt, now, { forceSubscriptionsResync })
-    const channelIds = new Set(channels.map((c) => c.id))
-    const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
-
-    const known = videoRepo.getByIds(videoIds)
-    const knownIds = new Set(known.map((v) => v.id))
-    const recheckIds = forceFullRecheck
-      ? Array.from(knownIds)
-      : known
-          .filter(
-            (v) =>
-              v.status === 'live' ||
-              v.status === 'upcoming' ||
-              (v.status !== 'ended' && now - v.lastCheckedAt > 24 * 60 * 60 * 1000)
-          )
-          .map((v) => v.id)
-    const newIds = videoIds.filter((id) => !knownIds.has(id))
-    // 手動登録動画は RSS に出ないため、明示的に再チェック対象へ加える
-    const manualIds = videoRepo.listManualTrackingIds()
-    const target = Array.from(new Set([...newIds, ...recheckIds, ...manualIds]))
-
-    const details = authClient
-      ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {
-          target: target.length,
-          newIds: newIds.length,
-          recheckIds: recheckIds.length
-        })
-      : []
-    const fetchedIds = new Set(details.map((v) => v.id))
-    if (!authClient) {
-      for (const entry of rssEntries.values()) {
-        videoRepo.upsert(toRssVideoRecord(entry, entry.channel, now))
-      }
-      metaRepo.set('last_full_refresh_at', String(now), now)
-      maybeCleanup(now)
-      return
-    }
-
-    for (const v of details) {
-      if (!channelIds.has(v.snippet?.channelId)) continue
-      videoRepo.upsert(toVideoRecord(v, now))
-      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
-    }
-
+  async function rescueOrphanLives(yt, { videoIds, fetchedIds, now }) {
     // RSS から消えた live/upcoming 動画を救済する
     // （メンバー限定化・削除されると RSS に返らず status が live のまま固まる）
     const rssIdSet = new Set(videoIds)
@@ -292,20 +195,55 @@ export function createSchedulerService({
         { candidates: orphanIds.length }
       )
     }
+  }
+
+  async function doRefresh({ forceFullRecheck = false, forceSubscriptionsResync = false } = {}) {
+    const now = Date.now()
+    const yt = ytFactory(authClient)
+
+    const channels = await resolveChannels(yt, now, { forceSubscriptionsResync })
+    const channelIds = new Set(channels.map((c) => c.id))
+    const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
+
+    const known = videoRepo.getByIds(videoIds)
+    // 手動登録動画は RSS に出ないため、明示的に再チェック対象へ加える
+    const manualIds = videoRepo.listManualTrackingIds()
+    const { target, newIds, recheckIds } = planRefreshTargets({
+      videoIds,
+      known,
+      manualIds,
+      forceFullRecheck,
+      now
+    })
+
+    const details = authClient
+      ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {
+          target: target.length,
+          newIds: newIds.length,
+          recheckIds: recheckIds.length
+        })
+      : []
+    const fetchedIds = new Set(details.map((v) => v.id))
+    if (!authClient) {
+      for (const entry of rssEntries.values()) {
+        videoRepo.upsert(toRssVideoRecord(entry, entry.channel, now))
+      }
+      metaRepo.set('last_full_refresh_at', String(now), now)
+      maintenance.maybeCleanup(now)
+      return
+    }
+
+    for (const v of details) {
+      if (!channelIds.has(v.snippet?.channelId)) continue
+      videoRepo.upsert(toVideoRecord(v, now))
+      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
+    }
+
+    await rescueOrphanLives(yt, { videoIds, fetchedIds, now })
 
     metaRepo.set('last_full_refresh_at', String(now), now)
 
-    maybeCleanup(now)
-  }
-
-  function maybeCleanup(now) {
-    const last = Number(metaRepo.get(CLEANUP_META_KEY) ?? 0)
-    if (now - last < CLEANUP_INTERVAL_MS) return
-    videoRepo.deleteExpiredEnded({
-      defaultThreshold: now - ENDED_RETENTION_MS,
-      notifyThreshold: now - NOTIFY_RETENTION_MS
-    })
-    metaRepo.set(CLEANUP_META_KEY, String(now), now)
+    maintenance.maybeCleanup(now)
   }
 
   // 既存アーカイブの duration / published_at を一度だけ補完する。
@@ -383,16 +321,7 @@ export function createSchedulerService({
   // クォータ超過の状態を返す。発生時刻を metaRepo から読み、その直後の
   // リセット時刻をまだ過ぎていなければ exceeded=true とする。
   function getQuotaStatus() {
-    const raw = metaRepo.get(QUOTA_EXCEEDED_META_KEY)
-    const exceededAt = Number(raw)
-    if (!raw || !Number.isFinite(exceededAt) || exceededAt <= 0) {
-      return { exceeded: false, resetAt: null }
-    }
-    const resetAt = nextQuotaReset(exceededAt)
-    if (Date.now() >= resetAt) {
-      return { exceeded: false, resetAt: null }
-    }
-    return { exceeded: true, resetAt }
+    return maintenance.getQuotaStatus()
   }
 
   return {
@@ -421,16 +350,14 @@ export function createSchedulerService({
         try {
           await doRefresh(opts)
           // 取得成功＝クォータ回復。記録済みの超過フラグがあれば消す。
-          if (metaRepo.get(QUOTA_EXCEEDED_META_KEY)) {
-            metaRepo.set(QUOTA_EXCEEDED_META_KEY, '', Date.now())
-          }
+          maintenance.clearQuotaExceeded()
           logger.info('scheduler.refresh.done', { durationMs: Date.now() - startedAt })
         } catch (err) {
           if (isQuotaError(err)) {
             // クォータ超過は想定内の運用状態。例外として投げ直さず、発生時刻を
             // 記録してバナー表示（getQuotaStatus）で案内する。巨大な GaxiosError
             // スタックトレースはコンソールに出さない。
-            metaRepo.set(QUOTA_EXCEEDED_META_KEY, String(Date.now()), Date.now())
+            maintenance.recordQuotaExceeded()
             logger.warn('scheduler.refresh.quotaExceeded', {
               durationMs: Date.now() - startedAt
             })

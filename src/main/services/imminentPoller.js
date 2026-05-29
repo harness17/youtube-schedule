@@ -1,5 +1,5 @@
-import { toVideoRecord } from './schedulerService.js'
 import { isQuotaError } from '../lib/quotaReset.js'
+import { toVideoRecord } from './videoRecordMapper.js'
 
 // 配信開始直前の動画と現在 live の動画だけを短い間隔で videos.list に再問い合わせて
 // upcoming → live → ended の遷移を即時検出する軽量ポーラー。
