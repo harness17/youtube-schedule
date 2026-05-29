@@ -1,4 +1,4 @@
-import { rowToVideo } from './videoRepository.js'
+import { rowToVideo } from './videoQueries.js'
 import { buildWatchUrl } from '../services/videoUrl.js'
 
 function uniqueVideoIds(ids) {

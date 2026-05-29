@@ -1,6 +1,7 @@
 import { parseDuration } from '../lib/parseDuration.js'
 import { resolveVideoId } from '../lib/resolveVideoId.js'
 import { isQuotaError } from '../lib/quotaReset.js'
+import { planRefreshTargets } from './refreshTargetPlanner.js'
 import { createSchedulerMaintenance } from './schedulerMaintenance.js'
 import { toRssVideoRecord, toVideoRecord } from './videoRecordMapper.js'
 
@@ -161,54 +162,7 @@ export function createSchedulerService({
     )
   }
 
-  async function doRefresh({ forceFullRecheck = false, forceSubscriptionsResync = false } = {}) {
-    const now = Date.now()
-    const yt = ytFactory(authClient)
-
-    const channels = await resolveChannels(yt, now, { forceSubscriptionsResync })
-    const channelIds = new Set(channels.map((c) => c.id))
-    const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
-
-    const known = videoRepo.getByIds(videoIds)
-    const knownIds = new Set(known.map((v) => v.id))
-    const recheckIds = forceFullRecheck
-      ? Array.from(knownIds)
-      : known
-          .filter(
-            (v) =>
-              v.status === 'live' ||
-              v.status === 'upcoming' ||
-              (v.status !== 'ended' && now - v.lastCheckedAt > 24 * 60 * 60 * 1000)
-          )
-          .map((v) => v.id)
-    const newIds = videoIds.filter((id) => !knownIds.has(id))
-    // 手動登録動画は RSS に出ないため、明示的に再チェック対象へ加える
-    const manualIds = videoRepo.listManualTrackingIds()
-    const target = Array.from(new Set([...newIds, ...recheckIds, ...manualIds]))
-
-    const details = authClient
-      ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {
-          target: target.length,
-          newIds: newIds.length,
-          recheckIds: recheckIds.length
-        })
-      : []
-    const fetchedIds = new Set(details.map((v) => v.id))
-    if (!authClient) {
-      for (const entry of rssEntries.values()) {
-        videoRepo.upsert(toRssVideoRecord(entry, entry.channel, now))
-      }
-      metaRepo.set('last_full_refresh_at', String(now), now)
-      maintenance.maybeCleanup(now)
-      return
-    }
-
-    for (const v of details) {
-      if (!channelIds.has(v.snippet?.channelId)) continue
-      videoRepo.upsert(toVideoRecord(v, now))
-      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
-    }
-
+  async function rescueOrphanLives(yt, { videoIds, fetchedIds, now }) {
     // RSS から消えた live/upcoming 動画を救済する
     // （メンバー限定化・削除されると RSS に返らず status が live のまま固まる）
     const rssIdSet = new Set(videoIds)
@@ -241,6 +195,51 @@ export function createSchedulerService({
         { candidates: orphanIds.length }
       )
     }
+  }
+
+  async function doRefresh({ forceFullRecheck = false, forceSubscriptionsResync = false } = {}) {
+    const now = Date.now()
+    const yt = ytFactory(authClient)
+
+    const channels = await resolveChannels(yt, now, { forceSubscriptionsResync })
+    const channelIds = new Set(channels.map((c) => c.id))
+    const { videoIds, rssEntries } = await collectVideoIds(yt, channels, now)
+
+    const known = videoRepo.getByIds(videoIds)
+    // 手動登録動画は RSS に出ないため、明示的に再チェック対象へ加える
+    const manualIds = videoRepo.listManualTrackingIds()
+    const { target, newIds, recheckIds } = planRefreshTargets({
+      videoIds,
+      known,
+      manualIds,
+      forceFullRecheck,
+      now
+    })
+
+    const details = authClient
+      ? await logger.withTiming('scheduler.videoDetails', () => videoFetcher.fetch(yt, target), {
+          target: target.length,
+          newIds: newIds.length,
+          recheckIds: recheckIds.length
+        })
+      : []
+    const fetchedIds = new Set(details.map((v) => v.id))
+    if (!authClient) {
+      for (const entry of rssEntries.values()) {
+        videoRepo.upsert(toRssVideoRecord(entry, entry.channel, now))
+      }
+      metaRepo.set('last_full_refresh_at', String(now), now)
+      maintenance.maybeCleanup(now)
+      return
+    }
+
+    for (const v of details) {
+      if (!channelIds.has(v.snippet?.channelId)) continue
+      videoRepo.upsert(toVideoRecord(v, now))
+      channelRepo.upsertSeen(v.snippet.channelId, v.snippet.channelTitle)
+    }
+
+    await rescueOrphanLives(yt, { videoIds, fetchedIds, now })
 
     metaRepo.set('last_full_refresh_at', String(now), now)
 
