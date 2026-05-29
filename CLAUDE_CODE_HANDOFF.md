@@ -10,6 +10,142 @@ status: active
 
 ---
 
+## 2026-05-29 10:34 完了（Phase C Slice 2: refresh phase 分離 — Codex 作成）
+
+- 対象: `feature/phase-c-slice2-refresh-phases`
+- 作成者: Codex
+- 主題: `schedulerService.doRefresh()` の recheck target 計画を純粋関数へ抽出し、orphan live 救済を schedulerService クロージャ内の名前付き関数へ分離した。
+- 触ってよい範囲:
+  - `src/main/services/schedulerService.js`
+  - `src/main/services/refreshTargetPlanner.js`
+  - `tests/main/services/refreshTargetPlanner.test.js`
+  - `CLAUDE_CODE_HANDOFF.md`
+- 触ってはいけない範囲:
+  - renderer / preload / IPC channel
+  - DB migration / cleanup retention policy / quota 判定
+  - `videoRepository` SQL
+  - YouTube API 呼び出し回数・順序の意味変更
+- 削除すべきファイル: なし
+- 完成条件:
+  - `refresh()` / RSS-only / 認証あり / orphan 救済 / manual ID 合流の外部挙動を維持
+  - `target` は既存と同じ `newIds -> recheckIds -> manualIds` 順序で重複排除
+  - `scheduler.videoDetails` と `scheduler.orphanCheck.summary` のログキー・値の意味を維持
+  - DB schema / IPC contract / renderer は変更なし
+- IPC 契約:
+  - N/A: main service 内部のリファクタのみ。request/response、preload exposure、renderer 呼び出し、event 発火・購読ペアはいずれも変更なし。
+- 変更内容:
+  - `refreshTargetPlanner.js` を追加し、`planRefreshTargets({ videoIds, known, manualIds, forceFullRecheck, now })` と `RECHECK_STALE_MS` を定義
+  - `schedulerService.js` の既存 recheck target 算出を `planRefreshTargets` 呼び出しへ置換
+  - orphan live 救済処理を `createSchedulerService` クロージャ内の `rescueOrphanLives` へ抽出し、I/O・logger event・ログ payload を維持
+  - `refreshTargetPlanner.test.js` を追加し、force full recheck / live・upcoming・stale / new 抽出 / manual 合流 / 重複排除と順序を検証
+- セルフ verify:
+  - ✅ `npx vitest run tests/main/services/refreshTargetPlanner.test.js tests/main/services/schedulerService.test.js tests/main/services/imminentPoller.test.js`（3 files / 44 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（53 files / 484 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（main service 内部リファクタのみ。UI / IPC / DB schema 変更なし）
+- レビュー観点:
+  - `planRefreshTargets` の `target` 順序が旧 inline 実装と一致しているか
+  - `rescueOrphanLives` 抽出で `videoFetcher.fetch` 呼び出し回数、`upsert`、`markEnded`、`scheduler.orphanCheck.summary` が変わっていないか
+  - 依頼外ファイル・unrelated cleanup が混ざっていないか
+- 未解決:
+  - なし
+- 次アクション:
+  - Claude Code: `/cross-review` で Phase C Slice 2 をレビュー。問題なければユーザー判断で merge / Slice 3 へ進む。
+
+---
+
+## 2026-05-29 10:30 依頼（Phase C Slice 2: refresh phase 分離 — Claude Code 作成）
+
+- 対象: `develop` から `feature/phase-c-slice2-refresh-phases` を切って作業すること
+- 作成者: Claude Code
+- 担当: **Codex（実装＋テスト）**
+- 親 spec: `docs/superpowers/specs/2026-05-29-phase-c-main-service-cleanup-design.md`（Slice 2）
+- 主題: `schedulerService.doRefresh()` 内にインライン展開されている「recheck target 計画」と「orphan live 救済」を関数分離し、`doRefresh` を薄い orchestrator にする。Slice 1（helper 抽出）の続き。
+
+### 背景
+
+`resolveChannels` / `collectVideoIds` は既に名前付き関数として分離済み。残るインラインフェーズは 2 つ：
+
+1. **recheck target 計画**（現 `schedulerService.js` 172〜187 行付近）: `known` / `forceFullRecheck` / `manualIds` から `videoFetcher.fetch` に渡す `target` を算出する純粋ロジック。
+2. **orphan live 救済**（現 211〜243 行付近）: RSS から消えた live/upcoming を `videos.list` で再確認し、API からも消えていれば `markEnded` する I/O フェーズ。
+
+### スコープ（この 2 点のみ。それ以上は広げない）
+
+1. **`refreshTargetPlanner.js`（新規 module・純粋関数）として recheck 計画を抽出する**
+   - 関数例: `planRefreshTargets({ videoIds, known, manualIds, forceFullRecheck, now })` → `{ target, newIds, recheckIds }` を返す。
+   - `doRefresh` 側はこの戻り値の `newIds.length` / `recheckIds.length` を既存どおりログ（`scheduler.videoDetails`）に渡す。**ログのキー・値の意味を変えない**。
+   - stale 判定の定数 `24 * 60 * 60 * 1000` は planner 内に `RECHECK_STALE_MS` として閉じ込める。
+   - `target` の構築は現状と同じ `Array.from(new Set([...newIds, ...recheckIds, ...manualIds]))` の順序・重複排除を維持する。
+   - focused unit test を `tests/main/services/refreshTargetPlanner.test.js` に追加（forceFullRecheck 分岐 / live・upcoming・stale 抽出 / new 抽出 / manual 合流 / 重複排除）。
+2. **orphan live 救済を `schedulerService.js` 内の名前付き関数へ抽出する**
+   - 例: `rescueOrphanLives(yt, { orphanIds, fetchedIds, now })` を `createSchedulerService` クロージャ内の関数として切り出し、`doRefresh` から呼ぶだけにする。
+   - **新規 module 化や DI 構造変更はしない**（I/O が `videoFetcher` / `videoRepo` / `logger` に密結合のため、クロージャ内関数に留める）。orphan の I/O 挙動・`logger.withTiming` の event 名・ログ内容を変えない。
+
+### 触ってよい範囲
+
+- `src/main/services/schedulerService.js`
+- `src/main/services/refreshTargetPlanner.js`（新規）
+- `tests/main/services/refreshTargetPlanner.test.js`（新規）
+- `tests/main/services/schedulerService.test.js`（既存テストが通る範囲での最小追記のみ。既存ケースの書き換え禁止）
+- `CLAUDE_CODE_HANDOFF.md`（完了追記）
+
+### 触ってはいけない範囲
+
+- `resolveChannels` / `collectVideoIds`（既に分離済み。今回は触らない）
+- renderer / preload / IPC channel
+- DB migration / cleanup retention policy / quota 判定（Slice 1 の `schedulerMaintenance` 領域）
+- `videoRepository` SQL の意味変更（Slice 3 に延期）
+- YouTube API 呼び出し回数・順序（`videoFetcher.fetch` の呼び出し回数を増やさない）
+- `service class` 化・DI コンテナ導入などの構造大変更
+
+### 削除すべきファイル
+
+なし（インラインコードを関数へ移すだけ。旧定義の残置は不可）。
+
+### 完成条件
+
+- `refresh()` / RSS-only パス / 認証ありパス / orphan 救済 / manual 追跡 ID 合流の外部挙動と副作用が不変。
+- `planRefreshTargets` の戻り値で算出される `target` が、現行 `doRefresh` の `target` と同一集合・同一順序になる。
+- `scheduler.videoDetails` ログの `target` / `newIds` / `recheckIds` の値が現行と一致する。
+- orphan 救済の `markEnded` 件数・`scheduler.orphanCheck.summary` ログ内容が現行と一致する。
+- DB schema / IPC contract / YouTube API 呼び出し回数 / renderer は変更なし。
+- 新規 planner の focused unit test と既存 `schedulerService` / `imminentPoller` tests が pass。
+
+### IPC 契約
+
+- N/A: request/response・preload exposure・renderer 呼び出し・event 発火/購読ペアいずれも変更なし（理由: main service 内部のリファクタのみ）。
+
+### verify コマンド
+
+```powershell
+npm run lint
+npm run test
+npm run build
+```
+
+実動確認: 原則 N/A（main service 内部リファクタ・UI/IPC 変更なし）。ただし orphan 救済ロジックに触れるため、不安があれば `npm run dev` で起動エラーが出ないことだけ確認してよい。
+
+### 既知リスク
+
+- planner 抽出で `target` の順序が変わると `videoFetcher.fetch` の引数順が変わる（機能影響はないが、テストが順序依存だと落ちる）。順序維持を完成条件に含めた。
+- stale 判定 `now - v.lastCheckedAt > 24h` と `v.status !== 'ended'` の組み合わせを取りこぼすと recheck 対象がずれる。planner test で網羅する。
+- orphan 救済を module 化すると DI が膨らむ。今回はクロージャ内関数に留める方針。
+
+### レビュー観点（Claude Code が後で見る）
+
+- `target` 集合・順序が現行と完全一致するか（planner test ＋ schedulerService test で担保）
+- orphan 救済の I/O 副作用（upsert / markEnded）とログが不変か
+- `doRefresh` がフェーズ呼び出しだけの薄い orchestrator になっているか
+- 依頼外ファイル変更・unrelated cleanup が混ざっていないか
+
+### 次アクション
+
+- Codex: 上記スコープで実装＋テスト → verify → handoff に完了追記。
+- Claude Code: `/cross-review` でレビュー。問題なければ Slice 3（`videoRepository` query 整理）へ。
+
+---
+
 ## 2026-05-29 10:23 レビュー完了（Phase C Slice 1 — Claude Code 作成）
 
 - 対象: `feature/phase-c-main-service-cleanup`
