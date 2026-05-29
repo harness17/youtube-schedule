@@ -89,6 +89,10 @@ git tag vX.X.X
 git push origin master develop --tags
 ```
 
+> ⚠️ **手動で `gh release create` しないこと。** Release ワークフローがタグ push を検知し、**draft** リリースを自動作成してアセット（exe / latest.yml）を添付する。
+> 手動で公開済みリリースを先に作ると、アセットがアップロードされ終わるまでの数分間「`latest.yml` が無い公開リリース」が露出し、起動中アプリの自動更新チェックが **404（UPDATE_CHECK_FAILED）** になる。
+> リリースは Step 8 でノート確定後に人間が `--draft=false` で公開する。
+
 ### 7. CI と Release ワークフローの完了を確認する
 
 push すると **CI**（lint + test）と **Release**（build + publish）が同時に起動する。
