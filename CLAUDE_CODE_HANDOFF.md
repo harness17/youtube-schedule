@@ -10,6 +10,33 @@ status: active
 
 ---
 
+## 2026-05-29 10:54 レビュー完了（Phase C Slice 3: videoRepository query 分離 — Claude Code 作成）
+
+- 対象: `feature/phase-c-slice3-repo-queries`（Codex commit `cfd308a`）
+- 作成者: Claude Code
+- 主題: Slice 3 の独立レビュー。read query 分離が SQL の意味を変えず、public API と既存テストを維持しているかを確認。
+- レビュー結果: 🟢 良好（🔴 重大指摘なし / 🟡 軽微指摘なし）
+- 確認したこと:
+  - SQL verbatim 移動: `videoQueries.js` の全 read statement（`listVisible` / `listMissed` / `listFavorites` / `listFeed` / `searchByText` / `listArchive` の動的 SQL）と read 専用定数・`escapeLikeQuery`・`rowToVideo` が移動元と文字列・パラメータ単位で一致。
+  - composition: `videoRepository.js` は `return { ...queries, <write群> }` で read API を再公開し、write statement と write-side read-back 用の private `getByIdStmt` / `getByIdForFavStmt` を保持。public API 名・引数・戻り値に変化なし。
+  - import 切替: `playlistRepository.js` の `rowToVideo` import を `./videoQueries.js` に変更済み。再 export shim なし。`statsRepository.js` はローカル mapper のため変更不要を確認。
+  - dead code 残置なし・依頼外ファイル変更なし。
+  - 既存 videoRepository 系 3 テスト（`videoRepository.test.js` / `videoRepository.membership.test.js` / `videoRepository.archive.test.js`）は無修正 = SQL 意味不変の証跡。
+  - 新規 `videoQueries.test.js` は `createVideoQueries` を直接呼び、`listVisible`（live/upcoming 抽出）/ `listArchive`（channel + period + text 複合フィルタ）/ `searchByText`（LIKE `%`・`_` エスケープ）を focused に検証。
+- 独立 verify（Slice 3 ブランチで Claude Code が再実行）:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（54 files / 487 passed — Codex の主張と一致）
+  - ✅ `npm run build`
+- merge ゲート:
+  - ① セルフ verify: ✅
+  - ② 相互レビュー記録: ✅（本セクション）
+  - ③ 🔴 重大指摘なし: ✅
+  - ④ ユーザー merge 指示: ⏳ 待ち
+- 次アクション:
+  - ユーザー merge 指示後、Slice 2（`feature/phase-c-slice2-refresh-phases`）+ Slice 3 を develop へ束ね merge → v1.22.0。Slice 1 は develop 反映済み。
+
+---
+
 ## 2026-05-29 10:46 完了（Phase C Slice 3: videoRepository query 分離 — Codex 作成）
 
 - 対象: `feature/phase-c-slice3-repo-queries`
