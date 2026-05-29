@@ -1,12 +1,88 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-27
+最終更新: 2026-05-29
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
-status: ready_for_review
+status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-05-29 10:23 レビュー完了（Phase C Slice 1 — Claude Code 作成）
+
+- 対象: `feature/phase-c-main-service-cleanup`
+- 作成者: Claude Code
+- レビュー結論: **想定プラン（spec Slice 1 完成条件 1〜5）を全て満たす。🔴 なし、merge 可（ユーザー判断待ち）**
+- 確認結果:
+  - `videoRecordMapper.js` の `toVideoRecord` / `toRssVideoRecord` は抽出元とバイト一致。挙動不変
+  - `schedulerMaintenance.js` の cleanup interval / 30日・90日 threshold / quota status 判定は元実装と同一。`nowProvider` 注入はテスタビリティ向上の additive 変更で外部挙動に影響なし
+  - 非ゴール遵守: renderer / preload / IPC channel / DB migration / retention policy / YouTube API 呼び出し回数いずれも変更なし。`getQuotaStatus` の公開シグネチャ維持
+  - IPC 4 点対称: 変更なしのため N/A（diag:quotaStatus 経路は不変）
+  - dead code: 置き換え対象の旧定義は schedulerService から除去済み。残置なし
+- 独立 verify（handoff のセルフ申告を再現）:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（52 files / 480 passed）
+  - ✅ `npm run build`
+- レビューで対応した指摘:
+  - 🟡 `schedulerService.js:7` の `export { toVideoRecord } from './videoRecordMapper.js'` は呼び出し元ゼロ（imminentPoller・テストとも mapper を直 import）。後方互換 re-export だが内部コードで dead export のため削除。削除後 lint / test（480 passed）再通過を確認
+- 次アクション:
+  - ユーザー: Phase C Slice 1 の `develop` への merge 可否を判断（merge ゲート ①②③ は充足、④ 待ち）
+  - 以降は Slice 2（refresh phase 分離）→ Slice 3（videoRepository query 整理）
+
+---
+
+## 2026-05-29 10:16 完了（Phase C Slice 1: main サービス層 helper 抽出 — Codex 作成）
+
+- 対象: `feature/phase-c-main-service-cleanup`
+- 作成者: Codex
+- 主題: Phase C の第一スライスとして、`schedulerService` から動画レコード変換と cleanup/quota 状態管理を分離し、後続の refresh phase 分離に備える
+- 触ってよい範囲:
+  - `src/main/services/schedulerService.js`
+  - `src/main/services/imminentPoller.js`
+  - `src/main/services/videoRecordMapper.js`
+  - `src/main/services/schedulerMaintenance.js`
+  - `tests/main/services/videoRecordMapper.test.js`
+  - `tests/main/services/schedulerMaintenance.test.js`
+  - `docs/superpowers/specs/2026-05-27-debt-repayment-roadmap.md`
+  - `docs/superpowers/specs/2026-05-29-phase-c-main-service-cleanup-design.md`
+- 触ってはいけない範囲:
+  - renderer / preload / IPC channel
+  - DB migrations / cleanup retention policy
+  - YouTube API fetcher 呼び出し回数
+  - `videoRepository` SQL の意味変更（Slice 3 に延期）
+- 削除すべきファイル: なし
+- 完成条件:
+  - `refresh()`、RSS-only、playlist refresh、archive backfill、manual add、quota status の外部 API と副作用を維持する
+  - DB schema、IPC contract、YouTube API 呼び出し回数、renderer は変更しない
+  - quota error の握り潰しと記録、通常 error の再 throw、backfill abort を維持する
+  - `schedulerService` / `imminentPoller` / 新規 helper tests と全体 verify を通す
+- IPC 契約:
+  - N/A: request/response channel、preload exposure、renderer 呼び出し、event 発火・購読ペアは変更なし
+- 変更内容:
+  - `videoRecordMapper.js` を追加し、YouTube API detail / RSS entry から DB record への変換を `schedulerService` から抽出
+  - `schedulerMaintenance.js` を追加し、cleanup interval / 30日・90日 retention threshold / quota exceeded metadata 判定を抽出
+  - `imminentPoller` の `toVideoRecord` 依存を `schedulerService` から mapper module へ変更
+  - 後方互換のため `schedulerService.js` から `toVideoRecord` re-export は維持
+  - Phase C spec を追加し、ロードマップの Phase C リンクを更新
+  - helper module の focused unit test を追加
+- セルフ verify:
+  - ✅ `npx vitest run tests/main/services/videoRecordMapper.test.js tests/main/services/schedulerMaintenance.test.js tests/main/services/schedulerService.test.js tests/main/services/imminentPoller.test.js`（4 files / 48 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（52 files / 480 passed）
+  - ✅ `npm run build`
+- 実動確認: N/A（main service helper 抽出のみ。renderer / UI / IPC contract 変更なし）
+- レビュー観点:
+  - `schedulerMaintenance.clearQuotaExceeded()` が従来どおり「記録済みのときだけ空文字で clear」になっているか
+  - `toVideoRecord` re-export を残した判断が後方互換として妥当か
+  - Phase C spec の Slice 2/3 境界が十分に小さいか
+  - 公開 artifact として spec/handoff に不要な個人情報・secret が混入していないか
+- 未解決:
+  - `videoRepository` query 整理は未着手。SQL 意味変更リスクがあるため Slice 3 に延期
+  - `schedulerService.refresh()` の channel/RSS/recheck/orphan phase 分離は Slice 2 に延期
+- 次アクション:
+  - Claude Code: `/cross-review` で Phase C Slice 1 をレビュー。問題なければユーザー判断で merge / v1.22.0 に進める
 
 ---
 
