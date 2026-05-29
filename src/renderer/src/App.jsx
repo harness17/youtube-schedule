@@ -17,6 +17,7 @@ import SimpleModeEmptyScreen from '../components/SimpleModeEmptyScreen.jsx'
 import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
+import { updaterErrorMessage } from './updaterMessages.js'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useStats } from '../hooks/useStats.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
@@ -216,7 +217,7 @@ export default function App() {
     window.api.onUpdateDownloaded(() => setUpdateStatus('ready'))
     window.api.onUpdaterError((msg) => {
       setUpdateStatus(null)
-      setToast(`更新エラー: ${msg}`)
+      setToast(updaterErrorMessage(msg))
     })
   }, [])
 
