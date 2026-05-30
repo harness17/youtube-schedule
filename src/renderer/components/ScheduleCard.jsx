@@ -68,7 +68,9 @@ export default function ScheduleCard({
   showCollectionBadges = false,
   isInPlaylist = false,
   isRemovedFromPlaylist = false,
-  onDeleteFromYoutom
+  onDeleteFromYoutom,
+  onFilterChannel,
+  isChannelFiltered = false
 }) {
   const [expanded, setExpanded] = useState(false)
   const [countdown, setCountdown] = useState(() => formatCountdown(item.scheduledStartTime))
@@ -104,6 +106,12 @@ export default function ScheduleCard({
 
   // お知らせ・お気に入りフラグがある場合はオレンジアクセントを付ける
   const isHighlighted = item.isNotify || item.isFavorite
+
+  // 「このチャンネルのみ」絞り込みボタンのラベル・タイトル（選択中はトグル解除を示す）
+  const channelFilterTitle = isChannelFiltered
+    ? 'このチャンネルの絞り込みを解除'
+    : 'このチャンネルのみ表示'
+  const channelFilterLabel = isChannelFiltered ? 'このチャンネルだけ表示中' : 'このチャンネルのみ'
 
   // カードの枠線カラー
   const borderColor = isLive
@@ -314,6 +322,40 @@ export default function ScheduleCard({
           >
             {item.channelTitle}
           </span>
+          {onFilterChannel && item.channelId && (
+            <button
+              title={channelFilterTitle}
+              onClick={(e) => {
+                e.stopPropagation()
+                onFilterChannel(item.channelId)
+              }}
+              style={{
+                flexShrink: 0,
+                padding: '2px 8px',
+                fontSize: '11px',
+                background: isChannelFiltered
+                  ? darkMode
+                    ? 'rgba(0,194,255,0.18)'
+                    : 'rgba(0,150,200,0.12)'
+                  : darkMode
+                    ? '#1e1e2c'
+                    : '#ebebf5',
+                color: isChannelFiltered ? (darkMode ? '#00c2ff' : '#0099cc') : subColor,
+                border: isChannelFiltered
+                  ? `1px solid ${darkMode ? 'rgba(0,194,255,0.4)' : 'rgba(0,150,200,0.35)'}`
+                  : `1px solid ${darkMode ? '#2a2a38' : '#dddde8'}`,
+                borderRadius: '5px',
+                cursor: 'pointer',
+                lineHeight: '16px',
+                fontWeight: isChannelFiltered ? '600' : 'normal',
+                transition: 'all 0.12s',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              🔍 {channelFilterLabel}
+            </button>
+          )}
           <button
             title={isPinned ? '優先解除' : '優先に設定'}
             onClick={(e) => {
@@ -457,5 +499,7 @@ ScheduleCard.propTypes = {
   showCollectionBadges: PropTypes.bool,
   isInPlaylist: PropTypes.bool,
   isRemovedFromPlaylist: PropTypes.bool,
-  onDeleteFromYoutom: PropTypes.func
+  onDeleteFromYoutom: PropTypes.func,
+  onFilterChannel: PropTypes.func,
+  isChannelFiltered: PropTypes.bool
 }
