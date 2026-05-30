@@ -218,3 +218,42 @@ describe('ScheduleCard', () => {
     expect(screen.queryByTitle('YouTom から削除')).not.toBeInTheDocument()
   })
 })
+
+describe('ScheduleCard チャンネル絞り込みボタン', () => {
+  it('onFilterChannel 指定時に「このチャンネルのみ」ボタンが表示される', () => {
+    render(<ScheduleCard item={mockItem} onFilterChannel={vi.fn()} />)
+    expect(screen.getByTitle('このチャンネルのみ表示')).toBeInTheDocument()
+  })
+
+  it('onFilterChannel 未指定時はボタンが表示されない', () => {
+    render(<ScheduleCard item={mockItem} />)
+    expect(screen.queryByTitle('このチャンネルのみ表示')).not.toBeInTheDocument()
+  })
+
+  it('ボタンクリックで onFilterChannel が channelId 引数で呼ばれる', () => {
+    const onFilterChannel = vi.fn()
+    render(<ScheduleCard item={mockItem} onFilterChannel={onFilterChannel} />)
+    fireEvent.click(screen.getByTitle('このチャンネルのみ表示'))
+    expect(onFilterChannel).toHaveBeenCalledWith(mockItem.channelId)
+  })
+
+  it('isChannelFiltered=true のときタイトルとラベルが解除用に変わる', () => {
+    render(<ScheduleCard item={mockItem} onFilterChannel={vi.fn()} isChannelFiltered={true} />)
+    expect(screen.getByTitle('このチャンネルの絞り込みを解除')).toBeInTheDocument()
+    expect(screen.getByText(/このチャンネルだけ表示中/)).toBeInTheDocument()
+  })
+
+  it('isChannelFiltered=true でもクリックで onFilterChannel が呼ばれる（トグル解除用）', () => {
+    const onFilterChannel = vi.fn()
+    render(
+      <ScheduleCard item={mockItem} onFilterChannel={onFilterChannel} isChannelFiltered={true} />
+    )
+    fireEvent.click(screen.getByTitle('このチャンネルの絞り込みを解除'))
+    expect(onFilterChannel).toHaveBeenCalledWith(mockItem.channelId)
+  })
+
+  it('channelId が無いときはボタンを表示しない', () => {
+    render(<ScheduleCard item={{ ...mockItem, channelId: null }} onFilterChannel={vi.fn()} />)
+    expect(screen.queryByTitle('このチャンネルのみ表示')).not.toBeInTheDocument()
+  })
+})

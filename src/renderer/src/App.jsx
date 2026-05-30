@@ -18,6 +18,7 @@ import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
 import { updaterErrorMessage } from './updaterMessages.js'
+import { isArchiveChannelOnly, toggleArchiveChannelOnly } from './channelFilter.js'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useStats } from '../hooks/useStats.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
@@ -303,6 +304,32 @@ export default function App() {
   const archiveHasActiveFilters =
     archiveFilters.channelIds.length > 0 || archiveFilters.period !== 'all'
 
+  // ===== チャンネル絞り込み（このチャンネルのみ）===============================
+  /**
+   * 配信カードの「このチャンネルのみ」ボタン押下時の絞り込み。
+   * archive タブは archiveFilters.channelIds を単独置換トグル、
+   * それ以外のタブは上部セレクトボックス（selectedChannel）を単独選択トグルする。
+   */
+  function handleFilterChannel(channelId) {
+    if (!channelId) return
+    if (activeTab === 'archive') {
+      setArchiveFilters((f) => ({
+        ...f,
+        channelIds: toggleArchiveChannelOnly(f.channelIds, channelId)
+      }))
+    } else {
+      setSelectedChannel((current) => (current === channelId ? 'all' : channelId))
+    }
+  }
+
+  /** そのチャンネルだけに絞り込み中かどうか（ボタンのハイライト・ラベル切替用） */
+  function isChannelFiltered(channelId) {
+    if (activeTab === 'archive') {
+      return isArchiveChannelOnly(archiveFilters.channelIds, channelId)
+    }
+    return selectedChannel === channelId
+  }
+
   // ===== 共通カード描画ハーネス =================================================
   /**
    * アーカイブ・見逃し・お気に入りタブで共通の ScheduleCard を生成する。
@@ -323,6 +350,8 @@ export default function App() {
         showViewedButton={true}
         isViewed={item.viewedAt != null}
         showDateInTime={true}
+        onFilterChannel={handleFilterChannel}
+        isChannelFiltered={isChannelFiltered(item.channelId)}
         {...extraProps}
       />
     )
@@ -760,7 +789,11 @@ export default function App() {
             </div>
           ) : (
             feedVideos.map((item) =>
-              renderTabCard(item, { showStatusBadge: false, showViewedButton: false })
+              renderTabCard(item, {
+                showStatusBadge: false,
+                showViewedButton: false,
+                onFilterChannel: undefined
+              })
             )
           )}
         </>
@@ -783,6 +816,8 @@ export default function App() {
             onToggleWatch={handleToggleNotify}
             onToggleFavorite={handleToggleFavorite}
             onTogglePin={handleTogglePin}
+            onFilterChannel={handleFilterChannel}
+            isChannelFiltered={isChannelFiltered}
           />
         </>
       )}

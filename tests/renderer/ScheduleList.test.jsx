@@ -173,4 +173,26 @@ describe('ScheduleList', () => {
     expect(screen.getByText('ピックアップ対象の予定・ライブはありません')).toBeInTheDocument()
     expect(screen.queryByText('予定された配信はありません')).not.toBeInTheDocument()
   })
+
+  it('onFilterChannel を渡すと各カードに「このチャンネルのみ」ボタンを中継表示する', () => {
+    render(<ScheduleList live={liveItems} upcoming={upcomingItems} onFilterChannel={vi.fn()} />)
+    expect(screen.getAllByTitle('このチャンネルのみ表示').length).toBe(3)
+  })
+
+  it('onFilterChannel 未指定ならボタンは表示されない', () => {
+    render(<ScheduleList live={liveItems} upcoming={upcomingItems} />)
+    expect(screen.queryByTitle('このチャンネルのみ表示')).not.toBeInTheDocument()
+  })
+
+  it('isChannelFiltered が true を返すチャンネルのカードは解除タイトルになる', () => {
+    render(
+      <ScheduleList
+        live={liveItems}
+        upcoming={upcomingItems}
+        onFilterChannel={vi.fn()}
+        isChannelFiltered={(channelId) => channelId === 'UC1'}
+      />
+    )
+    expect(screen.getAllByTitle('このチャンネルの絞り込みを解除').length).toBe(3)
+  })
 })

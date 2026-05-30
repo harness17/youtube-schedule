@@ -76,7 +76,9 @@ export default function ScheduleList({
   pickupOnly = false,
   onToggleWatch,
   onToggleFavorite,
-  onTogglePin
+  onTogglePin,
+  onFilterChannel,
+  isChannelFiltered = () => false
 }) {
   const displayLive = pickupOnly
     ? live.filter((item) => isPickupItem(item, pinnedChannelIds))
@@ -160,6 +162,8 @@ export default function ScheduleList({
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
+              onFilterChannel={onFilterChannel}
+              isChannelFiltered={isChannelFiltered(item.channelId)}
             />
           ))}
         </div>
@@ -178,6 +182,8 @@ export default function ScheduleList({
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
+              onFilterChannel={onFilterChannel}
+              isChannelFiltered={isChannelFiltered(item.channelId)}
             />
           ))}
         </div>
@@ -196,6 +202,8 @@ export default function ScheduleList({
               onToggleWatch={onToggleWatch}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
+              onFilterChannel={onFilterChannel}
+              isChannelFiltered={isChannelFiltered(item.channelId)}
             />
           ))}
         </div>
@@ -212,5 +220,7 @@ ScheduleList.propTypes = {
   pickupOnly: PropTypes.bool,
   onToggleWatch: PropTypes.func,
   onToggleFavorite: PropTypes.func,
-  onTogglePin: PropTypes.func
+  onTogglePin: PropTypes.func,
+  onFilterChannel: PropTypes.func,
+  isChannelFiltered: PropTypes.func
 }
