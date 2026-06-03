@@ -10,6 +10,50 @@ status: active
 
 ---
 
+## 2026-06-03 20:56 実装完了（Phase A Slice 2 — SettingsModal タブ UI 分割 — Codex 作成）
+
+- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 作成者: Codex
+- 主題: `SettingsModal.jsx` の5タブ描画関数を独立コンポーネントへ分割し、IPC 呼び出しは親コンポーネントに維持。
+- 触ったファイル:
+  - `src/renderer/components/SettingsModal.jsx` — renderXxx 関数を削除し、各 SettingsTab コンポーネント呼び出しへ差し替え。`handleOpenExternal` / `handleResetDatabase` / `handleLogout` と `styles` prop を追加
+  - `src/renderer/components/SettingsTabDisplay.jsx`（新規）— 表示タブ
+  - `src/renderer/components/SettingsTabChannels.jsx`（新規）— チャンネルタブ、`renderChannelRow` はファイル内ローカル関数として移動
+  - `src/renderer/components/SettingsTabData.jsx`（新規）— データタブ
+  - `src/renderer/components/SettingsTabConnection.jsx`（新規）— 接続タブ
+  - `src/renderer/components/SettingsTabAbout.jsx`（新規）— アプリ情報タブ
+  - `tests/renderer/SettingsTabDisplay.test.jsx`（新規）
+  - `tests/renderer/SettingsTabChannels.test.jsx`（新規）
+  - `tests/renderer/SettingsTabData.test.jsx`（新規）
+  - `tests/renderer/SettingsTabConnection.test.jsx`（新規）
+  - `tests/renderer/SettingsTabAbout.test.jsx`（新規）
+- 完成条件:
+  - ✅ 5タブを個別コンポーネントへ分割し、文言・スタイル値・主要構造は旧 JSX を移動
+  - ✅ `SettingsModal.jsx` は 500 行
+  - ✅ `window.api.xxx` 呼び出しは `SettingsModal.jsx` に残し、子は callback props のみ使用
+  - ✅ `renderDisplay` / `renderConnection` / `renderChannels` / `renderChannelRow` / `renderData` / `renderAbout` の関数定義は残存なし
+  - ✅ 各タブの smoke / 代表 interaction test を追加
+- IPC 契約: N/A（renderer component 分割のみ。main handler / preload exposure / event 発火・購読ペアは変更なし）
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（62 files / 528 passed）
+  - ✅ `npm run build`
+  - ✅ `(Get-Content src/renderer/components/SettingsModal.jsx).Count` → 500
+  - ✅ 旧 render 関数名の `Select-String` → 該当なし
+  - ✅ `src/renderer/components/SettingsTab*.jsx` の `window.api` 検索 → 該当なし
+- 実動確認: N/A（UI component 分割のみ。Electron 起動確認は反対側レビューまたは次の UI 実動確認で実施）
+- レビュー観点:
+  - 旧 JSX の文言・スタイル・ボタン挙動が移動前と同等か
+  - `SettingsTabChannels` の flat props が今後の Slice 3/4 で過剰結合にならないか
+  - `SettingsModal.jsx` の 500 行ちょうどが今後の小変更で再超過しないか
+- 未解決:
+  - Codex セッションからの `git add` / `git commit` は `.git/index.lock` 作成が `Permission denied` で失敗。`.git` ACL に Deny があり、変更は未 stage のまま残っている。
+- 次アクション:
+  - ユーザーまたは権限のあるローカル環境: 個別ファイル指定で stage して commit。
+  - Claude Code: Phase A Slice 2 を cross-review。問題なければユーザー判断で次スライスへ進む。
+
+---
+
 ## 2026-06-03 20:21 レビュー完了・merge 済み（Phase A Slice 1 — Claude Code 作成）
 
 - 対象: `feature/phase-a-settings-modal-model` → develop へ merge 完了

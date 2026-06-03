@@ -3,11 +3,15 @@ import PropTypes from 'prop-types'
 import {
   SETTINGS_TAB_KEYS,
   SETTINGS_TABS,
-  getSettingsChannelGroups,
   manualVideoErrorMessage,
   manualVideoSuccessMessage,
   sortSettingsChannels
 } from '../src/settingsModalModel.js'
+import SettingsTabAbout from './SettingsTabAbout.jsx'
+import SettingsTabChannels from './SettingsTabChannels.jsx'
+import SettingsTabConnection from './SettingsTabConnection.jsx'
+import SettingsTabData from './SettingsTabData.jsx'
+import SettingsTabDisplay from './SettingsTabDisplay.jsx'
 
 export default function SettingsModal({
   open,
@@ -52,7 +56,6 @@ export default function SettingsModal({
       setChannels(sortSettingsChannels(chs ?? []))
     })
   }, [open])
-
   if (!open) return null
 
   const textColor = darkMode ? '#e8e8f0' : '#111120'
@@ -100,6 +103,23 @@ export default function SettingsModal({
           })
   })
   const descStyle = { fontSize: '11px', color: subColor, marginTop: '3px' }
+  const styles = {
+    textColor,
+    subColor,
+    bgColor,
+    inputBg,
+    inputBorder,
+    subBtnBg,
+    subBtnColor,
+    sectionLabelStyle,
+    rowStyle,
+    btnStyle,
+    descStyle
+  }
+
+  async function handleOpenExternal(url) {
+    window.api.openExternal(url)
+  }
 
   async function handleAutoDownloadToggle() {
     const next = !autoDownload
@@ -149,6 +169,15 @@ export default function SettingsModal({
     onToast(
       `お気に入りを読み込みました（適用: ${result.applied}件 / スキップ: ${result.skipped}件）`
     )
+  }
+
+  async function handleResetDatabase() {
+    if (!window.confirm('データベースをリセットしますか？この操作は取り消せません。')) {
+      return
+    }
+    await window.api.resetDatabase()
+    onToast('データベースをリセットしました')
+    onClose()
   }
 
   async function handleCheckUpdate() {
@@ -224,6 +253,11 @@ export default function SettingsModal({
     }
   }
 
+  function handleLogout() {
+    onClose()
+    onLogout()
+  }
+
   async function handleAddManualVideo() {
     const input = manualVideoInput.trim()
     if (!input || manualVideoSaving) return
@@ -246,699 +280,79 @@ export default function SettingsModal({
     }
   }
 
-  function renderConnection() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>動作モード</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                {isAuthenticated ? 'フルモードで動作中' : '簡易モードで動作中'}
-              </div>
-              <div style={descStyle}>
-                簡易モードはOAuthなしで手動追加チャンネルをRSS取得します。フルモードはGoogle連携で登録チャンネルを同期します。
-              </div>
-              <button
-                onClick={() =>
-                  window.api.openExternal(
-                    'https://github.com/harness17/youtube-schedule#3-%E3%83%95%E3%83%AB%E3%83%A2%E3%83%BC%E3%83%89%E3%81%A7%E4%BD%BF%E3%81%86%E4%BB%BB%E6%84%8F'
-                  )
-                }
-                style={{
-                  marginTop: '6px',
-                  padding: 0,
-                  background: 'none',
-                  border: 'none',
-                  color: darkMode ? '#8aa8ff' : '#1a73e8',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  fontFamily: 'inherit',
-                  textDecoration: 'underline'
-                }}
-              >
-                簡易モード / フルモードの違いとGoogle認証の注意点を見る ↗
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-              {(() => {
-                // credentials.json の状態を3段階でバッジ表示。詳細エラーは別行に折り返す
-                let label, color, bg, border, dot
-                if (credentialsMissing) {
-                  label = 'credentials.json: 未配置'
-                  color = subColor
-                  bg = subBtnBg
-                  border = inputBorder
-                  dot = '○'
-                } else if (authError) {
-                  label = 'credentials.json: 読み込みエラー'
-                  color = '#cc2222'
-                  bg = darkMode ? 'rgba(200,30,30,0.12)' : '#fff0f0'
-                  border = '#f0c0c0'
-                  dot = '⚠'
-                } else {
-                  label = 'credentials.json: 読み込み済み'
-                  color = darkMode ? '#9ee6b8' : '#148a3b'
-                  bg = darkMode ? 'rgba(60,180,100,0.12)' : 'rgba(60,180,100,0.08)'
-                  border = darkMode ? 'rgba(60,180,100,0.35)' : 'rgba(60,180,100,0.25)'
-                  dot = '●'
-                }
-                return (
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '999px',
-                      fontSize: '11px',
-                      color,
-                      background: bg,
-                      border: `1px solid ${border}`,
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {dot} {label}
-                  </span>
-                )
-              })()}
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  color: isAuthenticated ? (darkMode ? '#9ee6b8' : '#148a3b') : subColor,
-                  background: isAuthenticated
-                    ? darkMode
-                      ? 'rgba(60,180,100,0.12)'
-                      : 'rgba(60,180,100,0.08)'
-                    : subBtnBg,
-                  border: `1px solid ${
-                    isAuthenticated
-                      ? darkMode
-                        ? 'rgba(60,180,100,0.35)'
-                        : 'rgba(60,180,100,0.25)'
-                      : inputBorder
-                  }`,
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {isAuthenticated ? '● Google連携: 認証済み' : '○ Google連携: 未認証'}
-              </span>
-            </div>
-            {!credentialsMissing && authError && (
-              <div
-                style={{
-                  ...descStyle,
-                  color: '#cc2222',
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word'
-                }}
-              >
-                {authError}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button style={btnStyle('secondary')} onClick={handleImportCredentials}>
-                credentials.json を読み込み
-              </button>
-              <button
-                style={btnStyle('primary', { disabled: credentialsMissing || isAuthenticated })}
-                onClick={handleLogin}
-                disabled={credentialsMissing || isAuthenticated}
-              >
-                Google連携
-              </button>
-            </div>
-            {credentialsPath && (
-              <div style={descStyle}>
-                配置先: <code>{credentialsPath}</code>
-              </div>
-            )}
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>アカウント</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                Google アカウントからログアウト
-              </div>
-              <div style={descStyle}>再ログインが必要になります</div>
-            </div>
-            <button
-              style={btnStyle('danger', { disabled: !isAuthenticated })}
-              disabled={!isAuthenticated}
-              onClick={() => {
-                onClose()
-                onLogout()
-              }}
-            >
-              ログアウト
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderDisplay() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>テーマ</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>ダークモード</div>
-              <div style={descStyle}>画面の配色を暗くします</div>
-            </div>
-            <button
-              onClick={() => onDarkModeChange(!darkMode)}
-              style={{
-                padding: '4px 14px',
-                fontSize: '11px',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                background: darkMode ? '#6060c0' : '#ddd',
-                color: darkMode ? 'white' : '#666'
-              }}
-            >
-              {darkMode ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>通知</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>配信開始前の通知</div>
-              <div style={descStyle}>🔔 登録した配信の何分前に通知するかを指定します</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input
-                type="number"
-                min="1"
-                max="1440"
-                step="1"
-                value={reminderMinutes}
-                onChange={(e) => onReminderMinutesChange(e.target.value)}
-                style={{
-                  width: '72px',
-                  padding: '6px 8px',
-                  fontSize: '12px',
-                  background: bgColor,
-                  color: textColor,
-                  border: `1px solid ${inputBorder}`,
-                  borderRadius: '6px',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  textAlign: 'right'
-                }}
-              />
-              <span style={{ color: subColor, fontSize: '12px' }}>分前</span>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>メンバー限定動画</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>メン限動画を一覧に表示しない</div>
-              <div style={descStyle}>
-                🔒 メンバー限定の動画を予定・見逃し・アーカイブ・お気に入りから隠します
-              </div>
-            </div>
-            <button
-              onClick={() => onHideMembershipVideosChange?.(!hideMembershipVideos)}
-              style={{
-                padding: '4px 14px',
-                fontSize: '11px',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                background: hideMembershipVideos ? '#6060c0' : '#ddd',
-                color: hideMembershipVideos ? 'white' : '#666'
-              }}
-            >
-              {hideMembershipVideos ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // チャンネル1行。優先チャンネルリストと手動追加チャンネルリストで共有する。
-  // showDelete=true のときだけ🗑削除ボタンを出す（手動追加チャンネル用）。
-  function renderChannelRow(channel, showDelete) {
-    const { id, title, isPinned } = channel
-    return (
-      <div
-        key={id}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '9px 10px',
-          background: isPinned
-            ? darkMode
-              ? 'rgba(255,201,64,0.08)'
-              : 'rgba(212,144,10,0.06)'
-            : bgColor,
-          border: `1px solid ${
-            isPinned ? (darkMode ? 'rgba(255,201,64,0.24)' : 'rgba(212,144,10,0.22)') : inputBorder
-          }`,
-          borderRadius: '8px'
-        }}
-      >
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: '13px',
-            color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : textColor,
-            fontWeight: isPinned ? '600' : 'normal',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}
-          title={title}
-        >
-          {isPinned && <span style={{ marginRight: '5px' }}>📌</span>}
-          {title}
-        </div>
-        <button
-          onClick={() => handleTogglePin(id)}
-          title={isPinned ? '優先解除' : '優先に設定'}
-          style={{
-            ...btnStyle('secondary'),
-            padding: '5px 12px',
-            background: isPinned
-              ? darkMode
-                ? 'rgba(255,201,64,0.18)'
-                : 'rgba(212,144,10,0.12)'
-              : subBtnBg,
-            color: isPinned ? (darkMode ? '#ffc940' : '#d4900a') : subBtnColor,
-            border: `1px solid ${
-              isPinned ? (darkMode ? 'rgba(255,201,64,0.4)' : 'rgba(212,144,10,0.35)') : inputBorder
-            }`,
-            fontWeight: isPinned ? '600' : 'normal'
-          }}
-        >
-          {isPinned ? '優先中' : '優先'}
-        </button>
-        {showDelete && (
-          <button
-            onClick={() => handleDeleteChannel(id, title)}
-            title="一覧から削除"
-            style={{ ...btnStyle('danger'), padding: '5px 10px' }}
-          >
-            🗑
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  function renderChannels() {
-    const { subscriptionChannels, manualChannels } = getSettingsChannelGroups(
-      channels,
-      channelManagerQuery
-    )
-    const listContainerStyle = {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '6px',
-      maxHeight: '320px',
-      overflowY: 'auto'
-    }
-    const emptyBox = (text) => (
-      <div
-        style={{
-          padding: '12px',
-          borderRadius: '8px',
-          background: bgColor,
-          border: `1px dashed ${inputBorder}`,
-          color: subColor,
-          fontSize: '12px',
-          textAlign: 'center'
-        }}
-      >
-        {text}
-      </div>
-    )
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>メン限動画の手動追加</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                自動取得できない動画を追加して追跡
-              </div>
-              <div style={descStyle}>
-                メンバー限定配信など、RSS・購読では取得できない動画を URL または動画 ID
-                で追加できます。追加にはその動画を視聴できる Google
-                アカウントでのログインが必要です。
-              </div>
-            </div>
-            <input
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=... または 動画ID"
-              value={manualVideoInput}
-              onChange={(e) => setManualVideoInput(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <button
-              style={btnStyle('primary', { disabled: manualVideoSaving })}
-              disabled={manualVideoSaving}
-              onClick={handleAddManualVideo}
-            >
-              {manualVideoSaving ? '追加中...' : '追加'}
-            </button>
-            {manualVideoMessage && (
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: manualVideoMessage.type === 'success' ? '#1e9e54' : '#e8001c'
-                }}
-              >
-                {manualVideoMessage.text}
-              </div>
-            )}
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>優先チャンネル</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                予定・ライブ一覧の上部に表示するチャンネルを管理
-              </div>
-              <div style={descStyle}>
-                Google 連携で同期した購読チャンネルの一覧です。配信カードの 📌
-                ボタンと同じ設定で、ここからまとめて見直せます。
-              </div>
-              {onSyncChannelsNow && (
-                <div style={{ marginTop: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={onSyncChannelsNow}
-                    disabled={isSyncingChannels || !isAuthenticated}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      background: inputBg,
-                      color: textColor,
-                      border: `1px solid ${inputBorder}`,
-                      borderRadius: '6px',
-                      cursor: isSyncingChannels || !isAuthenticated ? 'not-allowed' : 'pointer',
-                      opacity: isSyncingChannels || !isAuthenticated ? 0.5 : 1
-                    }}
-                    title="購読チャンネルを今すぐ再同期（通常は 24h キャッシュ）"
-                  >
-                    {isSyncingChannels ? '同期中…' : '🔄 今すぐ同期'}
-                  </button>
-                  <span style={{ ...descStyle, marginLeft: '8px' }}>
-                    通常は24時間ごとに自動同期されます
-                  </span>
-                </div>
-              )}
-            </div>
-            <input
-              type="text"
-              placeholder="チャンネル名で絞り込み"
-              value={channelManagerQuery}
-              onChange={(e) => setChannelManagerQuery(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <div style={listContainerStyle}>
-              {subscriptionChannels.length > 0
-                ? subscriptionChannels.map((ch) => renderChannelRow(ch, false))
-                : emptyBox('該当するチャンネルがありません')}
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>手動追加チャンネル</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                Google 連携なしで追加・管理するチャンネル
-              </div>
-              <div style={descStyle}>
-                チャンネルページの URL、または @ハンドル名を入力してください。ここで追加した
-                チャンネルは購読同期では消えず、🗑 ボタンで削除できます。
-              </div>
-            </div>
-            <input
-              type="text"
-              placeholder="https://www.youtube.com/@example または @example"
-              value={manualChannelInput}
-              onChange={(e) => setManualChannelInput(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="表示名（任意）"
-              value={manualChannelTitle}
-              onChange={(e) => setManualChannelTitle(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                background: inputBg,
-                color: textColor,
-                border: `1px solid ${inputBorder}`,
-                borderRadius: '8px',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <button
-              style={btnStyle('primary', { disabled: manualChannelSaving })}
-              disabled={manualChannelSaving}
-              onClick={handleAddManualChannel}
-            >
-              {manualChannelSaving ? '追加中...' : '追加'}
-            </button>
-            <div style={listContainerStyle}>
-              {manualChannels.length > 0
-                ? manualChannels.map((ch) => renderChannelRow(ch, true))
-                : emptyBox('手動追加したチャンネルはまだありません')}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderData() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>設定のエクスポート / インポート</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                アプリ設定を JSON で保存・読み込み
-              </div>
-              <div style={descStyle}>含まれる内容: 優先チャンネル（📌）・テーマ設定</div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button style={btnStyle('primary')} onClick={handleExportSettings}>
-                ⬇ エクスポート
-              </button>
-              <button style={btnStyle('secondary')} onClick={handleImportSettings}>
-                ⬆ インポート
-              </button>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>お気に入りのエクスポート / インポート</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>
-                ⭐ お気に入り動画を JSON で保存・復元
-              </div>
-              <div style={descStyle}>
-                動画IDとタイトルを保存。件数が多い場合はファイルサイズに注意
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button style={btnStyle('primary')} onClick={handleExportFavorites}>
-                ⬇ エクスポート
-              </button>
-              <button style={btnStyle('secondary')} onClick={handleImportFavorites}>
-                ⬆ インポート
-              </button>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>データベース</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>⚠️ データベースをリセット</div>
-              <div style={descStyle}>
-                すべての動画・チャンネルデータが削除されます（設定は残ります）
-              </div>
-            </div>
-            <button
-              style={btnStyle('danger')}
-              onClick={async () => {
-                if (!window.confirm('データベースをリセットしますか？この操作は取り消せません。')) {
-                  return
-                }
-                await window.api.resetDatabase()
-                onToast('データベースをリセットしました')
-                onClose()
-              }}
-            >
-              🗑 リセット
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderAbout() {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <div style={sectionLabelStyle}>アップデート確認</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>最新バージョンを確認する</div>
-              <div style={descStyle}>
-                現在: v{appVersion}
-                {updateChecking ? '　確認中...' : ''}
-              </div>
-            </div>
-            <button
-              style={btnStyle('primary', { disabled: updateChecking })}
-              onClick={handleCheckUpdate}
-              disabled={updateChecking}
-            >
-              🔍 今すぐ確認
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>自動アップデート</div>
-          <div style={rowStyle}>
-            <div>
-              <div style={{ color: textColor, fontSize: '13px' }}>起動時に自動でダウンロード</div>
-              <div style={descStyle}>
-                新しいバージョンが見つかると自動でダウンロードします
-                <br />
-                <span style={{ color: darkMode ? '#5555a0' : '#aaaacc' }}>
-                  ※ 変更は次回起動時に反映されます
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleAutoDownloadToggle}
-              style={{
-                padding: '4px 14px',
-                fontSize: '11px',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                background: autoDownload ? '#6060c0' : '#ddd',
-                color: autoDownload ? 'white' : '#666'
-              }}
-            >
-              {autoDownload ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>バージョン情報</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '4px' }}>
-            {[
-              ['アプリ名', 'Youtom'],
-              ['説明', 'YouTube 配信予定ビューア'],
-              ['バージョン', `v${appVersion}`]
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}
-              >
-                <span style={{ color: subColor }}>{label}</span>
-                <span style={{ color: textColor }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>ライセンス</div>
-          <div style={{ ...rowStyle, flexDirection: 'column', gap: '2px' }}>
-            <div style={{ color: textColor, fontSize: '13px' }}>MIT License</div>
-            <div style={descStyle}>Copyright © 2026 harness17</div>
-          </div>
-        </div>
-        <div>
-          <div style={sectionLabelStyle}>リンク</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule')
-              }
-            >
-              GitHub ↗
-            </button>
-            <button
-              style={btnStyle('secondary')}
-              onClick={() =>
-                window.api.openExternal('https://github.com/harness17/youtube-schedule/issues')
-              }
-            >
-              バグ報告 ↗
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const tabContent = {
-    connection: renderConnection,
-    display: renderDisplay,
-    channels: renderChannels,
-    data: renderData,
-    about: renderAbout
+    connection: () => (
+      <SettingsTabConnection
+        darkMode={darkMode}
+        isAuthenticated={isAuthenticated}
+        credentialsMissing={credentialsMissing}
+        credentialsPath={credentialsPath}
+        authError={authError}
+        styles={styles}
+        onImportCredentials={handleImportCredentials}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+        onOpenExternal={handleOpenExternal}
+      />
+    ),
+    display: () => (
+      <SettingsTabDisplay
+        darkMode={darkMode}
+        reminderMinutes={reminderMinutes}
+        hideMembershipVideos={hideMembershipVideos}
+        styles={styles}
+        onDarkModeChange={onDarkModeChange}
+        onReminderMinutesChange={onReminderMinutesChange}
+        onHideMembershipVideosChange={onHideMembershipVideosChange}
+      />
+    ),
+    channels: () => (
+      <SettingsTabChannels
+        darkMode={darkMode}
+        channels={channels}
+        channelManagerQuery={channelManagerQuery}
+        manualChannelInput={manualChannelInput}
+        manualChannelTitle={manualChannelTitle}
+        manualChannelSaving={manualChannelSaving}
+        manualVideoInput={manualVideoInput}
+        manualVideoSaving={manualVideoSaving}
+        manualVideoMessage={manualVideoMessage}
+        isAuthenticated={isAuthenticated}
+        isSyncingChannels={isSyncingChannels}
+        styles={styles}
+        onChannelManagerQueryChange={setChannelManagerQuery}
+        onManualChannelInputChange={setManualChannelInput}
+        onManualChannelTitleChange={setManualChannelTitle}
+        onManualVideoInputChange={setManualVideoInput}
+        onAddManualChannel={handleAddManualChannel}
+        onAddManualVideo={handleAddManualVideo}
+        onTogglePin={handleTogglePin}
+        onDeleteChannel={handleDeleteChannel}
+        onSyncChannelsNow={onSyncChannelsNow}
+      />
+    ),
+    data: () => (
+      <SettingsTabData
+        styles={styles}
+        onExportSettings={handleExportSettings}
+        onImportSettings={handleImportSettings}
+        onExportFavorites={handleExportFavorites}
+        onImportFavorites={handleImportFavorites}
+        onResetDatabase={handleResetDatabase}
+      />
+    ),
+    about: () => (
+      <SettingsTabAbout
+        darkMode={darkMode}
+        appVersion={appVersion}
+        autoDownload={autoDownload}
+        updateChecking={updateChecking}
+        styles={styles}
+        onCheckUpdate={handleCheckUpdate}
+        onAutoDownloadToggle={handleAutoDownloadToggle}
+        onOpenExternal={handleOpenExternal}
+      />
+    )
   }
 
   return (
