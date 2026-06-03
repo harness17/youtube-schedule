@@ -12,6 +12,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
+import { sortSettingsChannels } from '../src/settingsModalModel.js'
 
 // ===== 定数 =====================================================================
 // アーカイブ 1 ページあたりの取得件数。ネットワーク負荷とスクロール体験のバランスで 50 に設定
@@ -363,15 +364,15 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
    * 選択中チャンネルが現タブのデータにない場合でも allDbChannels から補完してドロップダウンに残す。
    */
   const tabChannels = useMemo(() => {
-    const sortFn = (a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-      return a.title.localeCompare(b.title)
-    }
     let channels
     if (activeTab === 'archive') {
-      channels = allDbChannels
-        .map((c) => ({ id: c.id, title: c.title, isPinned: pinnedChannelIds.has(c.id) }))
-        .sort(sortFn)
+      channels = sortSettingsChannels(
+        allDbChannels.map((c) => ({
+          id: c.id,
+          title: c.title,
+          isPinned: pinnedChannelIds.has(c.id)
+        }))
+      )
     } else {
       let source
       if (activeTab === 'schedule') source = [...live, ...upcoming]
@@ -382,9 +383,9 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
       for (const item of source) {
         if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
       }
-      channels = [...map.entries()]
-        .map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
-        .sort(sortFn)
+      channels = sortSettingsChannels(
+        [...map.entries()].map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
+      )
     }
     // タブに配信がない選択中チャンネルをセレクトBOX最上部に補完して選択状態を維持する
     if (selectedChannel !== 'all' && !channels.some((c) => c.id === selectedChannel)) {
