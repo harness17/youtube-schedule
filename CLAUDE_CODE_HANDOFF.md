@@ -1,12 +1,87 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-05-29
+最終更新: 2026-06-03
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-06-03 11:24 完了（Phase A Slice 1: SettingsModal 表示モデル抽出 — Codex 作成）
+
+- 対象: `feature/phase-a-settings-modal-model`
+- 作成者: Codex
+- 主題: Phase A renderer 分割の設計 spec を追加し、最初の小スライスとして `SettingsModal.jsx` からタブ定義・チャンネル分類・手動動画追加メッセージを純粋 helper へ抽出。
+- 触ったファイル:
+  - `docs/superpowers/specs/2026-06-03-phase-a-renderer-split-design.md`（新規）— Phase A の目的、Non-goal、Slice 1〜4、verify を定義
+  - `docs/superpowers/specs/2026-05-27-debt-repayment-roadmap.md` — Phase A spec へのリンク更新
+  - `src/renderer/src/settingsModalModel.js`（新規）— `SETTINGS_TABS` / `SETTINGS_TAB_KEYS` / `sortSettingsChannels` / `getSettingsChannelGroups` / 手動動画メッセージ helper
+  - `src/renderer/components/SettingsModal.jsx` — local helper / 定数を新 model module 参照へ差し替え
+  - `tests/renderer/settingsModalModel.test.js`（新規）— タブキー、並び替え、分類、検索、メッセージ変換の focused test
+- 完成条件:
+  - ✅ Phase A spec を追加し、renderer 分割にスコープ限定
+  - ✅ UI / IPC / DB schema / 設定ファイル形式 / 外部 API 呼び出しは変更なし
+  - ✅ `SettingsModal` の表示モデル helper を純粋関数化し、focused unit test を追加
+  - ✅ 既存 modal の表示文言・操作意味を維持
+- IPC 契約: N/A（renderer 内部 helper 抽出のみ。main handler / preload exposure / renderer IPC 呼び出し / event 発火・購読ペアはいずれも変更なし）
+- セルフ verify:
+  - ✅ `npm run test -- tests/renderer/settingsModalModel.test.js`（1 file / 7 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（57 files / 514 passed）
+  - ✅ `npm run build`
+- 公開アーティファクト確認:
+  - ✅ `public-artifact-privacy.md` を確認
+  - ✅ 追加 spec / 変更 doc / 関連ソースに対し、指定 sensitive pattern の `rg` スキャンで該当なし
+- 実動確認: N/A（UI 表示の意味を変えない renderer helper 抽出のみ。Electron 起動確認は次の UI component 分割スライスで実施推奨）
+- レビュー観点:
+  - `SettingsModal.jsx` の `sortSettingsChannels` 差し替えが元の pinned-first/title-sort と同等か
+  - `getSettingsChannelGroups()` が手動追加チャンネルを検索対象から外す既存挙動を維持しているか
+  - Phase A spec の Slice 2〜4 が十分に小さく、UI component 分割で props 過多にならないか
+- 未解決:
+  - `CLAUDE_CODE_HANDOFF.md` には作業開始前から 2026-05-30 の handoff 追記差分が未コミットで存在。今回の追記では巻き戻していない。
+  - ブランチ作成時、`codex/...` refs はローカル制約で作成できなかったため、repo 既存命名に合わせて `feature/phase-a-settings-modal-model` を使用。
+- 次アクション:
+  - Claude Code: Phase A Slice 1 を cross-review。問題なければユーザー判断で develop へ merge。次スライスは `SettingsModal` の tab UI component 分割。
+
+---
+
+## 2026-05-30 17:52 実装完了（配信カード「このチャンネルのみ」絞り込みボタン — Claude Code 作成）
+
+- 対象: `feature/channel-only-filter`（develop から分岐、commit `5e8f323`）
+- 作成者: Claude Code
+- 主題: 配信カードのチャンネル欄に「🔍 このチャンネルのみ」ボタンを追加。クリックでそのチャンネルだけに絞り込む（上部セレクト/ArchiveFilterBar に反映、同挙動）。
+- 設計 doc: `docs/superpowers/specs/2026-05-29-channel-only-filter-button-design.md`（同ブランチで実態反映済み）
+- 触ってよい範囲: `src/renderer/src/channelFilter.js`, `src/renderer/components/ScheduleCard.jsx`, `src/renderer/components/ScheduleList.jsx`, `src/renderer/src/App.jsx`, `tests/renderer/{channelFilter,ScheduleCard,ScheduleList}.test.*`
+- 触ってはいけない範囲: useTabState のフィルタ状態管理本体、上部セレクトボックス / ArchiveFilterBar の UI、playlist / stats タブ
+- 削除すべきファイル: なし（純粋な機能追加）
+- 完成条件:
+  - schedule/missed/favorites: ボタン押下で `setSelectedChannel` 単独選択トグル → 上部セレクトに反映、`filteredLive/Missed/Favorites` 再計算
+  - archive: ボタン押下で `archiveFilters.channelIds` をそのチャンネル単独へ置換トグル → `[archiveFilters]` effect で `runArchiveSearch` 再検索、ArchiveFilterBar に反映
+  - トグル解除: 選択中カード再押下で all / channelIds 空に戻る
+  - ハイライト: 選択中カードはボタンがハイライト + ラベル「このチャンネルだけ表示中」
+  - 後方互換: feed / playlist / stats はボタン非表示（`onFilterChannel` 未指定）
+  - 既存タブ・既存ボタン（📌/⭐/🔔/✓）を壊さない
+- IPC 契約: N/A（renderer 内で完結。main / preload / IPC / DB / migration の変更なし）
+- 変更内容:
+  - `channelFilter.js`（新規）: `isArchiveChannelOnly` / `toggleArchiveChannelOnly`（archive トグル純粋関数。テスト容易性のため App から抽出）
+  - `ScheduleCard.jsx`: `onFilterChannel` / `isChannelFiltered` props 追加、チャンネル行（📌優先ボタンの左隣）にボタン。`channelId` 無し or `onFilterChannel` 未指定で非表示
+  - `App.jsx`: `handleFilterChannel` / `isChannelFiltered`（activeTab 分岐）、`renderTabCard` と `ScheduleList` に中継、feed は `onFilterChannel: undefined` で抑止
+  - `ScheduleList.jsx`: props 中継（schedule タブ用）
+- セルフ verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（56 files / 507 passed。新規: 純粋関数 8 + ScheduleCard 6 + ScheduleList 3）
+  - ✅ `npm run build`
+- 実動確認: `npm run dev` で boot clean（better-sqlite3 rebuild OK / main・preload・renderer ビルド成功 / electron 起動）。GPU・disk cache の環境ノイズエラーのみ。**クリック→フィルタの目視確認は本環境では不可**（Electron は MCP Playwright 非対応・画面視認不可）→ 自動テスト + コード検査で代替。develop 実行での目視確認を依頼。
+- レビュー観点（Codex 向け）:
+  - App seam（自動テスト外）: `handleFilterChannel` / `isChannelFiltered` の activeTab 分岐、`setSelectedChannel` / `setArchiveFilters` の呼び分けが `filterItem` / `[archiveFilters]` effect と整合するか
+  - feed 抑止: `extraProps` が spread 末尾で `onFilterChannel: undefined` を上書きし、feed でボタンが出ないか
+  - 後方互換: PlaylistTab / StatsTab に `onFilterChannel` を渡していない（ボタン非表示）か
+  - dead code 残置・依頼外変更なし。doc の変更ファイル表が実態と一致（純粋関数抽出で 4 → 実質 5 + テスト 3）
+- 未解決: なし
+- 次アクション: ✅ 2026-05-30 ユーザー目視確認後 develop へ `--no-ff` merge 完了（Codex 事前レビューはユーザー判断でスキップ）。残: origin への push / `feature/channel-only-filter` 削除はユーザー指示待ち
 
 ---
 

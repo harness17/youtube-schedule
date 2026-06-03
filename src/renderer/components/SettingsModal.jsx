@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
-
-const TABS = [
-  { key: 'display', label: '🎨 表示' },
-  { key: 'channels', label: '📌 チャンネル' },
-  { key: 'data', label: '📦 データ' },
-  { key: 'connection', label: '🔌 接続' },
-  { key: 'about', label: 'ℹ️ アプリ情報' }
-]
+import {
+  SETTINGS_TAB_KEYS,
+  SETTINGS_TABS,
+  getSettingsChannelGroups,
+  manualVideoErrorMessage,
+  manualVideoSuccessMessage,
+  sortSettingsChannels
+} from '../src/settingsModalModel.js'
 
 export default function SettingsModal({
   open,
@@ -45,18 +45,11 @@ export default function SettingsModal({
   const [manualVideoSaving, setManualVideoSaving] = useState(false)
   const [manualVideoMessage, setManualVideoMessage] = useState(null)
 
-  function sortChannels(list) {
-    return [...list].sort((a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-      return (a.title ?? '').localeCompare(b.title ?? '', 'ja')
-    })
-  }
-
   useEffect(() => {
     if (!open) return
     window.api.getSetting('autoDownload', true).then(setAutoDownload)
     window.api.listAllChannels?.().then((chs) => {
-      setChannels(sortChannels(chs ?? []))
+      setChannels(sortSettingsChannels(chs ?? []))
     })
   }, [open])
 
@@ -181,7 +174,7 @@ export default function SettingsModal({
 
   async function reloadChannels() {
     const chs = await window.api.listAllChannels?.()
-    setChannels(sortChannels(chs ?? []))
+    setChannels(sortSettingsChannels(chs ?? []))
     onChannelsUpdated?.()
   }
 
@@ -241,20 +234,12 @@ export default function SettingsModal({
       if (result?.ok) {
         setManualVideoMessage({
           type: 'success',
-          text: `「${result.video?.title ?? '動画'}」を追加しました`
+          text: manualVideoSuccessMessage(result.video)
         })
         setManualVideoInput('')
         onChannelsUpdated?.()
       } else {
-        const errorText =
-          {
-            INVALID_INPUT: 'URL または動画 ID の形式が正しくありません',
-            NOT_AUTHENTICATED: 'ログインが必要です。接続タブからログインしてください',
-            NOT_FOUND:
-              '動画が見つかりません。非公開、またはこのアカウントで視聴できない可能性があります',
-            FETCH_FAILED: '取得に失敗しました。時間をおいて再試行してください'
-          }[result?.error] ?? '追加に失敗しました'
-        setManualVideoMessage({ type: 'error', text: errorText })
+        setManualVideoMessage({ type: 'error', text: manualVideoErrorMessage(result?.error) })
       }
     } finally {
       setManualVideoSaving(false)
@@ -576,15 +561,10 @@ export default function SettingsModal({
   }
 
   function renderChannels() {
-    // 購読チャンネル（is_manual=false）と手動追加チャンネル（is_manual=true）を分離して
-    // それぞれ別セクションで管理する。優先リストの絞り込みは購読チャンネルのみ対象。
-    const subscriptionChannels = channels.filter(
-      (c) =>
-        !c.isManual &&
-        (channelManagerQuery === '' ||
-          (c.title ?? '').toLowerCase().includes(channelManagerQuery.toLowerCase()))
+    const { subscriptionChannels, manualChannels } = getSettingsChannelGroups(
+      channels,
+      channelManagerQuery
     )
-    const manualChannels = channels.filter((c) => c.isManual)
     const listContainerStyle = {
       display: 'flex',
       flexDirection: 'column',
@@ -1028,7 +1008,7 @@ export default function SettingsModal({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${TABS.length}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${SETTINGS_TABS.length}, minmax(0, 1fr))`,
             gap: '8px',
             padding: '10px 12px',
             borderBottom: `1px solid ${inputBorder}`,
@@ -1036,7 +1016,7 @@ export default function SettingsModal({
             alignItems: 'stretch'
           }}
         >
-          {TABS.map(({ key, label }) => (
+          {SETTINGS_TABS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -1100,7 +1080,7 @@ SettingsModal.propTypes = {
   onImportCredentials: PropTypes.func.isRequired,
   hideMembershipVideos: PropTypes.bool,
   onHideMembershipVideosChange: PropTypes.func,
-  initialTab: PropTypes.oneOf(['connection', 'display', 'channels', 'data', 'about']),
+  initialTab: PropTypes.oneOf(SETTINGS_TAB_KEYS),
   onSyncChannelsNow: PropTypes.func,
   isSyncingChannels: PropTypes.bool
 }
