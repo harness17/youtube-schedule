@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import PropTypes from 'prop-types'
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
-import ScheduleCard from '../components/ScheduleCard.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
+import TabCard, { FavoriteSection } from '../components/TabCard.jsx'
 import StatsTab from '../components/StatsTab.jsx'
 import PlaylistTab from '../components/PlaylistTab.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
@@ -13,12 +10,19 @@ import SettingsModal from '../components/SettingsModal.jsx'
 import Toast from '../components/Toast.jsx'
 import BackToTop from '../components/BackToTop.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
-import SimpleModeEmptyScreen from '../components/SimpleModeEmptyScreen.jsx'
-import SimpleModeBanner from '../components/SimpleModeBanner.jsx'
+import MissedSectionNav from '../components/MissedSectionNav.jsx'
+import FavoritesSectionNav from '../components/FavoritesSectionNav.jsx'
+import AppTabFeed from '../components/AppTabFeed.jsx'
+import AppTabArchive from '../components/AppTabArchive.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
 import { updaterErrorMessage } from './updaterMessages.js'
-import { isArchiveChannelOnly, toggleArchiveChannelOnly } from './channelFilter.js'
+import { APP_TABS, getVisibleTabs } from './appTabsModel.js'
+import {
+  isArchiveChannelOnly,
+  isSelectedChannelOnly,
+  toggleArchiveChannelOnly
+} from './channelFilter.js'
 import { useSchedule } from '../hooks/useSchedule.js'
 import { useStats } from '../hooks/useStats.js'
 import { useDarkMode } from '../hooks/useDarkMode.js'
@@ -33,37 +37,6 @@ import {
 
 // main.jsx が { ErrorBoundary } を App.jsx からインポートしているため再エクスポート
 export { ErrorBoundary }
-
-function SortableFavoriteCard({ item, reorderMode, cardContent }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !reorderMode
-  })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    display: 'grid',
-    gridTemplateColumns: reorderMode ? '28px minmax(0, 1fr)' : 'minmax(0, 1fr)',
-    gap: '8px',
-    alignItems: 'center'
-  }
-  return (
-    <div ref={setNodeRef} style={style}>
-      {reorderMode && (
-        <div className="yt-drag-handle" {...attributes} {...listeners}>
-          ⠿
-        </div>
-      )}
-      {cardContent}
-    </div>
-  )
-}
-SortableFavoriteCard.propTypes = {
-  item: PropTypes.shape({ id: PropTypes.string.isRequired }).isRequired,
-  reorderMode: PropTypes.bool.isRequired,
-  cardContent: PropTypes.node.isRequired
-}
 
 export default function App() {
   // ===== アプリ全体の UI 状態 ==================================================
@@ -204,7 +177,9 @@ export default function App() {
       handleTabChange('schedule')
     } else if (
       !isAuthenticated &&
-      ['schedule', 'missed', 'archive', 'stats', 'playlist'].includes(activeTab)
+      APP_TABS.filter((t) => t.mode === 'full')
+        .map((t) => t.key)
+        .includes(activeTab)
     ) {
       handleTabChange('feed')
     }
@@ -327,55 +302,24 @@ export default function App() {
     if (activeTab === 'archive') {
       return isArchiveChannelOnly(archiveFilters.channelIds, channelId)
     }
-    return selectedChannel === channelId
+    return isSelectedChannelOnly(selectedChannel, channelId)
   }
 
   // ===== 共通カード描画ハーネス =================================================
-  /**
-   * アーカイブ・見逃し・お気に入りタブで共通の ScheduleCard を生成する。
-   * 新しい prop を追加するときはこの関数のみ更新すれば全タブに反映される。
-   */
-  function renderTabCard(item, extraProps = {}) {
-    return (
-      <ScheduleCard
-        key={item.id}
-        item={item}
-        darkMode={darkMode}
-        watched={item.isNotify}
-        isPinned={pinnedChannelIds.has(item.channelId)}
-        onToggleWatch={handleToggleNotify}
-        onToggleFavorite={handleToggleFavorite}
-        onMarkViewed={handleMarkViewed}
-        onTogglePin={handleTogglePin}
-        showViewedButton={true}
-        isViewed={item.viewedAt != null}
-        showDateInTime={true}
-        onFilterChannel={handleFilterChannel}
-        isChannelFiltered={isChannelFiltered(item.channelId)}
-        {...extraProps}
-      />
-    )
+  const cardCtx = {
+    darkMode,
+    pinnedChannelIds,
+    onToggleWatch: handleToggleNotify,
+    onToggleFavorite: handleToggleFavorite,
+    onMarkViewed: handleMarkViewed,
+    onTogglePin: handleTogglePin,
+    onFilterChannel: handleFilterChannel,
+    isChannelFiltered
   }
 
-  function renderFavoriteSection(sectionItems, onDragEnd) {
-    const sectionIds = sectionItems.map((v) => v.id)
-    return (
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
-          {sectionItems.map((item) => (
-            <SortableFavoriteCard
-              key={item.id}
-              item={item}
-              reorderMode={favoriteReorderMode}
-              cardContent={renderTabCard(item, {
-                showStatusBadge: item.status !== 'ended',
-                showViewedButton: item.status === 'ended'
-              })}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
-    )
+  const favoriteCardCtx = {
+    ...cardCtx,
+    reorderMode: favoriteReorderMode
   }
 
   async function handleStatsTogglePin(channelId) {
@@ -593,32 +537,18 @@ export default function App() {
         }}
       >
         <div className="yt-tabs" style={{ marginBottom: 0 }}>
-          {[
-            { key: 'feed', label: '新着動画', mode: 'simple' },
-            { key: 'schedule', label: '予定・ライブ', mode: 'full' },
-            { key: 'missed', label: '見逃し', mode: 'full' },
-            { key: 'archive', label: 'アーカイブ', mode: 'full' },
-            { key: 'stats', label: '💡 インサイト', mode: 'full' },
-            { key: 'favorites', label: '⭐ お気に入り', mode: 'both' },
-            { key: 'playlist', label: '📂 プレイリスト', mode: 'full' }
-          ]
-            .filter(
-              (tab) =>
-                tab.mode === 'both' ||
-                (isAuthenticated ? tab.mode === 'full' : tab.mode === 'simple')
-            )
-            .map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => handleTabChange(key)}
-                className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
-              >
-                {label}
-                {key === 'missed' && missedBadgeCount > 0 && (
-                  <span className="yt-tab-badge">{missedBadgeCount}</span>
-                )}
-              </button>
-            ))}
+          {getVisibleTabs(isAuthenticated).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => handleTabChange(key)}
+              className={`yt-tab${activeTab === key ? ' yt-tab--active' : ''}`}
+            >
+              {label}
+              {key === 'missed' && missedBadgeCount > 0 && (
+                <span className="yt-tab-badge">{missedBadgeCount}</span>
+              )}
+            </button>
+          ))}
         </div>
         {activeTab === 'schedule' && (
           <button
@@ -642,85 +572,15 @@ export default function App() {
             />
           </div>
         )}
-        {activeTab === 'missed' &&
-          filteredMissed.length > 0 &&
-          (() => {
-            const { upcomingMissed, endedMissed } = missedSections
-            if (upcomingMissed.length === 0 || endedMissed.length === 0) return null
-            return (
-              <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
-                <button
-                  className="yt-nav-btn"
-                  onClick={() =>
-                    document
-                      .getElementById('missed-upcoming')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                >
-                  📅 予定・配信中
-                </button>
-                <button
-                  className="yt-nav-btn"
-                  onClick={() =>
-                    document
-                      .getElementById('missed-ended')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                >
-                  📋 見逃し
-                </button>
-              </div>
-            )
-          })()}
-        {activeTab === 'favorites' &&
-          filteredFavorites.length > 0 &&
-          (() => {
-            const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
-            const sectionCount = [normalFavs, upcomingFavs, viewedFavs].filter(
-              (s) => s.length > 0
-            ).length
-            if (sectionCount < 2) return null
-            return (
-              <div style={{ display: 'flex', gap: '4px', paddingTop: '4px', flexShrink: 0 }}>
-                {upcomingFavs.length > 0 && (
-                  <button
-                    className="yt-nav-btn"
-                    onClick={() =>
-                      document
-                        .getElementById('fav-upcoming')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
-                  >
-                    📅 予定・配信中
-                  </button>
-                )}
-                {normalFavs.length > 0 && (
-                  <button
-                    className="yt-nav-btn"
-                    onClick={() =>
-                      document
-                        .getElementById('fav-normal')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
-                  >
-                    📋 通常
-                  </button>
-                )}
-                {viewedFavs.length > 0 && (
-                  <button
-                    className="yt-nav-btn"
-                    onClick={() =>
-                      document
-                        .getElementById('fav-viewed')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
-                  >
-                    ✅ 視聴済み
-                  </button>
-                )}
-              </div>
-            )
-          })()}
+        {activeTab === 'missed' && (
+          <MissedSectionNav filteredMissed={filteredMissed} missedSections={missedSections} />
+        )}
+        {activeTab === 'favorites' && (
+          <FavoritesSectionNav
+            filteredFavorites={filteredFavorites}
+            favoriteSections={favoriteSections}
+          />
+        )}
         {activeTab === 'favorites' && favoriteVideos.length > 0 && (
           <div
             style={{
@@ -767,36 +627,15 @@ export default function App() {
 
       {/* ── 新着動画タブ（簡易モード） ── */}
       {activeTab === 'feed' && (
-        <>
-          {allDbChannels.length > 0 && (
-            <SimpleModeBanner
-              darkMode={darkMode}
-              onOpenSettings={() => openSettings('connection')}
-            />
-          )}
-          {loading ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              読み込み中...
-            </div>
-          ) : allDbChannels.length === 0 ? (
-            <SimpleModeEmptyScreen
-              darkMode={darkMode}
-              onOpenSettings={() => openSettings('channels')}
-            />
-          ) : feedVideos.length === 0 ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              新着動画はまだありません
-            </div>
-          ) : (
-            feedVideos.map((item) =>
-              renderTabCard(item, {
-                showStatusBadge: false,
-                showViewedButton: false,
-                onFilterChannel: undefined
-              })
-            )
-          )}
-        </>
+        <AppTabFeed
+          feedVideos={feedVideos}
+          allDbChannels={allDbChannels}
+          loading={loading}
+          darkMode={darkMode}
+          subColor={subColor}
+          onOpenSettings={openSettings}
+          cardCtx={cardCtx}
+        />
       )}
 
       {/* ── 予定・ライブタブ ── */}
@@ -851,9 +690,14 @@ export default function App() {
                       >
                         📅 予定・配信中
                       </div>
-                      {upcomingMissed.map((item) =>
-                        renderTabCard(item, { showStatusBadge: true, showViewedButton: false })
-                      )}
+                      {upcomingMissed.map((item) => (
+                        <TabCard
+                          key={item.id}
+                          item={item}
+                          cardCtx={cardCtx}
+                          extraProps={{ showStatusBadge: true, showViewedButton: false }}
+                        />
+                      ))}
                     </>
                   )}
                   {endedMissed.length > 0 && (
@@ -868,9 +712,14 @@ export default function App() {
                       >
                         📋 見逃し
                       </div>
-                      {endedMissed.map((item) =>
-                        renderTabCard(item, { showStatusBadge: false, showViewedButton: true })
-                      )}
+                      {endedMissed.map((item) => (
+                        <TabCard
+                          key={item.id}
+                          item={item}
+                          cardCtx={cardCtx}
+                          extraProps={{ showStatusBadge: false, showViewedButton: true }}
+                        />
+                      ))}
                     </>
                   )}
                 </>
@@ -882,43 +731,17 @@ export default function App() {
 
       {/* ── アーカイブタブ ── */}
       {activeTab === 'archive' && (
-        <div>
-          {tabLoading ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
-              読み込み中...
-            </div>
-          ) : filteredArchive.length === 0 ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '32px' }}>
-              {archiveHasActiveFilters && !searchQuery.trim()
-                ? '条件に一致するアーカイブはありません'
-                : searchQuery.trim() || archiveHasActiveFilters
-                  ? '検索結果がありません'
-                  : 'アーカイブがありません'}
-            </div>
-          ) : (
-            <>
-              {filteredArchive.map((item) => renderTabCard(item))}
-              {archiveHasMore && <div ref={archiveSentinelRef} style={{ height: '1px' }} />}
-              {archiveLoadingMore && (
-                <div style={{ textAlign: 'center', color: subColor, padding: '16px' }}>
-                  読み込み中...
-                </div>
-              )}
-              {!archiveHasMore && filteredArchive.length > 0 && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    color: subColor,
-                    fontSize: '12px',
-                    padding: '16px'
-                  }}
-                >
-                  すべて表示しました
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <AppTabArchive
+          filteredArchive={filteredArchive}
+          tabLoading={tabLoading}
+          archiveHasMore={archiveHasMore}
+          archiveLoadingMore={archiveLoadingMore}
+          archiveSentinelRef={archiveSentinelRef}
+          archiveHasActiveFilters={archiveHasActiveFilters}
+          searchQuery={searchQuery}
+          subColor={subColor}
+          cardCtx={cardCtx}
+        />
       )}
 
       {/* ── 統計タブ ── */}
@@ -968,14 +791,19 @@ export default function App() {
                       >
                         📅 予定・配信中
                       </div>
-                      {renderFavoriteSection(upcomingFavs, ({ active, over }) => {
-                        if (over && active.id !== over.id)
-                          reorderFavorites(
-                            active.id,
-                            over.id,
-                            upcomingFavs.map((v) => v.id)
-                          )
-                      })}
+                      <FavoriteSection
+                        sectionItems={upcomingFavs}
+                        cardCtx={favoriteCardCtx}
+                        sensors={sensors}
+                        onDragEnd={({ active, over }) => {
+                          if (over && active.id !== over.id)
+                            reorderFavorites(
+                              active.id,
+                              over.id,
+                              upcomingFavs.map((v) => v.id)
+                            )
+                        }}
+                      />
                     </>
                   )}
                   {normalFavs.length > 0 && (
@@ -987,14 +815,19 @@ export default function App() {
                       >
                         📋 通常
                       </div>
-                      {renderFavoriteSection(normalFavs, ({ active, over }) => {
-                        if (over && active.id !== over.id)
-                          reorderFavorites(
-                            active.id,
-                            over.id,
-                            normalFavs.map((v) => v.id)
-                          )
-                      })}
+                      <FavoriteSection
+                        sectionItems={normalFavs}
+                        cardCtx={favoriteCardCtx}
+                        sensors={sensors}
+                        onDragEnd={({ active, over }) => {
+                          if (over && active.id !== over.id)
+                            reorderFavorites(
+                              active.id,
+                              over.id,
+                              normalFavs.map((v) => v.id)
+                            )
+                        }}
+                      />
                     </>
                   )}
                   {viewedFavs.length > 0 && (
@@ -1006,14 +839,19 @@ export default function App() {
                       >
                         ✅ 視聴済み
                       </div>
-                      {renderFavoriteSection(viewedFavs, ({ active, over }) => {
-                        if (over && active.id !== over.id)
-                          reorderFavorites(
-                            active.id,
-                            over.id,
-                            viewedFavs.map((v) => v.id)
-                          )
-                      })}
+                      <FavoriteSection
+                        sectionItems={viewedFavs}
+                        cardCtx={favoriteCardCtx}
+                        sensors={sensors}
+                        onDragEnd={({ active, over }) => {
+                          if (over && active.id !== over.id)
+                            reorderFavorites(
+                              active.id,
+                              over.id,
+                              viewedFavs.map((v) => v.id)
+                            )
+                        }}
+                      />
                     </>
                   )}
                 </>

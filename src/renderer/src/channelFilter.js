@@ -2,8 +2,12 @@
  * アーカイブタブのチャンネル絞り込み（archiveFilters.channelIds）に対する
  * 「このチャンネルのみ」トグルの純粋ロジック。
  *
- * 非アーカイブタブは selectedChannel の単純比較で済むため、ここには含めない。
  */
+
+/** 非アーカイブタブでのチャンネル絞り込み判定 */
+export function isSelectedChannelOnly(selectedChannel, channelId) {
+  return selectedChannel === channelId
+}
 
 /** channelIds がそのチャンネル単独だけを選択中かどうか */
 export function isArchiveChannelOnly(channelIds, channelId) {

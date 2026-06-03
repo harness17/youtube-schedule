@@ -10,6 +10,45 @@ status: active
 
 ---
 
+## 2026-06-03 21:26 実装完了（Phase A Slice 3 — App.jsx タブ描画分割 — Codex 作成）
+
+- 対象計画: `docs/plans/2026-06-03-phase-a-slice3-app-tab-split.md`
+- 変更したファイル:
+  - `src/renderer/src/App.jsx`
+  - `src/renderer/src/channelFilter.js`
+  - `src/renderer/src/appTabsModel.js`
+  - `src/renderer/components/SortableFavoriteCard.jsx`
+  - `src/renderer/components/TabCard.jsx`
+  - `src/renderer/components/MissedSectionNav.jsx`
+  - `src/renderer/components/FavoritesSectionNav.jsx`
+  - `src/renderer/components/AppTabFeed.jsx`
+  - `src/renderer/components/AppTabArchive.jsx`
+  - `tests/renderer/channelFilter.test.js`
+  - `tests/renderer/appTabsModel.test.js`
+  - `tests/renderer/TabCard.test.jsx`
+  - `tests/renderer/AppTabFeed.test.jsx`
+  - `tests/renderer/AppTabArchive.test.jsx`
+- 実装概要:
+  - `App.jsx` から `SortableFavoriteCard`、共通 `TabCard`、favorites DnD section、missed/favorites section nav、feed/archive タブ本文を分離。
+  - タブ定義を `appTabsModel.js` に移し、表示タブと認証解除時の full-mode 判定を同じ定義から導出。
+  - `channelFilter.js` に非アーカイブ用の `isSelectedChannelOnly()` を追加し、`App.jsx` の絞り込み判定から利用。
+  - `App.jsx` は 914 行。`function SortableFavoriteCard` / `function renderTabCard` / `function renderFavoriteSection` / インライン feed タブ配列の残存なし。
+- verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（66 files / 542 passed）
+  - ✅ `npm run build`
+  - ✅ `(Get-Content src/renderer/src/App.jsx).Count` → 914
+  - ✅ 旧定義残存チェック 0 件
+- 実動確認:
+  - 未実施。今回の計画 Step 10 は `lint/test/build` と静的残存チェックまでで、Electron 起動確認は含めていない。
+- 注意点:
+  - 計画 Step 2 のテスト文面は `getVisibleTabs(false) === ['feed']` だったが、同じ計画内の `APP_TABS` 設計と既存 `App.jsx` は `favorites` を `mode: 'both'` として未認証時も表示していた。UI 構成変更禁止・既存挙動維持を優先し、テストは `['feed', 'favorites']` にした。
+  - `cardCtx` は計画通り毎 render で組み立てる。React.memo / useMemo 最適化は本スライス対象外。
+- 次アクション:
+  - Claude Code: Slice 3 の cross-review。特に favorites DnD 境界、未認証時 favorites 表示維持判断、抽出コンポーネントの props 境界を確認。
+
+---
+
 ## 2026-06-03 21:00 レビュー完了（Phase A Slice 2 — SettingsModal タブ UI 分割 — Claude Code レビュー）
 
 - レビューア: Claude Code

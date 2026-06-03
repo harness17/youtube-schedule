@@ -1,8 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import {
   isArchiveChannelOnly,
+  isSelectedChannelOnly,
   toggleArchiveChannelOnly
 } from '../../src/renderer/src/channelFilter.js'
+
+describe('isSelectedChannelOnly', () => {
+  it('同じチャンネルが選択中なら true', () => {
+    expect(isSelectedChannelOnly('ch1', 'ch1')).toBe(true)
+  })
+
+  it('別チャンネルが選択中なら false', () => {
+    expect(isSelectedChannelOnly('ch1', 'ch2')).toBe(false)
+  })
+
+  it('all は特定チャンネル選択ではないため false', () => {
+    expect(isSelectedChannelOnly('all', 'ch1')).toBe(false)
+  })
+})
 
 describe('isArchiveChannelOnly', () => {
   it('そのチャンネル単独で選択中なら true', () => {
