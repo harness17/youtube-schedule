@@ -55,6 +55,25 @@ status: active
 
 ---
 
+## 2026-06-04 21:53 レビュー完了（Phase A Slice 4 — useTabState 純粋ヘルパー抽出 — Claude Code レビュー）
+
+- レビュー対象コミット: `f6df756`
+- レビューア: Claude Code
+- レビュー結論: **🔴 重大指摘なし。🟢 全チェック通過**
+- IPC 4 点対称: N/A（renderer 内部の純粋関数抽出のみ）✅
+- dead code 残置: `sortSettingsChannels` / `arrayMove` が `useTabState.js` に残っていないことを確認 ✅
+- public return shape: `useTabState` の return {} を確認、全 key・型・順序変更なし ✅
+- `applyFavoriteReorder` の scope 並び替えロジック: 旧 setState callback と同等 ✅
+- `buildTabChannelList` の selectedChannel 補完・pinned-first sort: 旧 tabChannels useMemo と同等 ✅
+- テスト: 542 → 561（+19 件）。`tabStateHelpers.test.js` の 19 ケースが 5 関数すべてをカバー ✅
+- merge ゲート:
+  - ✅ ① セルフ verify（Codex）+ Claude Code verify
+  - ✅ ② 相互レビュー記録（本セクション）
+  - ✅ ③ 🔴 重大指摘なし
+  - ⏳ ④ ユーザー merge 指示待ち
+
+---
+
 ## 2026-06-04 レビュー完了（Phase A Slice 3 — App.jsx タブ描画分割 — Claude Code レビュー）
 
 - レビュー対象コミット: `8185311`
