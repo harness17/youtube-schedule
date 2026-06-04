@@ -1,12 +1,106 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-06-03
+最終更新: 2026-06-04
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-06-04 21:49 実装完了（Phase A Slice 4 — useTabState 純粋ヘルパー抽出 — Codex 作成）
+
+- 対象計画: `docs/plans/2026-06-04-phase-a-slice4-tabstate-helpers.md`
+- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 作成者: Codex
+- 主題: `useTabState.js` 内の副作用なし計算ロジック 5 点を `tabStateHelpers.js` へ抽出し、focused unit test を追加。
+- 変更したファイル:
+  - `src/renderer/src/tabStateHelpers.js`（新規）
+  - `tests/renderer/tabStateHelpers.test.js`（新規）
+  - `src/renderer/hooks/useTabState.js`
+  - `docs/plans/2026-06-04-phase-a-slice4-tabstate-helpers.md`
+  - `CLAUDE_CODE_HANDOFF.md`
+- 実装概要:
+  - `resolvePeriod` / `groupFavoritesBySection` / `groupMissedBySection` / `buildTabChannelList` / `applyFavoriteReorder` を純粋 helper として抽出。
+  - `useTabState.js` は抽出関数を import して呼び出す形に差し替え。public return shape の key 名・順序・型は変更なし。
+  - `arrayMove` は `useTabState.js` 内で `reorderFavorites` の旧 callback 以外に使用なしを確認し、`tabStateHelpers.js` 側へ import 移動。
+  - `sortSettingsChannels` は `buildTabChannelList` 側へ移動し、`useTabState.js` からの直接 import を削除。
+- 完成条件:
+  - ✅ `src/renderer/src/tabStateHelpers.js` 新規作成
+  - ✅ `tests/renderer/tabStateHelpers.test.js` 新規作成（19 tests）
+  - ✅ `src/renderer/hooks/useTabState.js` が抽出 helper を利用
+  - ✅ `useTabState` の public return shape は変更なし（return ブロックは未変更）
+  - ✅ IPC・UI・既存外部インターフェース変更なし
+  - ✅ lint / test / build 全パス
+- IPC 契約:
+  - N/A: renderer hook 内の純粋計算抽出のみ。main / preload / renderer IPC 呼び出し / event 発火・購読ペアはいずれも変更なし。
+- セルフ verify:
+  - ✅ `npm run test -- tests/renderer/tabStateHelpers.test.js`（1 file / 19 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（67 files / 561 passed）
+  - ✅ `npm run build`
+  - ✅ `Select-String src/renderer/hooks/useTabState.js -Pattern "arrayMove|sortSettingsChannels"` → 該当なし
+- 実動確認:
+  - N/A: UI・IPC・DB 変更なしの renderer helper 抽出。計画の verify は lint/test/build まで。
+- レビュー観点:
+  - `applyFavoriteReorder()` が旧 setState callback と同じ scope 内並び替えを維持しているか。
+  - `buildTabChannelList()` の selectedChannel 補完と pinned-first sort が旧 `tabChannels` useMemo と同等か。
+  - `useTabState` の public return shape に差分がないか。
+- 未解決:
+  - 作業開始時点で `CLAUDE_CODE_HANDOFF.md` は既に modified。今回の追記以外の既存差分は巻き戻していない。
+- 次アクション:
+  - Claude Code: Slice 4 の cross-review。問題なければユーザー判断で次スライスまたは Phase A 完了判断へ進む。
+
+---
+
+## 2026-06-04 レビュー完了（Phase A Slice 3 — App.jsx タブ描画分割 — Claude Code レビュー）
+
+- レビュー対象コミット: `8185311`
+- レビューア: Claude Code
+- レビュー結論: **🔴 重大指摘なし。🟢 全チェック通過**
+
+### IPC 4 点対称チェック
+
+- N/A: 本 Slice は純 renderer 再構成。main / preload は無変更。IPC contract の追加・変更なし。
+
+### dead code 残置チェック
+
+- `function SortableFavoriteCard` / `function renderTabCard` / `function renderFavoriteSection` — App.jsx に 0 件 ✅
+- 旧定義のテストファイルも残置なし ✅
+
+### handoff 完成条件の網羅
+
+- `App.jsx` 914 行（handoff 記載通り）✅
+- `appTabsModel.js`・`channelFilter.js`・7 コンポーネントすべて存在 ✅
+- `getVisibleTabs(false)` が `['feed', 'favorites']` を返す（mode:both の favorites が含まれる）— plan との差異は Codex が handoff に記録済み ✅
+- lint ✅ / test 542 pass ✅ / build ✅
+
+### テスト数の変化
+
+- Slice 2 後: 62 files / 528 tests
+- Slice 3 後: 66 files / 542 tests（+4 files / +14 tests）
+- 追加テスト内訳: appTabsModel (2), channelFilter 追加分 (1), TabCard (3), AppTabFeed (4), AppTabArchive (4) = 14 件。削除すべき旧テストなし（renderTabCard 等は App.jsx 内にテスト対象なし）✅
+
+### 動作観点
+
+- Slice 3 は UI 構成変更なし・IPC なし。Electron 起動確認は Slice 4 以降で UI 変更がある場合に実施する
+- `cardCtx` / `favoriteCardCtx` の分離（reorderMode を favoriteCardCtx にのみ追加）が正しく行われている ✅
+- `TabCard` の `showViewedButton: true` デフォルトは、AppTabFeed が `extraProps={{ showViewedButton: false }}` で上書きしているため feed タブでの表示は正しい ✅
+- `AppTabArchive` の `TabCard` は extraProps 指定なしのため `showViewedButton: true` が引き継がれる（アーカイブタブでは viewed ボタンが必要）✅
+- `FavoriteSection` の `extraProps` で `showStatusBadge` / `showViewedButton` を `item.status` から分岐しているのは正しい ✅
+
+### 軽微所見（merge ブロッカーなし）
+
+- 🟡 `TabCard` の `showViewedButton` デフォルトを `true` にしているため、将来タブが増えた際に意図せず表示されるリスクがある。現時点では feed の extraProps で明示的に `false` を渡しているため問題なし。将来の注意点として残す。
+
+### merge ゲート
+
+- ✅ ① セルフ verify（Codex）+ Claude Code verify
+- ✅ ② 相互レビュー記録（本セクション）
+- ✅ ③ 🔴 重大指摘なし
+- ⏳ ④ ユーザー merge 指示待ち
 
 ---
 

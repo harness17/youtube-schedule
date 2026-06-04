@@ -11,8 +11,13 @@
  * @param {{ live: object[], upcoming: object[], updateVideo: (id, patch) => void }} deps
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { arrayMove } from '@dnd-kit/sortable'
-import { sortSettingsChannels } from '../src/settingsModalModel.js'
+import {
+  applyFavoriteReorder,
+  buildTabChannelList,
+  groupFavoritesBySection,
+  groupMissedBySection,
+  resolvePeriod
+} from '../src/tabStateHelpers.js'
 
 // ===== 定数 =====================================================================
 // アーカイブ 1 ページあたりの取得件数。ネットワーク負荷とスクロール体験のバランスで 50 に設定
@@ -138,18 +143,6 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   function resetArchiveFilters() {
     setArchiveFilters(DEFAULT_ARCHIVE_FILTERS)
     setArchiveSort('newest')
-  }
-
-  // フィルタの period 種別を { periodStart, periodEnd } の epoch ms へ変換する
-  function resolvePeriod(filters) {
-    const dayMs = 24 * 60 * 60 * 1000
-    if (filters.period === 'custom') {
-      return { periodStart: filters.customStart, periodEnd: filters.customEnd }
-    }
-    const presets = { '7d': 7, '30d': 30, '90d': 90 }
-    const days = presets[filters.period]
-    if (!days) return { periodStart: null, periodEnd: null }
-    return { periodStart: Date.now() - days * dayMs, periodEnd: null }
   }
 
   function buildArchiveOptions({ limit = ARCHIVE_LIMIT, offset = 0, query = searchQuery } = {}) {
@@ -293,22 +286,7 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
   }
 
   function reorderFavorites(activeId, overId, scopeIds = null) {
-    setFavoriteVideos((prev) => {
-      const ids = Array.isArray(scopeIds) ? scopeIds : prev.map((v) => v.id)
-      const oldIndex = ids.indexOf(activeId)
-      const newIndex = ids.indexOf(overId)
-      if (oldIndex < 0 || newIndex < 0) return prev
-      const newScopeIds = arrayMove(ids, oldIndex, newIndex)
-      const scopedIndices = prev.reduce((acc, v, i) => {
-        if (ids.includes(v.id)) acc.push(i)
-        return acc
-      }, [])
-      const result = [...prev]
-      newScopeIds.forEach((id, i) => {
-        result[scopedIndices[i]] = prev.find((v) => v.id === id)
-      })
-      return result
-    })
+    setFavoriteVideos((prev) => applyFavoriteReorder(prev, activeId, overId, scopeIds))
     setFavoriteOrderDirty(true)
   }
 
@@ -363,51 +341,29 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
    * ピン済みを先頭に、その後アルファベット/50音順。
    * 選択中チャンネルが現タブのデータにない場合でも allDbChannels から補完してドロップダウンに残す。
    */
-  const tabChannels = useMemo(() => {
-    let channels
-    if (activeTab === 'archive') {
-      channels = sortSettingsChannels(
-        allDbChannels.map((c) => ({
-          id: c.id,
-          title: c.title,
-          isPinned: pinnedChannelIds.has(c.id)
-        }))
-      )
-    } else {
-      let source
-      if (activeTab === 'schedule') source = [...live, ...upcoming]
-      else if (activeTab === 'missed') source = missedVideos
-      else if (activeTab === 'favorites') source = favoriteVideos
-      else source = []
-      const map = new Map()
-      for (const item of source) {
-        if (!map.has(item.channelId)) map.set(item.channelId, item.channelTitle)
-      }
-      channels = sortSettingsChannels(
-        [...map.entries()].map(([id, title]) => ({ id, title, isPinned: pinnedChannelIds.has(id) }))
-      )
-    }
-    // タブに配信がない選択中チャンネルをセレクトBOX最上部に補完して選択状態を維持する
-    if (selectedChannel !== 'all' && !channels.some((c) => c.id === selectedChannel)) {
-      const dbCh = allDbChannels.find((c) => c.id === selectedChannel)
-      if (dbCh) {
-        channels = [
-          { id: dbCh.id, title: dbCh.title, isPinned: pinnedChannelIds.has(dbCh.id) },
-          ...channels
-        ]
-      }
-    }
-    return channels
-  }, [
-    activeTab,
-    live,
-    upcoming,
-    missedVideos,
-    favoriteVideos,
-    pinnedChannelIds,
-    allDbChannels,
-    selectedChannel
-  ])
+  const tabChannels = useMemo(
+    () =>
+      buildTabChannelList({
+        activeTab,
+        live,
+        upcoming,
+        missedVideos,
+        favoriteVideos,
+        pinnedChannelIds,
+        allDbChannels,
+        selectedChannel
+      }),
+    [
+      activeTab,
+      live,
+      upcoming,
+      missedVideos,
+      favoriteVideos,
+      pinnedChannelIds,
+      allDbChannels,
+      selectedChannel
+    ]
+  )
 
   /**
    * 検索ボックスのキーワードに一致するか（schedule タブ用フロントフィルタ）。
@@ -458,36 +414,16 @@ export function useTabState({ live, upcoming, updateVideo, initialTab = 'schedul
    * お気に入りを 予定・配信中(upcoming|live) / 通常(ended+未視聴) / 視聴済み に分類。
    * 各セクション内の順番は favoriteVideos の保存済み順を維持する。
    */
-  const favoriteSections = useMemo(() => {
-    return filteredFavorites.reduce(
-      (acc, item) => {
-        if (item.viewedAt != null) {
-          acc.viewedFavs.push(item)
-        } else if (item.status === 'ended') {
-          acc.normalFavs.push(item)
-        } else {
-          acc.upcomingFavs.push(item)
-        }
-        return acc
-      },
-      { upcomingFavs: [], normalFavs: [], viewedFavs: [] }
-    )
-  }, [filteredFavorites])
+  const favoriteSections = useMemo(
+    () => groupFavoritesBySection(filteredFavorites),
+    [filteredFavorites]
+  )
 
   /**
    * 見逃しを 予定・配信中(upcoming|live) / 見逃し(ended+未視聴) に分類。
    * お気に入りタブと同じセクション表示に使う。
    */
-  const missedSections = useMemo(() => {
-    return filteredMissed.reduce(
-      (acc, item) => {
-        if (item.status === 'ended') acc.endedMissed.push(item)
-        else acc.upcomingMissed.push(item)
-        return acc
-      },
-      { upcomingMissed: [], endedMissed: [] }
-    )
-  }, [filteredMissed])
+  const missedSections = useMemo(() => groupMissedBySection(filteredMissed), [filteredMissed])
 
   // ===== 公開インターフェース ===================================================
   return {
