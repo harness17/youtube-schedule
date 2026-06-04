@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx'
 import ScheduleList from '../components/ScheduleList.jsx'
-import TabCard, { FavoriteSection } from '../components/TabCard.jsx'
 import StatsTab from '../components/StatsTab.jsx'
 import PlaylistTab from '../components/PlaylistTab.jsx'
 import StatusBanners from '../components/StatusBanners.jsx'
@@ -14,6 +13,8 @@ import MissedSectionNav from '../components/MissedSectionNav.jsx'
 import FavoritesSectionNav from '../components/FavoritesSectionNav.jsx'
 import AppTabFeed from '../components/AppTabFeed.jsx'
 import AppTabArchive from '../components/AppTabArchive.jsx'
+import AppTabMissed from '../components/AppTabMissed.jsx'
+import AppTabFavorites from '../components/AppTabFavorites.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
 import youtomLogo from './assets/youtom-logo.svg'
 import { updaterErrorMessage } from './updaterMessages.js'
@@ -663,70 +664,16 @@ export default function App() {
 
       {/* ── 見逃しタブ ── */}
       {activeTab === 'missed' && (
-        <div>
-          {tabLoading ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              読み込み中...
-            </div>
-          ) : filteredMissed.length === 0 ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              {(searchQuery.trim() || selectedChannel !== 'all') && missedVideos.length > 0
-                ? selectedChannel !== 'all' && !searchQuery.trim()
-                  ? 'このチャンネルの配信はありません'
-                  : '検索結果がありません'
-                : '見逃した配信はありません 🎉'}
-            </div>
-          ) : (
-            (() => {
-              const { upcomingMissed, endedMissed } = missedSections
-              return (
-                <>
-                  {upcomingMissed.length > 0 && (
-                    <>
-                      <div
-                        id="missed-upcoming"
-                        className="yt-section-label"
-                        style={{ color: subColor }}
-                      >
-                        📅 予定・配信中
-                      </div>
-                      {upcomingMissed.map((item) => (
-                        <TabCard
-                          key={item.id}
-                          item={item}
-                          cardCtx={cardCtx}
-                          extraProps={{ showStatusBadge: true, showViewedButton: false }}
-                        />
-                      ))}
-                    </>
-                  )}
-                  {endedMissed.length > 0 && (
-                    <>
-                      <div
-                        id="missed-ended"
-                        className="yt-section-label"
-                        style={{
-                          color: subColor,
-                          marginTop: upcomingMissed.length > 0 ? '16px' : 0
-                        }}
-                      >
-                        📋 見逃し
-                      </div>
-                      {endedMissed.map((item) => (
-                        <TabCard
-                          key={item.id}
-                          item={item}
-                          cardCtx={cardCtx}
-                          extraProps={{ showStatusBadge: false, showViewedButton: true }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </>
-              )
-            })()
-          )}
-        </div>
+        <AppTabMissed
+          tabLoading={tabLoading}
+          filteredMissed={filteredMissed}
+          hasMissed={missedVideos.length > 0}
+          searchQuery={searchQuery}
+          selectedChannel={selectedChannel}
+          subColor={subColor}
+          missedSections={missedSections}
+          cardCtx={cardCtx}
+        />
       )}
 
       {/* ── アーカイブタブ ── */}
@@ -762,103 +709,18 @@ export default function App() {
 
       {/* ── お気に入りタブ（区分ごとに保存済みの任意順） ── */}
       {activeTab === 'favorites' && (
-        <div>
-          {tabLoading ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              読み込み中...
-            </div>
-          ) : filteredFavorites.length === 0 ? (
-            <div style={{ textAlign: 'center', color: subColor, marginTop: '48px' }}>
-              {(searchQuery.trim() || selectedChannel !== 'all') && favoriteVideos.length > 0
-                ? selectedChannel !== 'all' && !searchQuery.trim()
-                  ? 'このチャンネルの配信はありません'
-                  : '検索結果がありません'
-                : 'お気に入りはまだありません'}
-            </div>
-          ) : (
-            (() => {
-              const { normalFavs, upcomingFavs, viewedFavs } = favoriteSections
-              const hasAbove = (i) =>
-                [upcomingFavs, normalFavs].slice(0, i).some((s) => s.length > 0)
-              return (
-                <>
-                  {upcomingFavs.length > 0 && (
-                    <>
-                      <div
-                        id="fav-upcoming"
-                        className="yt-section-label"
-                        style={{ color: subColor }}
-                      >
-                        📅 予定・配信中
-                      </div>
-                      <FavoriteSection
-                        sectionItems={upcomingFavs}
-                        cardCtx={favoriteCardCtx}
-                        sensors={sensors}
-                        onDragEnd={({ active, over }) => {
-                          if (over && active.id !== over.id)
-                            reorderFavorites(
-                              active.id,
-                              over.id,
-                              upcomingFavs.map((v) => v.id)
-                            )
-                        }}
-                      />
-                    </>
-                  )}
-                  {normalFavs.length > 0 && (
-                    <>
-                      <div
-                        id="fav-normal"
-                        className="yt-section-label"
-                        style={{ color: subColor, marginTop: hasAbove(1) ? '16px' : 0 }}
-                      >
-                        📋 通常
-                      </div>
-                      <FavoriteSection
-                        sectionItems={normalFavs}
-                        cardCtx={favoriteCardCtx}
-                        sensors={sensors}
-                        onDragEnd={({ active, over }) => {
-                          if (over && active.id !== over.id)
-                            reorderFavorites(
-                              active.id,
-                              over.id,
-                              normalFavs.map((v) => v.id)
-                            )
-                        }}
-                      />
-                    </>
-                  )}
-                  {viewedFavs.length > 0 && (
-                    <>
-                      <div
-                        id="fav-viewed"
-                        className="yt-section-label"
-                        style={{ color: subColor, marginTop: hasAbove(2) ? '16px' : 0 }}
-                      >
-                        ✅ 視聴済み
-                      </div>
-                      <FavoriteSection
-                        sectionItems={viewedFavs}
-                        cardCtx={favoriteCardCtx}
-                        sensors={sensors}
-                        onDragEnd={({ active, over }) => {
-                          if (over && active.id !== over.id)
-                            reorderFavorites(
-                              active.id,
-                              over.id,
-                              viewedFavs.map((v) => v.id)
-                            )
-                        }}
-                      />
-                    </>
-                  )}
-                </>
-              )
-            })()
-          )}
-        </div>
+        <AppTabFavorites
+          tabLoading={tabLoading}
+          filteredFavorites={filteredFavorites}
+          hasFavorites={favoriteVideos.length > 0}
+          searchQuery={searchQuery}
+          selectedChannel={selectedChannel}
+          subColor={subColor}
+          favoriteSections={favoriteSections}
+          favoriteCardCtx={favoriteCardCtx}
+          sensors={sensors}
+          reorderFavorites={reorderFavorites}
+        />
       )}
 
       {/* ── プレイリストタブ（YouTube から YouTom への取り込み専用） ── */}

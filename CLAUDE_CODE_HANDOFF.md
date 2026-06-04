@@ -10,6 +10,55 @@ status: active
 
 ---
 
+## 2026-06-04 22:02 実装完了（Phase A Slice 5 — AppTabMissed / AppTabFavorites 抽出 — Codex 作成）
+
+- 対象計画: `docs/plans/2026-06-04-phase-a-slice5-missed-favorites-tabs.md`
+- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 作成者: Codex
+- 主題: `App.jsx` 内の missed / favorites タブ本文 JSX を独立コンポーネントへ抽出し、focused unit test を追加。
+- 変更したファイル:
+  - `src/renderer/components/AppTabMissed.jsx`（新規）
+  - `src/renderer/components/AppTabFavorites.jsx`（新規）
+  - `tests/renderer/AppTabMissed.test.jsx`（新規）
+  - `tests/renderer/AppTabFavorites.test.jsx`（新規）
+  - `src/renderer/src/App.jsx`
+  - `docs/plans/2026-06-04-phase-a-slice5-missed-favorites-tabs.md`
+  - `CLAUDE_CODE_HANDOFF.md`
+- 実装概要:
+  - missed タブの loading / empty state / upcoming・ended section JSX を `AppTabMissed.jsx` へ移動。
+  - favorites タブの loading / empty state / upcoming・normal・viewed section JSX と section-scoped DnD reorder 呼び出しを `AppTabFavorites.jsx` へ移動。
+  - `App.jsx` の missed / favorites ブロックはコンポーネント呼び出しへ差し替え。App.jsx 側に旧 `<div>` ラッパーは残していない。
+  - タブバー内の `activeTab === 'favorites' && favoriteVideos.length > 0` リオーダーコントロールは未変更。
+- 完成条件:
+  - ✅ `AppTabMissed.jsx` / `AppTabFavorites.jsx` 新規作成
+  - ✅ `AppTabMissed.test.jsx` / `AppTabFavorites.test.jsx` 新規作成（13 tests）
+  - ✅ `App.jsx` が新コンポーネントを呼び出す形に更新
+  - ✅ `App.jsx` 行数 776（800 行以下）
+  - ✅ IPC・UI・既存外部インターフェース変更なし
+  - ✅ lint / test / build 全パス
+- IPC 契約:
+  - N/A: renderer component 抽出のみ。main / preload / renderer IPC 呼び出し / event 発火・購読ペアはいずれも変更なし。
+- セルフ verify:
+  - ✅ `npm run test -- tests/renderer/AppTabMissed.test.jsx tests/renderer/AppTabFavorites.test.jsx`（2 files / 13 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（69 files / 574 passed）
+  - ✅ `npm run build`
+  - ✅ `(Get-Content src/renderer/src/App.jsx).Count` → 776
+  - ✅ `Select-String src/renderer/src/App.jsx -Pattern "TabCard|FavoriteSection|activeTab === 'favorites' && favoriteVideos.length > 0|<AppTabMissed|<AppTabFavorites"` → `TabCard` / `FavoriteSection` import・呼び出し残存なし、リオーダーコントロール条件と新コンポーネント呼び出しを確認
+- 実動確認:
+  - N/A: 計画の verify は lint/test/build まで。UI・IPC・DB 仕様変更なしの renderer component 抽出。
+- レビュー観点:
+  - `App.jsx` 側に missed / favorites の旧 `<div>` ラッパーや旧 inline JSX が残っていないか。
+  - `AppTabFavorites` の各 `onDragEnd` が旧実装と同じ section scope ids を渡しているか。
+  - タブバー内リオーダーコントロールが変更されていないか。
+  - loading / empty state 文言と section label / `TabCard` extraProps が旧実装と同等か。
+- 未解決:
+  - `git add CLAUDE_CODE_HANDOFF.md src/renderer/src/App.jsx src/renderer/components/AppTabMissed.jsx src/renderer/components/AppTabFavorites.jsx tests/renderer/AppTabMissed.test.jsx tests/renderer/AppTabFavorites.test.jsx` は `.git/index.lock` 作成権限不足で失敗。`index.lock` の既存残置はなし。実装・verify は完了しているが、stage / commit は未完了。
+- 次アクション:
+  - ユーザーまたは権限のある環境で上記 6 ファイルを個別指定 stage し、commit 後に Claude Code が Slice 5 の cross-review を行う。
+
+---
+
 ## 2026-06-04 21:49 実装完了（Phase A Slice 4 — useTabState 純粋ヘルパー抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice4-tabstate-helpers.md`
