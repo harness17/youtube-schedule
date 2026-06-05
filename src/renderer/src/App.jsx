@@ -9,6 +9,7 @@ import SettingsModal from '../components/SettingsModal.jsx'
 import Toast from '../components/Toast.jsx'
 import BackToTop from '../components/BackToTop.jsx'
 import UpdateBanner from '../components/UpdateBanner.jsx'
+import AppHeader from '../components/AppHeader.jsx'
 import MissedSectionNav from '../components/MissedSectionNav.jsx'
 import FavoritesSectionNav from '../components/FavoritesSectionNav.jsx'
 import AppTabFeed from '../components/AppTabFeed.jsx'
@@ -16,7 +17,6 @@ import AppTabArchive from '../components/AppTabArchive.jsx'
 import AppTabMissed from '../components/AppTabMissed.jsx'
 import AppTabFavorites from '../components/AppTabFavorites.jsx'
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar.jsx'
-import youtomLogo from './assets/youtom-logo.svg'
 import { updaterErrorMessage } from './updaterMessages.js'
 import { APP_TABS, getVisibleTabs } from './appTabsModel.js'
 import {
@@ -373,60 +373,15 @@ export default function App() {
       <StatusBanners dbBroken={dbBroken} isOffline={isOffline} />
 
       {/* ── ヘッダー行 1: タイトル・更新ボタン・設定 ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '10px',
-          flexWrap: 'wrap'
-        }}
-      >
-        <div className="yt-brand" style={{ flex: 1 }}>
-          <img src={youtomLogo} alt="" className="yt-brand-logo" />
-          <div>
-            <h1 className="yt-display yt-brand-title" style={{ color: textColor }}>
-              Youtom
-              {appVersion && (
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 'normal',
-                    color: subColor,
-                    fontFamily: 'inherit',
-                    letterSpacing: 0
-                  }}
-                >
-                  v{appVersion}
-                </span>
-              )}
-            </h1>
-            <div className="yt-brand-subtitle" style={{ color: subColor }}>
-              YouTube 配信予定ビューア
-            </div>
-          </div>
-        </div>
-        <span
-          onClick={!isAuthenticated ? () => openSettings('connection') : undefined}
-          className={`yt-header-mode${isAuthenticated ? ' yt-header-mode--auth' : ' yt-header-mode--clickable'}`}
-        >
-          {isAuthenticated ? 'フルモード' : '簡易モード'}
-        </span>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="yt-header-btn yt-header-btn--refresh"
-        >
-          {loading ? '更新中...' : '↺ 更新'}
-        </button>
-        <button
-          onClick={() => openSettings('display')}
-          title="設定"
-          className="yt-header-btn yt-header-btn--icon"
-        >
-          ⚙️
-        </button>
-      </div>
+      <AppHeader
+        appVersion={appVersion}
+        isAuthenticated={isAuthenticated}
+        loading={loading}
+        textColor={textColor}
+        subColor={subColor}
+        onRefresh={refresh}
+        onOpenSettings={openSettings}
+      />
 
       {/* ── ヘッダー行 2: キーワード検索・チャンネルフィルター ── */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>

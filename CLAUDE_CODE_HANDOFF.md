@@ -1,12 +1,170 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-06-04
+最終更新: 2026-06-05
 対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-06-05 09:52 レビュー完了（Phase A Slice 5 + Slice 6 — Claude Code レビュー）
+
+- レビュー対象:
+  - Slice 5: commit `81437dd`（missed/favorites タブを `AppTabMissed` / `AppTabFavorites` に抽出）
+  - Slice 6: 未コミット差分（`App.jsx` ヘッダー行 1 を `AppHeader` に抽出 + `AppHeader.jsx` / `AppHeader.test.jsx` 新規）
+- レビューア: Claude Code
+- レビュー結論: **🔴 重大指摘なし。🟢 全チェック通過。merge ゲート ①②③ 充足、④ ユーザー指示待ち**
+
+### IPC 4 点対称チェック
+
+- N/A: Slice 5 / Slice 6 とも純 renderer component 抽出。main handler / preload exposure / renderer IPC 呼び出し / event 発火・購読ペアはいずれも変更なし。
+
+### dead code 残置チェック
+
+- `grep "TabCard|FavoriteSection" src/renderer/src/App.jsx` → 0 件（import・呼び出しとも `AppTabMissed` / `AppTabFavorites` へ移管済み）✅
+- `grep "youtomLogo|yt-brand|yt-header-mode|yt-header-btn" src/renderer/src/App.jsx` → 0 件（旧ヘッダー inline JSX・ロゴ import 残置なし）✅
+- 新規コンポーネント（`AppTabMissed` / `AppTabFavorites` / `AppHeader`）に `window.api` 直呼びなし。IPC は親に残存 ✅
+
+### 逐語抽出の確認（UI 不変の証跡）
+
+- `AppTabMissed.jsx`: loading / empty / sections の 3 分岐を逐語移動。空ステートは `hasMissed`（= `missedVideos.length > 0`）prop で旧ロジックと等価。section label 文言（📅 予定・配信中 / 📋 見逃し）・`TabCard` extraProps（`showStatusBadge` / `showViewedButton`）・`marginTop` 条件まで一致 ✅
+- `AppTabFavorites.jsx`: 3 DnD セクションを逐語移動。各 `onDragEnd` は旧実装と同じ section-scoped id list（`upcomingFavs` / `normalFavs` / `viewedFavs` の `map((v) => v.id)`）を `reorderFavorites` に渡す。`hasAbove` helper・`marginTop` 条件・空ステート（`hasFavorites`）も等価 ✅
+- `AppHeader.jsx`: ヘッダー行 1 を逐語移動。ロゴ import パスを `./assets/...`（App.jsx 基準）→ `../src/assets/...`（components 基準）に正しく調整。クリック挙動（簡易モード→`onOpenSettings('connection')`、設定→`onOpenSettings('display')`、更新→`onRefresh`、`loading` 時 disabled）はすべて旧実装と同じ props 経由 ✅
+
+### handoff 完成条件・触ってはいけない範囲
+
+- タブバー内リオーダーコントロール（↕ 並び替え、`App.jsx:540-574`）は未変更で App.jsx に残存 ✅
+- `favoriteCardCtx` の `reorderMode: favoriteReorderMode`（`App.jsx:323`）も維持 ✅
+- `App.jsx` 行数 731（Slice 6 完成条件と一致）✅
+
+### テスト数の変化
+
+- Slice 4 後: 67 files / 561 tests → Slice 6 後: 70 files / 579 tests（+3 files / +18 tests）
+- 内訳: AppTabMissed (5) + AppTabFavorites (8) + AppHeader (5) = 18 件。削除すべき旧テストなし（抽出元は App.jsx 内 inline JSX でテスト対象外）✅
+- `AppHeader.test.jsx` の 5 ケースが handoff のレビュー観点（簡易モードクリック / 設定クリック / 更新クリック / loading disabled / 表示文言）を網羅 ✅
+
+### 独立 verify（Slice 6 を含む現在の作業ツリーで Claude Code が再実行）
+
+- ✅ `npm run lint`
+- ✅ `npm run test`（70 files / 579 passed — handoff の Slice 6 主張と一致）
+- ✅ `npm run build`
+
+### 軽微所見（merge ブロッカーなし）
+
+- 🟡 旧実装は missed/favorites タブ本文を style/className なしの素の `<div>` でラップしていたが、新コンポーネントは loading/empty を `<div>`、sections を fragment `<>` で返すため、外側ラッパー div が 1 枚減る。当該ラッパーは無スタイルのため視覚・レイアウト影響は実質なし。Slice 5 完成条件で「旧 `<div>` ラッパーが残っていないか」を確認観点としていたため意図通り。renderer 抽出のみで実動確認は N/A だが、merge 後の `npm run dev` で missed/favorites タブの表示崩れがないことを一度確認すると安全。
+
+### merge ゲート
+
+- ✅ ① セルフ verify（Codex）＋ Claude Code 独立 verify
+- ✅ ② 相互レビュー記録（本セクション）
+- ✅ ③ 🔴 重大指摘なし
+- ⏳ ④ ユーザー merge 指示待ち
+
+### 次アクション
+
+- ユーザー: Slice 5（commit 済み）+ Slice 6（未コミット）を develop に確定してよいか判断。
+- Slice 6 は未コミットのため、merge OK が出たら `src/renderer/src/App.jsx` / `src/renderer/components/AppHeader.jsx` / `tests/renderer/AppHeader.test.jsx`（+ 本 handoff 追記）を個別指定で stage → commit が必要。
+
+---
+
+## 2026-06-04 23:02 フェーズ移行（Phase A 完了ゲート — Codex 確認）
+
+- 確認者: Codex
+- 対象フェーズ: `docs/superpowers/specs/2026-06-03-phase-a-renderer-split-design.md`
+- 判断: Phase A は実装スライスとしては完了ゲートへ移行可能。次は追加実装ではなく cross-review / commit / 実動確認 / v1.23.0 リリース判断。
+- 現在の主対象行数:
+  - `src/renderer/components/SettingsModal.jsx` → 500 行（開始時 1106 行想定）
+  - `src/renderer/src/App.jsx` → 731 行（開始時 1040 行想定）
+  - `src/renderer/hooks/useTabState.js` → 481 行（開始時 544 行想定）
+- Phase A 完成条件照合:
+  - ✅ `SettingsModal.jsx` は `settingsModalModel.js` と `SettingsTab*.jsx` に分割済み。
+  - ✅ `App.jsx` は `appTabsModel.js` / `channelFilter.js` / `TabCard.jsx` / `AppTab*.jsx` / `AppHeader.jsx` に分割済み。
+  - ✅ `useTabState.js` は `tabStateHelpers.js` に純粋 helper を抽出済み。
+  - ✅ 抽出した純粋関数・主要コンポーネントに focused unit test あり。
+  - ✅ 最新セルフ verify は Slice 6 で `npm run lint` / `npm run test` / `npm run build` 全パス。
+- IPC 契約:
+  - N/A: Phase A は renderer 分割のみ。main / preload の channel 追加・変更なし。
+- 未完了ゲート:
+  - ⏳ Slice 5 / Slice 6 の Claude Code cross-review。
+  - ⏳ Slice 6 差分の stage / commit（現在 worktree に未コミット差分あり）。
+  - ⏳ 必要なら `npm run dev` で Electron 実動確認。renderer 分割のみだが、v1.23.0 前には推奨。
+  - ⏳ ユーザーによる v1.23.0 リリース判断。
+- 次アクション:
+  - Claude Code: Slice 5 (`81437dd`) と Slice 6 未コミット差分を cross-review。
+  - ユーザー: review 後、commit / release に進めるか判断。
+
+---
+
+## 2026-06-04 22:56 実装完了（Phase A Slice 6 — AppHeader 抽出 — Codex 作成）
+
+- 対象計画: `docs/plans/2026-06-04-phase-a-slice6-app-header.md`
+- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 作成者: Codex
+- 主題: `App.jsx` のヘッダー行 1（ロゴ、アプリ名、バージョン、モード表示、更新、設定）を `AppHeader.jsx` に抽出し、focused unit test を追加。
+- 変更したファイル:
+  - `src/renderer/components/AppHeader.jsx`（新規）
+  - `tests/renderer/AppHeader.test.jsx`（新規）
+  - `src/renderer/src/App.jsx`
+  - `docs/plans/2026-06-04-phase-a-slice6-app-header.md`（新規）
+  - `CLAUDE_CODE_HANDOFF.md`
+- 実装概要:
+  - `AppHeader.jsx` がヘッダー行 1 の既存 JSX / className / inline style を保持。
+  - `App.jsx` は `AppHeader` 呼び出しに差し替え、`youtomLogo` import を削除。
+  - `openSettings('connection')` / `openSettings('display')`、`refresh`、`loading` disabled 条件は旧実装と同じ props 経由にした。
+  - `App.jsx` 行数は 731。
+- 完成条件:
+  - ✅ `AppHeader.jsx` 新規作成
+  - ✅ `AppHeader.test.jsx` 新規作成（5 tests）
+  - ✅ `App.jsx` が `AppHeader` を呼び出す形に更新
+  - ✅ ヘッダー表示文言・クリック時引数・更新ボタン disabled 条件を focused test で確認
+  - ✅ IPC・DB・タブ状態・既存外部インターフェース変更なし
+  - ✅ lint / test / build 全パス
+- IPC 契約:
+  - N/A: renderer header component 抽出のみ。main / preload / renderer IPC 呼び出し / event 発火・購読ペアはいずれも変更なし。
+- セルフ verify:
+  - ✅ `npm run test -- tests/renderer/AppHeader.test.jsx`（1 file / 5 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 579 passed）
+  - ✅ `npm run build`
+  - ✅ `(Get-Content src/renderer/src/App.jsx).Count` → 731
+- 実動確認:
+  - N/A: UI 仕様変更なしの renderer component 抽出。計画の verify は lint/test/build まで。
+- レビュー観点:
+  - `AppHeader` の簡易モードクリックが旧実装同様 `openSettings('connection')` を呼ぶか。
+  - 設定ボタンが旧実装同様 `openSettings('display')` を呼ぶか。
+  - `loading` 時の更新ボタン disabled と表示が旧実装同様か。
+  - `App.jsx` からヘッダー行 1 の旧 inline JSX / `youtomLogo` import が残っていないか。
+- 未解決:
+  - 作業開始時点で `CLAUDE_CODE_HANDOFF.md` は Slice 5 引き継ぎ確認追記により既に modified。今回の追記以外の既存差分は巻き戻していない。
+- 次アクション:
+  - Claude Code: Slice 6 の cross-review。問題なければユーザー判断で次スライスへ進む。
+
+---
+
+## 2026-06-04 22:52 引き継ぎ確認（Phase A Slice 5 — Codex 確認）
+
+- 確認者: Codex
+- 対象コミット: `81437dd`（`refactor: Phase A Slice 5 — missed / favorites タブを AppTabMissed / AppTabFavorites に抽出`）
+- 現在状態:
+  - `develop` 上で Slice 5 はコミット済み。
+  - worktree は本追記前時点で clean。
+  - 直前セクションの `.git/index.lock` / stage 未完了 blocker は現在の repo 状態では解消済み。
+- 追加 verify:
+  - ✅ `npm run test -- tests/renderer/AppTabMissed.test.jsx tests/renderer/AppTabFavorites.test.jsx`（2 files / 13 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（69 files / 574 passed）
+  - ✅ `npm run build`
+- 追加レビュー所見:
+  - 🔴 重大指摘なし。
+  - missed / favorites の旧 inline JSX は新コンポーネント呼び出しへ置き換え済み。
+  - `AppTabFavorites` の各 DnD `onDragEnd` は旧実装と同じ section-local id list を `reorderFavorites()` に渡している。
+  - IPC 契約は N/A（renderer component 抽出のみ）。
+- 次アクション:
+  - Claude Code: `81437dd` を対象に Slice 5 cross-review。
+  - ユーザー: 必要なら本 handoff 追記を commit 対象に含める。
 
 ---
 
