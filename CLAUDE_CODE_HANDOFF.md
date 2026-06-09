@@ -1,6 +1,6 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-06-05
+最終更新: 2026-06-09
 対象リポジトリ: `<repo-root>`
 status: active
 
@@ -16,7 +16,7 @@ status: active
 - 対象コミット:
   - `2d9c437` — 推し別視聴済み率
   - `ed4c1da` — 視聴傾向4指標へ拡張
-- 最終結論: **重大指摘なし。merge可能（ユーザー判断待ち）**
+- 最終結論: **重大指摘なし。2026-06-09にユーザー承認を受けてdevelopへmerge済み**
 - 初回レビュー指摘:
   - favoriteChannels に30日条件がない点
   - 削除済みチャンネルのお気に入りを含む点
@@ -51,7 +51,7 @@ status: active
   - ✅ ① Codexセルフverify
   - ✅ ② Claude Code cross-review
   - ✅ ③ 重大指摘なし
-  - ⏳ ④ ユーザーmerge指示待ち
+  - ✅ ④ ユーザーmerge指示
 
 ---
 
