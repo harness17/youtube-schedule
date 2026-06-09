@@ -4,7 +4,9 @@ const EMPTY_STATS = {
   unwatchedPinned: [],
   silentChannels: [],
   frequencyRanking: [],
-  viewedRates: []
+  viewedRates: [],
+  unviewedBacklog: [],
+  favoriteChannels: []
 }
 
 export function useStats(active) {
@@ -25,7 +27,9 @@ export function useStats(active) {
           unwatchedPinned: data?.unwatchedPinned ?? [],
           silentChannels: data?.silentChannels ?? [],
           frequencyRanking: data?.frequencyRanking ?? [],
-          viewedRates: data?.viewedRates ?? []
+          viewedRates: data?.viewedRates ?? [],
+          unviewedBacklog: data?.unviewedBacklog ?? [],
+          favoriteChannels: data?.favoriteChannels ?? []
         })
       }
     } catch {

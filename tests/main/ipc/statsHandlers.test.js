@@ -30,7 +30,9 @@ describe('statsHandlers', () => {
         unwatchedPinned: [{ id: 'UC1' }],
         silentChannels: [],
         frequencyRanking: [],
-        viewedRates: [{ channelId: 'UC1', viewedRate: 50 }]
+        viewedRates: [{ channelId: 'UC1', viewedRate: 50 }],
+        unviewedBacklog: [{ channelId: 'UC1', unviewedCount: 2 }],
+        favoriteChannels: [{ channelId: 'UC1', favoriteCount: 1 }]
       })
     }
     dbBroken = false
@@ -49,7 +51,9 @@ describe('statsHandlers', () => {
       unwatchedPinned: [{ id: 'UC1' }],
       silentChannels: [],
       frequencyRanking: [],
-      viewedRates: [{ channelId: 'UC1', viewedRate: 50 }]
+      viewedRates: [{ channelId: 'UC1', viewedRate: 50 }],
+      unviewedBacklog: [{ channelId: 'UC1', unviewedCount: 2 }],
+      favoriteChannels: [{ channelId: 'UC1', favoriteCount: 1 }]
     })
   })
 
@@ -61,6 +65,8 @@ describe('statsHandlers', () => {
       silentChannels: [],
       frequencyRanking: [],
       viewedRates: [],
+      unviewedBacklog: [],
+      favoriteChannels: [],
       dbBroken: true
     })
     expect(statsRepo.getChannelActivity).not.toHaveBeenCalled()

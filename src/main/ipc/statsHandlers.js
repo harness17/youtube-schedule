@@ -8,6 +8,8 @@ export function registerStatsHandlers({ getStatsRepo, getDbBroken }) {
         silentChannels: [],
         frequencyRanking: [],
         viewedRates: [],
+        unviewedBacklog: [],
+        favoriteChannels: [],
         dbBroken: true
       }
     }

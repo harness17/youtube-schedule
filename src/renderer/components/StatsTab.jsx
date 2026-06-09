@@ -33,7 +33,37 @@ const SECTIONS = [
   { key: 'unwatched', label: '推し見落とし' },
   { key: 'silent', label: '沈黙チャンネル' },
   { key: 'ranking', label: '配信頻度ランキング' },
-  { key: 'viewedRate', label: '視聴済み率' }
+  { key: 'viewing', label: '視聴傾向' }
+]
+
+const VIEWING_SECTIONS = [
+  { key: 'frequent', label: 'よく見る推し' },
+  { key: 'backlog', label: '未視聴の蓄積' },
+  { key: 'balance', label: '頻度 × 視聴済み率' },
+  { key: 'favorites', label: 'お気に入り傾向' }
+]
+
+const VIEWING_GROUPS = [
+  {
+    key: 'high-high',
+    label: 'よく配信・よく見る',
+    matches: (row) => row.totalCount >= 4 && row.viewedRate >= 50
+  },
+  {
+    key: 'high-low',
+    label: 'よく配信・追えていない',
+    matches: (row) => row.totalCount >= 4 && row.viewedRate < 50
+  },
+  {
+    key: 'low-high',
+    label: '配信少なめ・よく見る',
+    matches: (row) => row.totalCount < 4 && row.viewedRate >= 50
+  },
+  {
+    key: 'low-low',
+    label: '配信少なめ・追えていない',
+    matches: (row) => row.totalCount < 4 && row.viewedRate < 50
+  }
 ]
 
 export default function StatsTab({
@@ -49,6 +79,7 @@ export default function StatsTab({
   syncing = false
 }) {
   const [activeSection, setActiveSection] = useState('unwatched')
+  const [activeViewingSection, setActiveViewingSection] = useState('frequent')
 
   if (loading) return <div className="yt-stats-empty">読み込み中...</div>
   if (error) return <div className="yt-stats-empty">インサイトの読み込みに失敗しました</div>
@@ -57,12 +88,26 @@ export default function StatsTab({
   const silentChannels = stats?.silentChannels ?? []
   const frequencyRanking = stats?.frequencyRanking ?? []
   const viewedRates = stats?.viewedRates ?? []
+  const unviewedBacklog = stats?.unviewedBacklog ?? []
+  const favoriteChannels = stats?.favoriteChannels ?? []
+  const frequentlyViewed = [...viewedRates]
+    .filter((row) => row.viewedCount > 0)
+    .sort(
+      (a, b) =>
+        b.viewedCount - a.viewedCount ||
+        b.viewedRate - a.viewedRate ||
+        b.totalCount - a.totalCount ||
+        a.channelTitle.localeCompare(b.channelTitle, 'ja')
+    )
+  const viewingChannelCount = new Set(
+    [...viewedRates, ...unviewedBacklog, ...favoriteChannels].map((row) => row.channelId)
+  ).size
 
   const counts = {
     unwatched: unwatchedPinned.length,
     silent: silentChannels.length,
     ranking: frequencyRanking.length,
-    viewedRate: viewedRates.length
+    viewing: viewingChannelCount
   }
 
   return (
@@ -213,38 +258,162 @@ export default function StatsTab({
         </section>
       )}
 
-      {activeSection === 'viewedRate' && (
+      {activeSection === 'viewing' && (
         <section className="yt-stats-section">
-          <div className="yt-section-label">推しチャンネル別 視聴済み率</div>
-          <div className="yt-stats-note">
-            直近30日に終了した配信のうち、✓「見た」を付けた割合。低い順に表示
-          </div>
-          {viewedRates.length === 0 ? (
-            <EmptyState>集計対象の終了配信はありません</EmptyState>
-          ) : (
-            <div className="yt-stats-viewed-list">
-              {viewedRates.map((row) => (
-                <button
-                  key={row.channelId}
-                  type="button"
-                  className="yt-stats-viewed-row"
-                  onClick={() => window.api.openExternal?.(row.channelUrl)}
-                  title="YouTube でチャンネルを開く"
-                >
-                  <div className="yt-stats-viewed-header">
-                    <span className="yt-stats-row-title">{row.channelTitle}</span>
-                    <span className="yt-stats-viewed-rate">{row.viewedRate}%</span>
-                  </div>
-                  <div className="yt-stats-viewed-bar" aria-hidden="true">
-                    <span style={{ width: `${row.viewedRate}%` }} />
-                  </div>
-                  <div className="yt-stats-row-meta">
-                    視聴済み {row.viewedCount}件 / 全{row.totalCount}件
-                    {row.unviewedCount > 0 && `（未視聴 ${row.unviewedCount}件）`}
-                  </div>
-                </button>
-              ))}
-            </div>
+          <div className="yt-section-label">チャンネル別 視聴傾向</div>
+          <nav className="yt-stats-trend-nav" aria-label="視聴傾向のセクション">
+            {VIEWING_SECTIONS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                className={`yt-stats-trend-btn${activeViewingSection === key ? ' is-active' : ''}`}
+                onClick={() => setActiveViewingSection(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {activeViewingSection === 'frequent' && (
+            <>
+              <div className="yt-stats-note">推しチャンネルの直近30日。✓「見た」の件数が多い順</div>
+              {frequentlyViewed.length === 0 ? (
+                <EmptyState>視聴済みの推し配信はありません</EmptyState>
+              ) : (
+                <div className="yt-stats-viewed-list">
+                  {frequentlyViewed.map((row) => (
+                    <button
+                      key={row.channelId}
+                      type="button"
+                      className="yt-stats-viewed-row"
+                      onClick={() => window.api.openExternal?.(row.channelUrl)}
+                      title="YouTube でチャンネルを開く"
+                    >
+                      <div className="yt-stats-viewed-header">
+                        <span className="yt-stats-row-title">{row.channelTitle}</span>
+                        <span className="yt-stats-viewed-rate">{row.viewedRate}%</span>
+                      </div>
+                      <div className="yt-stats-viewed-bar" aria-hidden="true">
+                        <span style={{ width: `${row.viewedRate}%` }} />
+                      </div>
+                      <div className="yt-stats-row-meta">
+                        視聴済み {row.viewedCount}件 / 全{row.totalCount}件
+                        {row.unviewedCount > 0 && `（未視聴 ${row.unviewedCount}件）`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeViewingSection === 'backlog' && (
+            <>
+              <div className="yt-stats-note">直近30日の終了配信。✓「見た」がない件数の多い順</div>
+              {unviewedBacklog.length === 0 ? (
+                <EmptyState>未視聴が溜まっているチャンネルはありません</EmptyState>
+              ) : (
+                <div className="yt-stats-viewed-list">
+                  {unviewedBacklog.map((row) => (
+                    <button
+                      key={row.channelId}
+                      type="button"
+                      className="yt-stats-viewed-row"
+                      onClick={() => window.api.openExternal?.(row.channelUrl)}
+                      title="YouTube でチャンネルを開く"
+                    >
+                      <div className="yt-stats-viewed-header">
+                        <span className="yt-stats-row-title">
+                          {row.isPinned && <span className="yt-stats-pin">📌</span>}
+                          {row.channelTitle}
+                        </span>
+                        <span className="yt-stats-viewed-rate">{row.unviewedCount}件</span>
+                      </div>
+                      <div className="yt-stats-row-meta">
+                        最古: {formatDate(row.oldestActivityAt)}
+                        {row.notifyCount > 0 && ` / お知らせ登録 ${row.notifyCount}件`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeViewingSection === 'balance' && (
+            <>
+              <div className="yt-stats-note">
+                推しの直近30日。高頻度は4件以上、よく見るは視聴済み率50%以上
+              </div>
+              {viewedRates.length === 0 ? (
+                <EmptyState>分類対象の推し配信はありません</EmptyState>
+              ) : (
+                <div className="yt-stats-balance-grid">
+                  {VIEWING_GROUPS.map((group) => {
+                    const rows = viewedRates.filter(group.matches)
+                    return (
+                      <div key={group.key} className="yt-stats-balance-group">
+                        <div className="yt-stats-group-title">
+                          <span>{group.label}</span>
+                          <span className="yt-stats-badge">{rows.length}</span>
+                        </div>
+                        {rows.length === 0 ? (
+                          <div className="yt-stats-row yt-stats-row--muted">該当なし</div>
+                        ) : (
+                          rows.map((row) => (
+                            <button
+                              key={row.channelId}
+                              type="button"
+                              className="yt-stats-balance-row"
+                              onClick={() => window.api.openExternal?.(row.channelUrl)}
+                            >
+                              <span className="yt-stats-row-title">{row.channelTitle}</span>
+                              <span className="yt-stats-row-meta">
+                                {row.totalCount}件 / {row.viewedRate}%
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeViewingSection === 'favorites' && (
+            <>
+              <div className="yt-stats-note">
+                DBに保存中のお気に入り件数。保持期間が異なるため割合ではなく件数で表示
+              </div>
+              {favoriteChannels.length === 0 ? (
+                <EmptyState>お気に入り動画はありません</EmptyState>
+              ) : (
+                <div className="yt-stats-viewed-list">
+                  {favoriteChannels.map((row) => (
+                    <button
+                      key={row.channelId}
+                      type="button"
+                      className="yt-stats-viewed-row"
+                      onClick={() => window.api.openExternal?.(row.channelUrl)}
+                      title="YouTube でチャンネルを開く"
+                    >
+                      <div className="yt-stats-viewed-header">
+                        <span className="yt-stats-row-title">
+                          {row.isPinned && <span className="yt-stats-pin">📌</span>}
+                          {row.channelTitle}
+                        </span>
+                        <span className="yt-stats-viewed-rate">{row.favoriteCount}件</span>
+                      </div>
+                      <div className="yt-stats-row-meta">
+                        お気に入り {row.favoriteCount}件 / うち視聴済み {row.viewedCount}件
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -257,7 +426,9 @@ StatsTab.propTypes = {
     unwatchedPinned: PropTypes.array,
     silentChannels: PropTypes.array,
     frequencyRanking: PropTypes.array,
-    viewedRates: PropTypes.array
+    viewedRates: PropTypes.array,
+    unviewedBacklog: PropTypes.array,
+    favoriteChannels: PropTypes.array
   }),
   loading: PropTypes.bool,
   error: PropTypes.string,

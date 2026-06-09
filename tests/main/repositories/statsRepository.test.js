@@ -190,6 +190,96 @@ describe('StatsRepository', () => {
     ])
   })
 
+  it('unviewed backlog counts recent ended streams and excludes invalid records', () => {
+    channels.syncSubscriptions(
+      [
+        { id: 'UC_BACKLOG', title: 'Backlog', uploadsPlaylistId: 'UU_BACKLOG' },
+        { id: 'UC_DELETED', title: 'Deleted', uploadsPlaylistId: 'UU_DELETED' }
+      ],
+      1
+    )
+    channels.togglePin('UC_BACKLOG')
+
+    videos.upsert(
+      sampleVideo({ id: 'b29', channelId: 'UC_BACKLOG', actualStartTime: NOW - 29 * DAY_MS })
+    )
+    videos.upsert(
+      sampleVideo({ id: 'b30', channelId: 'UC_BACKLOG', actualStartTime: NOW - 30 * DAY_MS })
+    )
+    videos.toggleNotify('b30')
+    videos.upsert(
+      sampleVideo({ id: 'b31', channelId: 'UC_BACKLOG', actualStartTime: NOW - 31 * DAY_MS })
+    )
+    videos.upsert(sampleVideo({ id: 'viewed', channelId: 'UC_BACKLOG' }))
+    videos.markViewed('viewed', NOW)
+    videos.upsert(
+      sampleVideo({
+        id: 'upcoming-backlog',
+        channelId: 'UC_BACKLOG',
+        status: 'upcoming',
+        actualStartTime: null,
+        scheduledStartTime: NOW + DAY_MS
+      })
+    )
+    videos.upsert(
+      sampleVideo({
+        id: 'upload-backlog',
+        channelId: 'UC_BACKLOG',
+        actualStartTime: null,
+        scheduledStartTime: null,
+        publishedAt: NOW - DAY_MS
+      })
+    )
+    videos.upsert(sampleVideo({ id: 'deleted-video', channelId: 'UC_DELETED' }))
+    channels.delete('UC_DELETED')
+
+    expect(stats.getChannelActivity(NOW).unviewedBacklog).toEqual([
+      expect.objectContaining({
+        channelId: 'UC_BACKLOG',
+        unviewedCount: 2,
+        notifyCount: 1,
+        oldestActivityAt: NOW - 30 * DAY_MS,
+        isPinned: true
+      })
+    ])
+  })
+
+  it('favorite channels count saved videos and sort by favorite then viewed count', () => {
+    channels.syncSubscriptions(
+      [
+        { id: 'UC_FAV_A', title: 'Favorite A', uploadsPlaylistId: 'UU_A' },
+        { id: 'UC_FAV_B', title: 'Favorite B', uploadsPlaylistId: 'UU_B' }
+      ],
+      1
+    )
+    channels.togglePin('UC_FAV_A')
+
+    videos.upsert(sampleVideo({ id: 'fa1', channelId: 'UC_FAV_A' }))
+    videos.upsert(sampleVideo({ id: 'fa2', channelId: 'UC_FAV_A' }))
+    videos.upsert(sampleVideo({ id: 'not-favorite', channelId: 'UC_FAV_A' }))
+    videos.upsert(sampleVideo({ id: 'fb1', channelId: 'UC_FAV_B' }))
+    videos.toggleFavorite('fa1')
+    videos.toggleFavorite('fa2')
+    videos.toggleFavorite('fb1')
+    videos.markViewed('fa1', NOW)
+    videos.markViewed('fb1', NOW)
+
+    expect(stats.getChannelActivity(NOW).favoriteChannels).toEqual([
+      expect.objectContaining({
+        channelId: 'UC_FAV_A',
+        favoriteCount: 2,
+        viewedCount: 1,
+        isPinned: true
+      }),
+      expect.objectContaining({
+        channelId: 'UC_FAV_B',
+        favoriteCount: 1,
+        viewedCount: 1,
+        isPinned: false
+      })
+    ])
+  })
+
   it('classifies silent channels as pinned, manual, and other', () => {
     channels.syncSubscriptions(
       [

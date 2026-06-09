@@ -10,6 +10,65 @@ status: active
 
 ---
 
+## 2026-06-09 18:15 実装完了（v1.24 視聴傾向4指標 — Codex 作成）
+
+- 対象: `codex/insight-viewed-rate`
+- 作成者: Codex
+- 設計仕様: `docs/superpowers/specs/2026-06-09-v1.24-viewing-insights.md`
+- 主題: 既存「視聴済み率」を「視聴傾向」へ拡張し、4つのチャンネル分析を追加
+- 追加した分析:
+  - よく見る推し: 現在推し、直近30日の終了配信を視聴済み件数順で表示
+  - 未視聴の蓄積: 現行チャンネルの直近30日未視聴件数、通知件数、最古日を表示
+  - 頻度 x 視聴済み率: 4件以上 / 50%以上を境界に推しを4分類
+  - お気に入り傾向: DBに保持されるお気に入り件数と視聴済み件数をチャンネル別表示
+- データ設計:
+  - 既存 `viewedRates` を「よく見る推し」と「頻度 x 視聴済み率」で再利用
+  - `stats:channelActivity` に `unviewedBacklog` / `favoriteChannels` を追加
+  - 新規IPC channel、DB migration、API呼び出し、OAuth scope追加なし
+  - お気に入りは非お気に入りとの保持期間差があるため、割合を算出せず保存件数のみ表示
+- UI:
+  - 上位サブナビは4項目を維持し、「視聴済み率」を「視聴傾向」へ変更
+  - 視聴傾向内に4つの小タブを追加
+  - 上位件数バッジは3集計間で重複しないユニークチャンネル数
+  - 頻度 x 視聴済み率は2列、900px以下では1列
+- 変更したファイル:
+  - `docs/superpowers/specs/2026-06-09-v1.24-viewing-insights.md`
+  - `src/main/repositories/statsRepository.js`
+  - `src/main/ipc/statsHandlers.js`
+  - `src/renderer/hooks/useStats.js`
+  - `src/renderer/components/StatsTab.jsx`
+  - `src/renderer/src/assets/main.css`
+  - `tests/main/repositories/statsRepository.test.js`
+  - `tests/main/ipc/statsHandlers.test.js`
+  - `tests/renderer/StatsTab.test.jsx`
+- テスト:
+  - 未視聴の30日境界、通知件数、通常動画 / upcoming / 論理削除除外
+  - お気に入り対象・非対象、保存数 / 視聴済み数、並び順
+  - よく見る推しの件数順、視聴済み0件除外
+  - 頻度4件、視聴済み率50%の4分類境界
+  - 小タブ切替、empty state、外部リンク
+- IPC契約:
+  - main handler / preload / renderer: 既存 `stats:channelActivity` / `getChannelActivityStats()` を拡張
+  - event発火・購読: N/A。既存 `schedule:updated` で再取得
+- セルフverify:
+  - ✅ focused test（3 files / 22 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 585 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - sandbox内では `userData/config.json` の読取権限で停止
+  - ✅ 通常権限の `npm run dev` ではYouTom Electronプロセスが継続稼働し、実データ環境の起動を確認
+  - GUIの各小タブ目視はClaude Code / ユーザー確認待ち
+- 残リスク:
+  - `viewed_at` は実視聴自動検出ではなく✓操作
+  - 4件 / 50%の分類閾値は初期値。利用感により将来調整余地あり
+  - `StatsTab.jsx` の表示責務が増えたため、次の大幅追加時は視聴傾向部分のコンポーネント抽出を検討
+- 次アクション:
+  - Claude Code: cross-reviewと実画面確認。SQL母集団、保持ポリシー、4小タブの幅を重点確認
+  - ユーザー: 重大指摘解消後にdevelop統合を判断
+
+---
+
 ## 2026-06-09 17:45 実装完了（v1.24 インサイト強化 — 推し別視聴済み率 — Codex 作成）
 
 - 対象: `codex/insight-viewed-rate` / `H:/ClaudeCode/Youtube/youtube-schedule`
