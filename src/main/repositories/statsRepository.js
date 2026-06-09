@@ -52,6 +52,21 @@ function rowToRanking(row) {
   }
 }
 
+function rowToViewedRate(row) {
+  const totalCount = row.total_count
+  const viewedCount = row.viewed_count
+  return {
+    channelId: row.channel_id,
+    channelTitle: row.channel_title ?? row.channel_id,
+    totalCount,
+    viewedCount,
+    unviewedCount: totalCount - viewedCount,
+    viewedRate: Math.round((viewedCount / totalCount) * 100),
+    lastActivityAt: row.last_activity_at ?? null,
+    channelUrl: `https://www.youtube.com/channel/${row.channel_id}`
+  }
+}
+
 export function createStatsRepository(db) {
   // 配信（ライブ・プレミア）のみを対象にする。通常の動画投稿は actual_start_time も
   // scheduled_start_time も持たないため、いずれかが NULL でない行が livestreaming 由来。
@@ -113,6 +128,28 @@ export function createStatsRepository(db) {
     LIMIT 20
   `)
 
+  const viewedRateStmt = db.prepare(`
+    SELECT
+      v.channel_id,
+      COALESCE(c.title, v.channel_title) AS channel_title,
+      COUNT(*) AS total_count,
+      SUM(CASE WHEN v.viewed_at IS NOT NULL THEN 1 ELSE 0 END) AS viewed_count,
+      MAX(${LIVE_ACTIVITY_AT}) AS last_activity_at
+    FROM videos v
+    JOIN channels c ON c.id = v.channel_id
+    WHERE c.deleted_at IS NULL
+      AND c.is_pinned = 1
+      AND v.status = 'ended'
+      AND ${IS_LIVESTREAM}
+      AND ${LIVE_ACTIVITY_AT} >= @since
+      AND ${LIVE_ACTIVITY_AT} <= @now
+    GROUP BY v.channel_id
+    ORDER BY
+      CAST(SUM(CASE WHEN v.viewed_at IS NOT NULL THEN 1 ELSE 0 END) AS REAL) / COUNT(*) ASC,
+      total_count DESC,
+      channel_title COLLATE NOCASE ASC
+  `)
+
   return {
     getChannelActivity(now = Date.now()) {
       const unwatchedPinned = unwatchedPinnedStmt.all({ since: now - 30 * DAY_MS }).map(rowToVideo)
@@ -122,8 +159,9 @@ export function createStatsRepository(db) {
       const frequencyRanking = frequencyRankingStmt
         .all({ since: now - 90 * DAY_MS })
         .map(rowToRanking)
+      const viewedRates = viewedRateStmt.all({ since: now - 30 * DAY_MS, now }).map(rowToViewedRate)
 
-      return { unwatchedPinned, silentChannels, frequencyRanking }
+      return { unwatchedPinned, silentChannels, frequencyRanking, viewedRates }
     }
   }
 }

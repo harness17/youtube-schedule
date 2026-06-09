@@ -674,6 +674,58 @@ body {
   font-weight: 700;
 }
 
+.yt-stats-viewed-list {
+  display: grid;
+  gap: 6px;
+}
+
+.yt-stats-viewed-row {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yt-stats-viewed-row:hover {
+  background: var(--surface2);
+}
+
+.yt-stats-viewed-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-stats-viewed-header .yt-stats-row-title {
+  flex: 1;
+}
+
+.yt-stats-viewed-rate {
+  color: var(--upcoming);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.yt-stats-viewed-bar {
+  height: 6px;
+  margin: 8px 0 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--btn-bg);
+}
+
+.yt-stats-viewed-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--upcoming);
+}
+
 /* ===== STATUS BANNERS ===== */
 .status-banners {
   margin-bottom: 10px;

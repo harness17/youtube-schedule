@@ -5,7 +5,8 @@ import StatsTab from '../../src/renderer/components/StatsTab.jsx'
 const baseStats = {
   unwatchedPinned: [],
   silentChannels: [],
-  frequencyRanking: []
+  frequencyRanking: [],
+  viewedRates: []
 }
 
 beforeEach(() => {
@@ -33,6 +34,9 @@ describe('StatsTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /配信頻度ランキング/ }))
     expect(screen.getByText('ランキング対象の配信はありません')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /視聴済み率/ }))
+    expect(screen.getByText('集計対象の終了配信はありません')).toBeInTheDocument()
   })
 
   it('shows sync-now button in silent section and calls onSyncNow', () => {
@@ -93,6 +97,17 @@ describe('StatsTab', () => {
               isPinned: true,
               channelUrl: 'https://www.youtube.com/channel/UC_PIN'
             }
+          ],
+          viewedRates: [
+            {
+              channelId: 'UC_PIN',
+              channelTitle: 'Pinned Channel',
+              totalCount: 4,
+              viewedCount: 3,
+              unviewedCount: 1,
+              viewedRate: 75,
+              channelUrl: 'https://www.youtube.com/channel/UC_PIN'
+            }
           ]
         }}
       />
@@ -113,5 +128,14 @@ describe('StatsTab', () => {
     expect(screen.getByText('3件')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Pinned Channel/ }))
     expect(window.api.openExternal).toHaveBeenCalledWith('https://www.youtube.com/channel/UC_PIN')
+
+    // 視聴済み率へ切り替えて集計とリンクを確認
+    fireEvent.click(screen.getByRole('button', { name: /視聴済み率/ }))
+    expect(screen.getByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('視聴済み 3件 / 全4件（未視聴 1件）')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Pinned Channel/ }))
+    expect(window.api.openExternal).toHaveBeenLastCalledWith(
+      'https://www.youtube.com/channel/UC_PIN'
+    )
   })
 })

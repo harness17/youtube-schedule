@@ -10,6 +10,62 @@ status: active
 
 ---
 
+## 2026-06-09 17:45 実装完了（v1.24 インサイト強化 — 推し別視聴済み率 — Codex 作成）
+
+- 対象: `codex/insight-viewed-rate` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 作成者: Codex
+- 主題: 現在推しに設定されているチャンネルについて、直近30日に終了した配信の視聴済みマーク率をインサイトへ追加
+- 完成条件:
+  - ✅ 直近30日に終了したライブ・プレミアだけを集計
+  - ✅ `viewed_at IS NOT NULL` を視聴済みとして、全件・視聴済み・未視聴・整数率を返す
+  - ✅ 率の低い順、同率なら配信数の多い順に表示
+  - ✅ 母数0のチャンネルは一覧に出さず、空状態を表示
+  - ✅ API呼び出し・OAuth scope・DB migrationの追加なし
+  - ✅ 既存3セクションと初期表示「推し見落とし」を維持
+- 変更したファイル:
+  - `src/main/repositories/statsRepository.js`
+  - `src/main/ipc/statsHandlers.js`
+  - `src/renderer/hooks/useStats.js`
+  - `src/renderer/components/StatsTab.jsx`
+  - `src/renderer/src/assets/main.css`
+  - `tests/main/repositories/statsRepository.test.js`
+  - `tests/main/ipc/statsHandlers.test.js`
+  - `tests/renderer/StatsTab.test.jsx`
+- 実装概要:
+  - 既存 `stats:channelActivity` の戻り値へ `viewedRates` を追加。新規IPC channelは作成していない。
+  - `status='ended'`、actual/scheduled startあり、活動時刻が30日前以上かつ現在以前、現在 `is_pinned=1` のチャンネルを集計。
+  - インサイトの4番目のサブナビ「視聴済み率」に、割合バーと件数内訳を表示。行クリックでYouTubeチャンネルを開く。
+  - 「視聴率」ではなく、ユーザーの✓操作に基づくことが分かる説明文にした。
+- IPC契約:
+  - main handler / preload exposure / renderer呼び出し: 既存 `stats:channelActivity` / `getChannelActivityStats()` を維持し、戻り値へ `viewedRates` を追加。
+  - event発火・購読: N/A。既存 `schedule:updated` 購読による再取得をそのまま利用。
+- テスト:
+  - 29日 / 30日を含み31日を除外
+  - 非推し、upcoming、通常動画を除外
+  - 率の低い順、同率時は配信数の多い順
+  - IPC正常系 / DB broken
+  - UI空状態 / 数値内訳 / 外部リンク
+- セルフverify:
+  - ✅ focused test（3 files / 19 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 582 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - ✅ `npm run dev` で better-sqlite3 rebuild、main / preload build、renderer dev server、Electron起動開始まで確認。
+  - ⛔ GUI目視はCodex in-app browser接続が環境エラーで開始できず未実施。renderer testでサブナビ切替・表示・リンクを確認。
+- 残リスク:
+  - ended動画は通常30日保持のため、この指標は直近30日に限定する。月別・年次推移には利用しない。
+  - `viewed_at` は実視聴の自動検出ではなくユーザーの✓操作。UI説明文で明示済み。
+  - 4項目サブナビの実画面幅・ダークモードの目視確認はClaude Codeまたはユーザー環境で必要。
+- Claude Code連携:
+  - OAuth再認証は2026-06-09に復旧済み。
+  - Claude Code Proセッション上限が2026-06-09 21:40 JSTまでのため、cross-reviewはリセット後に実施する。
+- 次アクション:
+  - Claude Code: 本差分をcross-reviewし、特に集計母数・保持ポリシー・4項目サブナビの実画面を確認。
+  - ユーザー: Claude Codeレビューで重大指摘がなければ、developへの統合を判断。
+
+---
+
 ## 2026-06-05 09:52 レビュー完了（Phase A Slice 5 + Slice 6 — Claude Code レビュー）
 
 - レビュー対象:

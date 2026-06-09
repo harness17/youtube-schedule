@@ -32,7 +32,8 @@ EmptyState.propTypes = {
 const SECTIONS = [
   { key: 'unwatched', label: '推し見落とし' },
   { key: 'silent', label: '沈黙チャンネル' },
-  { key: 'ranking', label: '配信頻度ランキング' }
+  { key: 'ranking', label: '配信頻度ランキング' },
+  { key: 'viewedRate', label: '視聴済み率' }
 ]
 
 export default function StatsTab({
@@ -55,11 +56,13 @@ export default function StatsTab({
   const unwatchedPinned = stats?.unwatchedPinned ?? []
   const silentChannels = stats?.silentChannels ?? []
   const frequencyRanking = stats?.frequencyRanking ?? []
+  const viewedRates = stats?.viewedRates ?? []
 
   const counts = {
     unwatched: unwatchedPinned.length,
     silent: silentChannels.length,
-    ranking: frequencyRanking.length
+    ranking: frequencyRanking.length,
+    viewedRate: viewedRates.length
   }
 
   return (
@@ -209,6 +212,42 @@ export default function StatsTab({
           )}
         </section>
       )}
+
+      {activeSection === 'viewedRate' && (
+        <section className="yt-stats-section">
+          <div className="yt-section-label">推しチャンネル別 視聴済み率</div>
+          <div className="yt-stats-note">
+            直近30日に終了した配信のうち、✓「見た」を付けた割合。低い順に表示
+          </div>
+          {viewedRates.length === 0 ? (
+            <EmptyState>集計対象の終了配信はありません</EmptyState>
+          ) : (
+            <div className="yt-stats-viewed-list">
+              {viewedRates.map((row) => (
+                <button
+                  key={row.channelId}
+                  type="button"
+                  className="yt-stats-viewed-row"
+                  onClick={() => window.api.openExternal?.(row.channelUrl)}
+                  title="YouTube でチャンネルを開く"
+                >
+                  <div className="yt-stats-viewed-header">
+                    <span className="yt-stats-row-title">{row.channelTitle}</span>
+                    <span className="yt-stats-viewed-rate">{row.viewedRate}%</span>
+                  </div>
+                  <div className="yt-stats-viewed-bar" aria-hidden="true">
+                    <span style={{ width: `${row.viewedRate}%` }} />
+                  </div>
+                  <div className="yt-stats-row-meta">
+                    視聴済み {row.viewedCount}件 / 全{row.totalCount}件
+                    {row.unviewedCount > 0 && `（未視聴 ${row.unviewedCount}件）`}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }
@@ -217,7 +256,8 @@ StatsTab.propTypes = {
   stats: PropTypes.shape({
     unwatchedPinned: PropTypes.array,
     silentChannels: PropTypes.array,
-    frequencyRanking: PropTypes.array
+    frequencyRanking: PropTypes.array,
+    viewedRates: PropTypes.array
   }),
   loading: PropTypes.bool,
   error: PropTypes.string,
