@@ -674,6 +674,130 @@ body {
   font-weight: 700;
 }
 
+.yt-stats-viewed-list {
+  display: grid;
+  gap: 6px;
+}
+
+.yt-stats-trend-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.yt-stats-trend-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--sub);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.yt-stats-trend-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.yt-stats-trend-btn.is-active {
+  border-color: var(--upcoming);
+  background: var(--upcoming);
+  color: #fff;
+}
+
+.yt-stats-viewed-row {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yt-stats-viewed-row:hover {
+  background: var(--surface2);
+}
+
+.yt-stats-viewed-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-stats-viewed-header .yt-stats-row-title {
+  flex: 1;
+}
+
+.yt-stats-viewed-rate {
+  color: var(--upcoming);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.yt-stats-viewed-bar {
+  height: 6px;
+  margin: 8px 0 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--btn-bg);
+}
+
+.yt-stats-viewed-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--upcoming);
+}
+
+.yt-stats-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.yt-stats-balance-group {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.yt-stats-balance-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yt-stats-balance-row:hover .yt-stats-row-title {
+  text-decoration: underline;
+}
+
+.yt-stats-balance-row .yt-stats-row-title {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .yt-stats-balance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ===== STATUS BANNERS ===== */
 .status-banners {
   margin-bottom: 10px;

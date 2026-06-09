@@ -14,7 +14,7 @@
 
 **担当:** Task 1-6・10 = Claude（DB 契約・main ロジック・API 検証）、Task 7-9 = Codex（UI）。Task 7-9 は `/codex-handoff` 経由で依頼する。
 
-**npm 注意:** テスト実行時に `better-sqlite3` の rebuild が EBUSY で落ちることがある。その場合 `npm_config_cache=H:/tmp/npm-cache` を付けて再実行する。
+**npm 注意:** テスト実行時に `better-sqlite3` の rebuild が EBUSY で落ちることがある。その場合 `npm_config_cache=<temp-dir>/npm-cache` を付けて再実行する。
 
 ---
 
@@ -83,7 +83,7 @@ export const migrations = [m001, m002, m003, m004, m005, m006, m007, m008, m009,
 
 - [ ] **Step 3: テストが通ることを確認**
 
-Run: `cd H:/ClaudeCode/Youtube/youtube-schedule && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6`
+Run: `cd <repo-root> && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6`
 Expected: 全テスト pass（migration 配列は repository テストの in-memory DB で実行される）
 
 - [ ] **Step 4: コミット**
@@ -152,7 +152,7 @@ describe('resolveVideoId', () => {
 
 - [ ] **Step 2: テストを実行して失敗を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run test -- resolveVideoId 2>&1 | tail -12`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run test -- resolveVideoId 2>&1 | tail -12`
 Expected: FAIL（`resolveVideoId` が存在しない）
 
 - [ ] **Step 3: 実装を書く**
@@ -195,7 +195,7 @@ export function resolveVideoId(input) {
 
 - [ ] **Step 4: テストを実行して成功を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run test -- resolveVideoId 2>&1 | tail -12`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run test -- resolveVideoId 2>&1 | tail -12`
 Expected: PASS（8 テスト）
 
 - [ ] **Step 5: コミット**
@@ -281,7 +281,7 @@ describe('videoRepository is_membership_only', () => {
 
 - [ ] **Step 2: テストを実行して失敗を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run test -- videoRepository.membership 2>&1 | tail -12`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run test -- videoRepository.membership 2>&1 | tail -12`
 Expected: FAIL（`isMembershipOnly` が保存・返却されない）
 
 - [ ] **Step 3: upsert SQL に `is_membership_only` を追加**
@@ -356,12 +356,12 @@ ON CONFLICT 部に追加（`published_at = ...` の行の後、`source = exclude
 
 - [ ] **Step 6: テストを実行して成功を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run test -- videoRepository.membership 2>&1 | tail -12`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run test -- videoRepository.membership 2>&1 | tail -12`
 Expected: PASS（3 テスト）
 
 - [ ] **Step 7: 全テストを確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6`
 Expected: 全 pass。既存の upsert を呼ぶテストは Step 4 のデフォルトで吸収される。
 
 - [ ] **Step 8: コミット**
@@ -445,7 +445,7 @@ import { resolveVideoId } from '../lib/resolveVideoId.js'
 
 - [ ] **Step 4: lint と全テストを確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6`
 Expected: lint clean、全テスト pass（`addManualVideo` は次タスクの IPC 経由でのみ呼ばれるため、このタスク単体で新規テストは追加しない。動作確認は Task 10 の実機検証で行う）
 
 - [ ] **Step 5: コミット**
@@ -495,7 +495,7 @@ git commit -m "feat(main): add addManualVideo to schedulerService"
 
 - [ ] **Step 5: lint・test・build を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=H:/tmp/npm-cache npm run build 2>&1 | tail -3`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=<temp-dir>/npm-cache npm run build 2>&1 | tail -3`
 Expected: すべて pass
 
 - [ ] **Step 6: コミット**
@@ -554,7 +554,7 @@ prepared statement（`backfillTargetIdsStmt` の近く）：
 
 - [ ] **Step 4: lint・test を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6`
 Expected: すべて pass
 
 - [ ] **Step 5: コミット**
@@ -610,7 +610,7 @@ const TABS = [
 
 - [ ] **Step 4: lint・test・build を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=H:/tmp/npm-cache npm run build 2>&1 | tail -3`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=<temp-dir>/npm-cache npm run build 2>&1 | tail -3`
 Expected: すべて pass
 
 - [ ] **Step 5: コミット**
@@ -643,7 +643,7 @@ PropTypes の `item` shape に追加：
 
 - [ ] **Step 3: lint・test・build を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=H:/tmp/npm-cache npm run build 2>&1 | tail -3`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=<temp-dir>/npm-cache npm run build 2>&1 | tail -3`
 Expected: すべて pass
 
 - [ ] **Step 4: コミット**
@@ -718,7 +718,7 @@ git commit -m "feat(renderer): show membership-only badge on card"
 
 - [ ] **Step 5: lint・test・build を確認**
 
-Run: `npm_config_cache=H:/tmp/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=H:/tmp/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=H:/tmp/npm-cache npm run build 2>&1 | tail -3`
+Run: `npm_config_cache=<temp-dir>/npm-cache npm run lint 2>&1 | tail -3 && npm_config_cache=<temp-dir>/npm-cache npm run test 2>&1 | tail -6 && npm_config_cache=<temp-dir>/npm-cache npm run build 2>&1 | tail -3`
 Expected: すべて pass
 
 - [ ] **Step 6: コミット**

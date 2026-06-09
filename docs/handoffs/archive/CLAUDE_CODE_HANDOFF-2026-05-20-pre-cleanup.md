@@ -1,7 +1,7 @@
 # YouTom 共同開発ハンドオフ
 
 最終更新: 2026-05-20
-対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
+対象リポジトリ: `<repo-root>`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
@@ -14,7 +14,7 @@ status: active
 
 - 作成者: Claude Code（設計）／実装担当: Codex
 - ブランチ: `develop`（または `feature/stats-tab` を切ってもよい）
-- worktree: `H:/ClaudeCode/Youtube/youtube-schedule`
+- worktree: `<repo-root>`
 
 ### 目的
 
@@ -341,7 +341,7 @@ npm run dev
   - `scripts/ensure-node-sqlite-binding.js`: Node runtime で `better-sqlite3` が実際に開けるか確認し、壊れている場合だけ Node ABI 向けに rebuild
   - `scripts/rebuild-native.js`: Electron rebuild でも同じ native build 環境を使うよう変更
 - 実装メモ:
-  - npm cache は既定の `C:\Users\harne\AppData\Local\npm-cache` ではなく、デフォルトで OS temp 配下の `youtom-npm-cache` を使う。明示的に変えたい場合は `YOUTOM_NPM_CACHE` を指定する。
+  - npm cache は既定の `%LOCALAPPDATA%\npm-cache` ではなく、デフォルトで OS temp 配下の `youtom-npm-cache` を使う。明示的に変えたい場合は `YOUTOM_NPM_CACHE` を指定する。
   - Codex runtime 同梱 Python がある場合は `PYTHON` に渡すため、node-gyp の Python 未検出を回避できる。
   - `npm run test` は binding が正常なら rebuild をスキップし、Electron ABI などで壊れている場合だけ修復する。
 - verify:
@@ -373,7 +373,7 @@ npm run dev
   - 🟢 `rowToChannel` は既に `isManual` を返しているため、main/preload/renderer のデータ契約追加は不要。
 - セルフ verify:
   - ✅ `npm run lint`
-  - ⚠️ `npm run test` は未完走。指定どおりデフォルト npm キャッシュで実行したが、`pretest` の `npm rebuild better-sqlite3` が `C:\Users\harne\AppData\Local\npm-cache\_prebuilds\...` への EPERM で失敗し、その後 node-gyp が Python を検出できず終了。続けて `npx vitest run` も実行したが、`better-sqlite3` の native binding `better_sqlite3.node` が見つからず、SQLite 系 114 tests が環境要因で失敗した。今回の JSX 条件変更に起因する失敗は確認できていない。
+  - ⚠️ `npm run test` は未完走。指定どおりデフォルト npm キャッシュで実行したが、`pretest` の `npm rebuild better-sqlite3` が `%LOCALAPPDATA%\npm-cache\_prebuilds\...` への EPERM で失敗し、その後 node-gyp が Python を検出できず終了。続けて `npx vitest run` も実行したが、`better-sqlite3` の native binding `better_sqlite3.node` が見つからず、SQLite 系 114 tests が環境要因で失敗した。今回の JSX 条件変更に起因する失敗は確認できていない。
   - ✅ `npm run build`
 - 実動確認: ⛔ 未実施。Electron GUI の `npm run dev` 確認は未着手。
 - 未解決:
@@ -428,7 +428,7 @@ npm run dev
   - 🟢 前回 🟡#1 は仕様として明文化済み。手動追加チャンネルを後で購読しても `is_manual=1` を維持する方針は、手動削除ボタンがある前提なら一貫している。
 - セルフ verify:
   - ✅ `npm run lint`
-  - ✅ `$env:npm_config_cache='H:/tmp/npm-cache'; npm run test`（31 files / 276 tests passed）
+  - ✅ `$env:npm_config_cache='<temp-dir>/npm-cache'; npm run test`（31 files / 276 tests passed）
   - ✅ `npm run build`
 - 実動確認: ⛔ 未実施。Electron GUI の `npm run dev` 確認はユーザー側の次アクション。
 - 未解決:
@@ -490,7 +490,7 @@ npm run dev
   - 🟡 軽微/確認推奨: `getLastSyncTime()` が `deleted_at IS NULL` のチャンネルだけを見るため、同期削除で購読チャンネルが全て消えた後は 24h キャッシュが効かず、30分更新ごとに `subscriptions.list` を呼ぶ可能性がある。既存の「購読0件」問題に近いが、本変更で到達しやすくなるため quota 観点で検討したい。
 - セルフ verify:
   - ✅ `npm run lint`
-  - ✅ `npm run test`（初回は既定 npm cache 権限と Python 検出で `better-sqlite3` rebuild が失敗。`$env:npm_config_cache='H:/tmp/npm-cache'; npm run test` で 31 files / 275 tests passed）
+  - ✅ `npm run test`（初回は既定 npm cache 権限と Python 検出で `better-sqlite3` rebuild が失敗。`$env:npm_config_cache='<temp-dir>/npm-cache'; npm run test` で 31 files / 275 tests passed）
   - ✅ `npm run build`
 - 実動確認: ⛔ 未実施。Electron GUI の `npm run dev` 確認は未着手。
 - レビュー観点:
@@ -543,7 +543,7 @@ npm run dev
   - `deleted_at IS NULL` フィルタの漏れ（取得対象・一覧）
 - 未解決 / Codex への申し送り:
   - 本変更は `feature/channel-sync-delete` ブランチ上にある（`chore/cross-agent-harness-profile` から分岐。develop は SettingsModal 5タブ refactor `562b3ab` を持たないため develop 直下には切り出せなかった）。先行3コミット（harness profile / archive fix / モーダル5タブ再編）を土台に含む。
-  - untracked ファイル `.claude/skills/codex-dev/`・`scripts/invoke-claude-review.ps1` は Codex 作業中のもので Claude Code は触っていない（未 stage）。codex MCP 登録用の `.mcp.json` は Claude Code 起動ディレクトリ（リポジトリ親 `H:\ClaudeCode\Youtube`）に置いたため本リポジトリ管理外。
+  - untracked ファイル `.claude/skills/codex-dev/`・`scripts/invoke-claude-review.ps1` は Codex 作業中のもので Claude Code は触っていない（未 stage）。codex MCP 登録用の `.mcp.json` は Claude Code 起動ディレクトリ（リポジトリ親 `<repo-parent>`）に置いたため本リポジトリ管理外。
   - チャンネル削除の変更（コード6 + migration 1）は未コミット。commit はレビュー後にユーザー指示で行う。
   - 実機での削除フロー・再購読時の📌復活の確認が未実施。
 - レビュー依頼（Codex 宛）:
@@ -661,7 +661,7 @@ Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 
 ### Git について
 
 - Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
-- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
+- npm cache 権限エラーが出たら `npm_config_cache=<temp-dir>/npm-cache` を指定
 - 範囲外ファイルを作らない
 
 ### 次アクション
@@ -730,7 +730,7 @@ Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 
 ### Git について
 
 - Codex は git commit/push しない。ファイル編集とセルフ verify まで。コミットは Claude が代行
-- npm cache 権限エラーが出たら `npm_config_cache=H:/tmp/npm-cache` を指定
+- npm cache 権限エラーが出たら `npm_config_cache=<temp-dir>/npm-cache` を指定
 - 範囲外ファイルを作らない
 
 ### レビュー結果（2026-05-16, Claude）
@@ -865,7 +865,7 @@ Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 
 - `useTabState` に `archiveFilters` / `archiveSort`、period → epoch 変換、archive 再取得、electron-store 永続化を追加
 - `settings:get` / `settings:set` と preload は汎用公開済みのため変更なし
 - `App.jsx` に ArchiveFilterBar を配線し、アーカイブタブでは既存の単一チャンネルドロップダウンを非表示化
-- verify 補足: 初回 `npm run test -- ArchiveFilterBar` は既知の npm cache 権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
+- verify 補足: 初回 `npm run test -- ArchiveFilterBar` は既知の npm cache 権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=<temp-dir>\npm-cache` 指定で再実行し pass
 
 ### 完成条件（スプリントコントラクト）
 
@@ -955,7 +955,7 @@ Phase 2c-1 では Codex が「Codex CLI runtime support 不足」エラーで 2 
 - `.github/workflows/release.yml`: `actions/checkout` / `actions/setup-node` / `actions/upload-artifact` を v5 に更新
 - `SignPath/github-action-submit-signing-request@v1` は依頼通り据え置き
   - 公式ドキュメントでは `@v2` の例を確認済みだが、このタスクでは変更対象外
-- verify 補足: 初回 `npm run test` は npm cache 書き込み権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=H:\tmp\npm-cache` 指定で再実行し pass
+- verify 補足: 初回 `npm run test` は npm cache 書き込み権限で `better-sqlite3` rebuild が失敗。`npm_config_cache=<temp-dir>\npm-cache` 指定で再実行し pass
 - Git 操作補足: Codex 環境で `.git/FETCH_HEAD` / `.git/refs/...lock` / `.git/index.lock` が Permission denied となり、`git pull` / ブランチ作成 / stage / commit / push は未完了
 
 ### 完成条件（スプリントコントラクト）
