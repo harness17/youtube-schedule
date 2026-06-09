@@ -10,6 +10,51 @@ status: active
 
 ---
 
+## 2026-06-09 22:22 クロスレビュー完了（v1.24 視聴傾向4指標 — Claude Code レビュー）
+
+- レビュアー: Claude Code 2.1.165 / Haiku
+- 対象コミット:
+  - `2d9c437` — 推し別視聴済み率
+  - `ed4c1da` — 視聴傾向4指標へ拡張
+- 最終結論: **重大指摘なし。merge可能（ユーザー判断待ち）**
+- 初回レビュー指摘:
+  - favoriteChannels に30日条件がない点
+  - 削除済みチャンネルのお気に入りを含む点
+  - unviewedBacklog の並び順テスト不足
+  - activeViewingSection のmagic string
+  - viewingChannelCountのunion意図が不明確
+  - CSS active色 / 900px breakpoint / 新規IPC要否
+- 再判定で撤回された指摘:
+  - favoriteChannels はspecどおり「保存中の全お気に入り」が対象。日付条件なしは意図的。
+  - 既存 `listFavorites` はチャンネル論理削除後もお気に入り動画を保持するため、削除済みチャンネルを含むのが既存契約。
+  - 新規IPCは不要。既存 `stats:channelActivity` の戻り値拡張で4点対称を維持。
+  - `@media (max-width: 900px)` は900px以下で1列になる。
+  - `#fff` は既存 `.yt-stats-subnav-btn.is-active` と同じstyle。
+- 反映した改善:
+  - favoriteChannels SQL前に全期間・論理削除後も保持する契約コメントを追加。
+  - `activeViewingSection` 初期値を `VIEWING_SECTIONS[0].key` に変更。
+  - viewingChannelCount が3分析のunionをSetで重複排除する意図をコメント追加。
+  - unviewedBacklog の「件数降順 → 同数なら最古日時昇順」テストを追加。
+- レビュー対応後verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 586 passed）
+  - ✅ `npm run build`
+  - ✅ focused test（2 files / 19 passed）
+- IPC 4点対称:
+  - main handler: `stats:channelActivity`
+  - preload exposure: `getChannelActivityStats()`
+  - renderer: `useStats`
+  - event: 既存 `schedule:updated` 発火・購読を継続
+- 残リスク:
+  - `VIEWING_SECTIONS` の順序を将来変えると初期小タブも変わる。現状は意図どおり。
+- mergeゲート:
+  - ✅ ① Codexセルフverify
+  - ✅ ② Claude Code cross-review
+  - ✅ ③ 重大指摘なし
+  - ⏳ ④ ユーザーmerge指示待ち
+
+---
+
 ## 2026-06-09 18:15 実装完了（v1.24 視聴傾向4指標 — Codex 作成）
 
 - 対象: `codex/insight-viewed-rate`

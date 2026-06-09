@@ -79,7 +79,7 @@ export default function StatsTab({
   syncing = false
 }) {
   const [activeSection, setActiveSection] = useState('unwatched')
-  const [activeViewingSection, setActiveViewingSection] = useState('frequent')
+  const [activeViewingSection, setActiveViewingSection] = useState(VIEWING_SECTIONS[0].key)
 
   if (loading) return <div className="yt-stats-empty">読み込み中...</div>
   if (error) return <div className="yt-stats-empty">インサイトの読み込みに失敗しました</div>
@@ -99,6 +99,7 @@ export default function StatsTab({
         b.totalCount - a.totalCount ||
         a.channelTitle.localeCompare(b.channelTitle, 'ja')
     )
+  // 各分析に同じチャンネルが現れるため、上位バッジはユニークな対象数にする。
   const viewingChannelCount = new Set(
     [...viewedRates, ...unviewedBacklog, ...favoriteChannels].map((row) => row.channelId)
   ).size

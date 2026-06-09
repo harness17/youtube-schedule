@@ -244,6 +244,39 @@ describe('StatsRepository', () => {
     ])
   })
 
+  it('unviewed backlog sorts by highest count then oldest activity', () => {
+    channels.syncSubscriptions(
+      [
+        { id: 'UC_MANY', title: 'Many', uploadsPlaylistId: 'UU_MANY' },
+        { id: 'UC_OLD', title: 'Old', uploadsPlaylistId: 'UU_OLD' },
+        { id: 'UC_NEW', title: 'New', uploadsPlaylistId: 'UU_NEW' }
+      ],
+      1
+    )
+
+    videos.upsert(
+      sampleVideo({ id: 'many-1', channelId: 'UC_MANY', actualStartTime: NOW - DAY_MS })
+    )
+    videos.upsert(
+      sampleVideo({ id: 'many-2', channelId: 'UC_MANY', actualStartTime: NOW - 2 * DAY_MS })
+    )
+    videos.upsert(
+      sampleVideo({ id: 'old-1', channelId: 'UC_OLD', actualStartTime: NOW - 20 * DAY_MS })
+    )
+    videos.upsert(
+      sampleVideo({ id: 'new-1', channelId: 'UC_NEW', actualStartTime: NOW - 5 * DAY_MS })
+    )
+
+    const backlogOrder = stats
+      .getChannelActivity(NOW)
+      .unviewedBacklog.map((row) => [row.channelId, row.unviewedCount])
+    expect(backlogOrder).toEqual([
+      ['UC_MANY', 2],
+      ['UC_OLD', 1],
+      ['UC_NEW', 1]
+    ])
+  })
+
   it('favorite channels count saved videos and sort by favorite then viewed count', () => {
     channels.syncSubscriptions(
       [

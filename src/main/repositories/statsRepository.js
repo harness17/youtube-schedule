@@ -196,6 +196,8 @@ export function createStatsRepository(db) {
       channel_title COLLATE NOCASE ASC
   `)
 
+  // お気に入りは永久保持され、既存のお気に入りタブもチャンネル削除後に動画を残す。
+  // その契約に合わせ、期間や channels.deleted_at では絞らず保存中の全件を集計する。
   const favoriteChannelsStmt = db.prepare(`
     SELECT
       v.channel_id,
