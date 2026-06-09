@@ -52,6 +52,44 @@ function rowToRanking(row) {
   }
 }
 
+function rowToViewedRate(row) {
+  const totalCount = row.total_count
+  const viewedCount = row.viewed_count
+  return {
+    channelId: row.channel_id,
+    channelTitle: row.channel_title ?? row.channel_id,
+    totalCount,
+    viewedCount,
+    unviewedCount: totalCount - viewedCount,
+    viewedRate: Math.round((viewedCount / totalCount) * 100),
+    lastActivityAt: row.last_activity_at ?? null,
+    channelUrl: `https://www.youtube.com/channel/${row.channel_id}`
+  }
+}
+
+function rowToUnviewedBacklog(row) {
+  return {
+    channelId: row.channel_id,
+    channelTitle: row.channel_title ?? row.channel_id,
+    unviewedCount: row.unviewed_count,
+    notifyCount: row.notify_count,
+    oldestActivityAt: row.oldest_activity_at ?? null,
+    isPinned: row.is_pinned === 1,
+    channelUrl: `https://www.youtube.com/channel/${row.channel_id}`
+  }
+}
+
+function rowToFavoriteChannel(row) {
+  return {
+    channelId: row.channel_id,
+    channelTitle: row.channel_title ?? row.channel_id,
+    favoriteCount: row.favorite_count,
+    viewedCount: row.viewed_count,
+    isPinned: row.is_pinned === 1,
+    channelUrl: `https://www.youtube.com/channel/${row.channel_id}`
+  }
+}
+
 export function createStatsRepository(db) {
   // 配信（ライブ・プレミア）のみを対象にする。通常の動画投稿は actual_start_time も
   // scheduled_start_time も持たないため、いずれかが NULL でない行が livestreaming 由来。
@@ -113,6 +151,72 @@ export function createStatsRepository(db) {
     LIMIT 20
   `)
 
+  const viewedRateStmt = db.prepare(`
+    SELECT
+      v.channel_id,
+      COALESCE(c.title, v.channel_title) AS channel_title,
+      COUNT(*) AS total_count,
+      SUM(CASE WHEN v.viewed_at IS NOT NULL THEN 1 ELSE 0 END) AS viewed_count,
+      MAX(${LIVE_ACTIVITY_AT}) AS last_activity_at
+    FROM videos v
+    JOIN channels c ON c.id = v.channel_id
+    WHERE c.deleted_at IS NULL
+      AND c.is_pinned = 1
+      AND v.status = 'ended'
+      AND ${IS_LIVESTREAM}
+      AND ${LIVE_ACTIVITY_AT} >= @since
+      AND ${LIVE_ACTIVITY_AT} <= @now
+    GROUP BY v.channel_id
+    ORDER BY
+      CAST(SUM(CASE WHEN v.viewed_at IS NOT NULL THEN 1 ELSE 0 END) AS REAL) / COUNT(*) ASC,
+      total_count DESC,
+      channel_title COLLATE NOCASE ASC
+  `)
+
+  const unviewedBacklogStmt = db.prepare(`
+    SELECT
+      v.channel_id,
+      COALESCE(c.title, v.channel_title) AS channel_title,
+      c.is_pinned,
+      COUNT(*) AS unviewed_count,
+      SUM(CASE WHEN v.notify = 1 THEN 1 ELSE 0 END) AS notify_count,
+      MIN(${LIVE_ACTIVITY_AT}) AS oldest_activity_at
+    FROM videos v
+    JOIN channels c ON c.id = v.channel_id
+    WHERE c.deleted_at IS NULL
+      AND v.status = 'ended'
+      AND v.viewed_at IS NULL
+      AND ${IS_LIVESTREAM}
+      AND ${LIVE_ACTIVITY_AT} >= @since
+      AND ${LIVE_ACTIVITY_AT} <= @now
+    GROUP BY v.channel_id
+    ORDER BY
+      unviewed_count DESC,
+      oldest_activity_at ASC,
+      channel_title COLLATE NOCASE ASC
+  `)
+
+  // お気に入りは永久保持され、既存のお気に入りタブもチャンネル削除後に動画を残す。
+  // その契約に合わせ、期間や channels.deleted_at では絞らず保存中の全件を集計する。
+  const favoriteChannelsStmt = db.prepare(`
+    SELECT
+      v.channel_id,
+      COALESCE(c.title, v.channel_title) AS channel_title,
+      COALESCE(c.is_pinned, 0) AS is_pinned,
+      COUNT(*) AS favorite_count,
+      SUM(CASE WHEN v.viewed_at IS NOT NULL THEN 1 ELSE 0 END) AS viewed_count
+    FROM videos v
+    LEFT JOIN channels c ON c.id = v.channel_id
+    WHERE v.is_favorite = 1
+      AND v.channel_id IS NOT NULL
+      AND v.channel_id != ''
+    GROUP BY v.channel_id
+    ORDER BY
+      favorite_count DESC,
+      viewed_count DESC,
+      channel_title COLLATE NOCASE ASC
+  `)
+
   return {
     getChannelActivity(now = Date.now()) {
       const unwatchedPinned = unwatchedPinnedStmt.all({ since: now - 30 * DAY_MS }).map(rowToVideo)
@@ -122,8 +226,20 @@ export function createStatsRepository(db) {
       const frequencyRanking = frequencyRankingStmt
         .all({ since: now - 90 * DAY_MS })
         .map(rowToRanking)
+      const viewedRates = viewedRateStmt.all({ since: now - 30 * DAY_MS, now }).map(rowToViewedRate)
+      const unviewedBacklog = unviewedBacklogStmt
+        .all({ since: now - 30 * DAY_MS, now })
+        .map(rowToUnviewedBacklog)
+      const favoriteChannels = favoriteChannelsStmt.all().map(rowToFavoriteChannel)
 
-      return { unwatchedPinned, silentChannels, frequencyRanking }
+      return {
+        unwatchedPinned,
+        silentChannels,
+        frequencyRanking,
+        viewedRates,
+        unviewedBacklog,
+        favoriteChannels
+      }
     }
   }
 }

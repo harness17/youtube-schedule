@@ -1,12 +1,172 @@
 # YouTom 共同開発ハンドオフ
 
-最終更新: 2026-06-05
-対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
+最終更新: 2026-06-09
+対象リポジトリ: `<repo-root>`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
 
 既存の `.claude/rules/cross-agent-review.md` は旧運用メモとして残し、相互依頼・レビュー・merge 判断はこのファイルと profile に集約する。
+
+---
+
+## 2026-06-09 22:22 クロスレビュー完了（v1.24 視聴傾向4指標 — Claude Code レビュー）
+
+- レビュアー: Claude Code 2.1.165 / Haiku
+- 対象コミット:
+  - `2d9c437` — 推し別視聴済み率
+  - `ed4c1da` — 視聴傾向4指標へ拡張
+- 最終結論: **重大指摘なし。2026-06-09にユーザー承認を受けてdevelopへmerge済み**
+- 初回レビュー指摘:
+  - favoriteChannels に30日条件がない点
+  - 削除済みチャンネルのお気に入りを含む点
+  - unviewedBacklog の並び順テスト不足
+  - activeViewingSection のmagic string
+  - viewingChannelCountのunion意図が不明確
+  - CSS active色 / 900px breakpoint / 新規IPC要否
+- 再判定で撤回された指摘:
+  - favoriteChannels はspecどおり「保存中の全お気に入り」が対象。日付条件なしは意図的。
+  - 既存 `listFavorites` はチャンネル論理削除後もお気に入り動画を保持するため、削除済みチャンネルを含むのが既存契約。
+  - 新規IPCは不要。既存 `stats:channelActivity` の戻り値拡張で4点対称を維持。
+  - `@media (max-width: 900px)` は900px以下で1列になる。
+  - `#fff` は既存 `.yt-stats-subnav-btn.is-active` と同じstyle。
+- 反映した改善:
+  - favoriteChannels SQL前に全期間・論理削除後も保持する契約コメントを追加。
+  - `activeViewingSection` 初期値を `VIEWING_SECTIONS[0].key` に変更。
+  - viewingChannelCount が3分析のunionをSetで重複排除する意図をコメント追加。
+  - unviewedBacklog の「件数降順 → 同数なら最古日時昇順」テストを追加。
+- レビュー対応後verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 586 passed）
+  - ✅ `npm run build`
+  - ✅ focused test（2 files / 19 passed）
+- IPC 4点対称:
+  - main handler: `stats:channelActivity`
+  - preload exposure: `getChannelActivityStats()`
+  - renderer: `useStats`
+  - event: 既存 `schedule:updated` 発火・購読を継続
+- 残リスク:
+  - `VIEWING_SECTIONS` の順序を将来変えると初期小タブも変わる。現状は意図どおり。
+- mergeゲート:
+  - ✅ ① Codexセルフverify
+  - ✅ ② Claude Code cross-review
+  - ✅ ③ 重大指摘なし
+  - ✅ ④ ユーザーmerge指示
+
+---
+
+## 2026-06-09 18:15 実装完了（v1.24 視聴傾向4指標 — Codex 作成）
+
+- 対象: `codex/insight-viewed-rate`
+- 作成者: Codex
+- 設計仕様: `docs/superpowers/specs/2026-06-09-v1.24-viewing-insights.md`
+- 主題: 既存「視聴済み率」を「視聴傾向」へ拡張し、4つのチャンネル分析を追加
+- 追加した分析:
+  - よく見る推し: 現在推し、直近30日の終了配信を視聴済み件数順で表示
+  - 未視聴の蓄積: 現行チャンネルの直近30日未視聴件数、通知件数、最古日を表示
+  - 頻度 x 視聴済み率: 4件以上 / 50%以上を境界に推しを4分類
+  - お気に入り傾向: DBに保持されるお気に入り件数と視聴済み件数をチャンネル別表示
+- データ設計:
+  - 既存 `viewedRates` を「よく見る推し」と「頻度 x 視聴済み率」で再利用
+  - `stats:channelActivity` に `unviewedBacklog` / `favoriteChannels` を追加
+  - 新規IPC channel、DB migration、API呼び出し、OAuth scope追加なし
+  - お気に入りは非お気に入りとの保持期間差があるため、割合を算出せず保存件数のみ表示
+- UI:
+  - 上位サブナビは4項目を維持し、「視聴済み率」を「視聴傾向」へ変更
+  - 視聴傾向内に4つの小タブを追加
+  - 上位件数バッジは3集計間で重複しないユニークチャンネル数
+  - 頻度 x 視聴済み率は2列、900px以下では1列
+- 変更したファイル:
+  - `docs/superpowers/specs/2026-06-09-v1.24-viewing-insights.md`
+  - `src/main/repositories/statsRepository.js`
+  - `src/main/ipc/statsHandlers.js`
+  - `src/renderer/hooks/useStats.js`
+  - `src/renderer/components/StatsTab.jsx`
+  - `src/renderer/src/assets/main.css`
+  - `tests/main/repositories/statsRepository.test.js`
+  - `tests/main/ipc/statsHandlers.test.js`
+  - `tests/renderer/StatsTab.test.jsx`
+- テスト:
+  - 未視聴の30日境界、通知件数、通常動画 / upcoming / 論理削除除外
+  - お気に入り対象・非対象、保存数 / 視聴済み数、並び順
+  - よく見る推しの件数順、視聴済み0件除外
+  - 頻度4件、視聴済み率50%の4分類境界
+  - 小タブ切替、empty state、外部リンク
+- IPC契約:
+  - main handler / preload / renderer: 既存 `stats:channelActivity` / `getChannelActivityStats()` を拡張
+  - event発火・購読: N/A。既存 `schedule:updated` で再取得
+- セルフverify:
+  - ✅ focused test（3 files / 22 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 585 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - sandbox内では `userData/config.json` の読取権限で停止
+  - ✅ 通常権限の `npm run dev` ではYouTom Electronプロセスが継続稼働し、実データ環境の起動を確認
+  - GUIの各小タブ目視はClaude Code / ユーザー確認待ち
+- 残リスク:
+  - `viewed_at` は実視聴自動検出ではなく✓操作
+  - 4件 / 50%の分類閾値は初期値。利用感により将来調整余地あり
+  - `StatsTab.jsx` の表示責務が増えたため、次の大幅追加時は視聴傾向部分のコンポーネント抽出を検討
+- 次アクション:
+  - Claude Code: cross-reviewと実画面確認。SQL母集団、保持ポリシー、4小タブの幅を重点確認
+  - ユーザー: 重大指摘解消後にdevelop統合を判断
+
+---
+
+## 2026-06-09 17:45 実装完了（v1.24 インサイト強化 — 推し別視聴済み率 — Codex 作成）
+
+- 対象: `codex/insight-viewed-rate` / `<repo-root>`
+- 作成者: Codex
+- 主題: 現在推しに設定されているチャンネルについて、直近30日に終了した配信の視聴済みマーク率をインサイトへ追加
+- 完成条件:
+  - ✅ 直近30日に終了したライブ・プレミアだけを集計
+  - ✅ `viewed_at IS NOT NULL` を視聴済みとして、全件・視聴済み・未視聴・整数率を返す
+  - ✅ 率の低い順、同率なら配信数の多い順に表示
+  - ✅ 母数0のチャンネルは一覧に出さず、空状態を表示
+  - ✅ API呼び出し・OAuth scope・DB migrationの追加なし
+  - ✅ 既存3セクションと初期表示「推し見落とし」を維持
+- 変更したファイル:
+  - `src/main/repositories/statsRepository.js`
+  - `src/main/ipc/statsHandlers.js`
+  - `src/renderer/hooks/useStats.js`
+  - `src/renderer/components/StatsTab.jsx`
+  - `src/renderer/src/assets/main.css`
+  - `tests/main/repositories/statsRepository.test.js`
+  - `tests/main/ipc/statsHandlers.test.js`
+  - `tests/renderer/StatsTab.test.jsx`
+- 実装概要:
+  - 既存 `stats:channelActivity` の戻り値へ `viewedRates` を追加。新規IPC channelは作成していない。
+  - `status='ended'`、actual/scheduled startあり、活動時刻が30日前以上かつ現在以前、現在 `is_pinned=1` のチャンネルを集計。
+  - インサイトの4番目のサブナビ「視聴済み率」に、割合バーと件数内訳を表示。行クリックでYouTubeチャンネルを開く。
+  - 「視聴率」ではなく、ユーザーの✓操作に基づくことが分かる説明文にした。
+- IPC契約:
+  - main handler / preload exposure / renderer呼び出し: 既存 `stats:channelActivity` / `getChannelActivityStats()` を維持し、戻り値へ `viewedRates` を追加。
+  - event発火・購読: N/A。既存 `schedule:updated` 購読による再取得をそのまま利用。
+- テスト:
+  - 29日 / 30日を含み31日を除外
+  - 非推し、upcoming、通常動画を除外
+  - 率の低い順、同率時は配信数の多い順
+  - IPC正常系 / DB broken
+  - UI空状態 / 数値内訳 / 外部リンク
+- セルフverify:
+  - ✅ focused test（3 files / 19 passed）
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 582 passed）
+  - ✅ `npm run build`
+- 実動確認:
+  - ✅ `npm run dev` で better-sqlite3 rebuild、main / preload build、renderer dev server、Electron起動開始まで確認。
+  - ⛔ GUI目視はCodex in-app browser接続が環境エラーで開始できず未実施。renderer testでサブナビ切替・表示・リンクを確認。
+- 残リスク:
+  - ended動画は通常30日保持のため、この指標は直近30日に限定する。月別・年次推移には利用しない。
+  - `viewed_at` は実視聴の自動検出ではなくユーザーの✓操作。UI説明文で明示済み。
+  - 4項目サブナビの実画面幅・ダークモードの目視確認はClaude Codeまたはユーザー環境で必要。
+- Claude Code連携:
+  - OAuth再認証は2026-06-09に復旧済み。
+  - Claude Code Proセッション上限が2026-06-09 21:40 JSTまでのため、cross-reviewはリセット後に実施する。
+- 次アクション:
+  - Claude Code: 本差分をcross-reviewし、特に集計母数・保持ポリシー・4項目サブナビの実画面を確認。
+  - ユーザー: Claude Codeレビューで重大指摘がなければ、developへの統合を判断。
 
 ---
 
@@ -101,7 +261,7 @@ status: active
 ## 2026-06-04 22:56 実装完了（Phase A Slice 6 — AppHeader 抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice6-app-header.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `App.jsx` のヘッダー行 1（ロゴ、アプリ名、バージョン、モード表示、更新、設定）を `AppHeader.jsx` に抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -171,7 +331,7 @@ status: active
 ## 2026-06-04 22:02 実装完了（Phase A Slice 5 — AppTabMissed / AppTabFavorites 抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice5-missed-favorites-tabs.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `App.jsx` 内の missed / favorites タブ本文 JSX を独立コンポーネントへ抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -220,7 +380,7 @@ status: active
 ## 2026-06-04 21:49 実装完了（Phase A Slice 4 — useTabState 純粋ヘルパー抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice4-tabstate-helpers.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `useTabState.js` 内の副作用なし計算ロジック 5 点を `tabStateHelpers.js` へ抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -398,7 +558,7 @@ status: active
 
 ## 2026-06-03 20:56 実装完了（Phase A Slice 2 — SettingsModal タブ UI 分割 — Codex 作成）
 
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `SettingsModal.jsx` の5タブ描画関数を独立コンポーネントへ分割し、IPC 呼び出しは親コンポーネントに維持。
 - 触ったファイル:
@@ -1376,7 +1536,7 @@ npm run build
 ### Verify 結果
 
 - ✅ `npm run lint`
-- ⚠️ `npm run test` は未完了。pretest の `better-sqlite3` rebuild で `better_sqlite3.node` がロックされ、`EPERM: operation not permitted, unlink ...better_sqlite3.node` で停止。`H:\ClaudeCode\Youtube\youtube-schedule\node_modules\electron\dist\electron.exe` のプロセスが起動中のため、ユーザー側で dev サーバ / Electron を停止してから再実行が必要。
+- ⚠️ `npm run test` は未完了。pretest の `better-sqlite3` rebuild で `better_sqlite3.node` がロックされ、`EPERM: operation not permitted, unlink ...better_sqlite3.node` で停止。`<repo-root>\node_modules\electron\dist\electron.exe` のプロセスが起動中のため、ユーザー側で dev サーバ / Electron を停止してから再実行が必要。
 - ✅ `npx vitest run tests/renderer/hooks/usePlaylist.test.js tests/renderer/PlaylistTab.test.jsx`（2 files / 15 passed）
 - ✅ `npm run build`
 
@@ -3288,7 +3448,7 @@ npm run build
 
 ## 2026-05-20 18:59 完了（統計タブ実装 — Codex 作成）
 
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: チャンネル整理支援ダッシュボード「📊 統計」タブの限定実装
 - 触ったファイル:
@@ -3344,7 +3504,7 @@ npm run build
 
 - 作成者: Claude Code（設計）／実装担当: Codex
 - ブランチ: `develop`（または `feature/stats-tab` を切ってもよい）
-- worktree: `H:/ClaudeCode/Youtube/youtube-schedule`
+- worktree: `<repo-root>`
 
 ### 目的
 

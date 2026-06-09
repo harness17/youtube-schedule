@@ -1,7 +1,7 @@
 # YouTom 開発プラン — Codex 共同開発ハーネス整備 + 保留課題対応
 
 作成日: 2026-05-15
-対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
+対象リポジトリ: `<repo-root>`
 現在バージョン: v1.14.1
 ブランド: YouTom（旧 youtube-schedule、2026-05-15 リブランド完了）
 
@@ -22,7 +22,7 @@ Phase 0 を最初に完成させ、Phase 1 の最初のタスクを Codex に振
 
 ## 2. Phase 0 — Codex 共同開発ハーネス整備
 
-技術記事プロジェクト（`H:/ClaudeCode/技術記事`）の cross-agent-review パターンを、コード開発向けに翻案する。
+技術記事プロジェクト（`<technical-articles-repo>`）の cross-agent-review パターンを、コード開発向けに翻案する。
 
 ### 2.1 ファイル構成
 
@@ -98,7 +98,7 @@ DB マイグレーション or UI 変更を伴う場合、Phase ① の前に Cl
 # Youtom 共同開発ハンドオフ
 
 最終更新: YYYY-MM-DD
-対象リポジトリ: H:/ClaudeCode/Youtube/youtube-schedule
+対象リポジトリ: <repo-root>
 
 ---
 
@@ -321,7 +321,7 @@ DB マイグレーション or UI 変更を伴う場合、Phase ① の前に Cl
 
 ## 5. 参考プロジェクト
 
-技術記事プロジェクト（`H:/ClaudeCode/技術記事`）の cross-agent-review 運用が直接的なベース。
+技術記事プロジェクト（`<technical-articles-repo>`）の cross-agent-review 運用が直接的なベース。
 
 - `AGENTS.md` / `CLAUDE.md` の役割記述
 - `CLAUDE_CODE_HANDOFF.md` の追記式 log

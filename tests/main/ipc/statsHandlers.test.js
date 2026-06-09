@@ -29,7 +29,10 @@ describe('statsHandlers', () => {
       getChannelActivity: vi.fn().mockReturnValue({
         unwatchedPinned: [{ id: 'UC1' }],
         silentChannels: [],
-        frequencyRanking: []
+        frequencyRanking: [],
+        viewedRates: [{ channelId: 'UC1', viewedRate: 50 }],
+        unviewedBacklog: [{ channelId: 'UC1', unviewedCount: 2 }],
+        favoriteChannels: [{ channelId: 'UC1', favoriteCount: 1 }]
       })
     }
     dbBroken = false
@@ -47,7 +50,10 @@ describe('statsHandlers', () => {
     expect(invoke('stats:channelActivity')).toEqual({
       unwatchedPinned: [{ id: 'UC1' }],
       silentChannels: [],
-      frequencyRanking: []
+      frequencyRanking: [],
+      viewedRates: [{ channelId: 'UC1', viewedRate: 50 }],
+      unviewedBacklog: [{ channelId: 'UC1', unviewedCount: 2 }],
+      favoriteChannels: [{ channelId: 'UC1', favoriteCount: 1 }]
     })
   })
 
@@ -58,6 +64,9 @@ describe('statsHandlers', () => {
       unwatchedPinned: [],
       silentChannels: [],
       frequencyRanking: [],
+      viewedRates: [],
+      unviewedBacklog: [],
+      favoriteChannels: [],
       dbBroken: true
     })
     expect(statsRepo.getChannelActivity).not.toHaveBeenCalled()

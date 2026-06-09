@@ -89,14 +89,14 @@ Phase H (仕上げ)   → Task 18 ~ 20
 
 **Files:**
 
-- Modify: `H:/ClaudeCode/Youtube/youtube-schedule/package.json`
+- Modify: `<repo-root>/package.json`
 
 - [ ] **Step 1: 依存関係をインストール**
 
 実行コマンド:
 
 ```bash
-cd H:/ClaudeCode/Youtube/youtube-schedule
+cd <repo-root>
 npm install better-sqlite3@^11.3.0 fast-xml-parser@^4.5.0
 npm install -D nock@^13.5.0
 ```
@@ -2323,7 +2323,7 @@ git commit -m "refactor: reduce store.js to settings and legacy cache accessors"
 実行:
 
 ```bash
-npx grep -n "ipcMain" H:/ClaudeCode/Youtube/youtube-schedule/src/main/index.js
+npx grep -n "ipcMain" <repo-root>/src/main/index.js
 ```
 
 想定: `schedule:get`, `schedule:refresh`, OAuth 関連などが列挙される。
@@ -2460,7 +2460,7 @@ app.on('before-quit', () => {
 実行:
 
 ```bash
-cd H:/ClaudeCode/Youtube/youtube-schedule
+cd <repo-root>
 npm run dev
 ```
 
@@ -2684,7 +2684,7 @@ git commit -m "feat: enforce single-instance lock to prevent SQLite write races"
 実行:
 
 ```bash
-npx grep -rn "youtube-api" H:/ClaudeCode/Youtube/youtube-schedule/src
+npx grep -rn "youtube-api" <repo-root>/src
 ```
 
 期待: 0 件。もし残っていればその import を削除 or 置換。
@@ -2694,8 +2694,8 @@ npx grep -rn "youtube-api" H:/ClaudeCode/Youtube/youtube-schedule/src
 実行:
 
 ```bash
-rm H:/ClaudeCode/Youtube/youtube-schedule/src/main/youtube-api.js
-rm H:/ClaudeCode/Youtube/youtube-schedule/tests/main/youtube-api.test.js
+rm <repo-root>/src/main/youtube-api.js
+rm <repo-root>/tests/main/youtube-api.test.js
 ```
 
 - [ ] **Step 3: 全テスト通し**
@@ -2703,7 +2703,7 @@ rm H:/ClaudeCode/Youtube/youtube-schedule/tests/main/youtube-api.test.js
 実行:
 
 ```bash
-cd H:/ClaudeCode/Youtube/youtube-schedule
+cd <repo-root>
 npm run test
 ```
 
@@ -2791,7 +2791,7 @@ console.timeEnd('listVisible')
 - `CLAUDE.md` の「YouTube データ取得戦略」節を現状（RSS ファースト + SQLite）に合わせて更新
 
 ```bash
-npx grep -rn "console\.log" H:/ClaudeCode/Youtube/youtube-schedule/src
+npx grep -rn "console\.log" <repo-root>/src
 ```
 
 - [ ] **Step 6: `CLAUDE.md` の記述更新**

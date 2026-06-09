@@ -3,7 +3,10 @@ import { useCallback, useEffect, useState } from 'react'
 const EMPTY_STATS = {
   unwatchedPinned: [],
   silentChannels: [],
-  frequencyRanking: []
+  frequencyRanking: [],
+  viewedRates: [],
+  unviewedBacklog: [],
+  favoriteChannels: []
 }
 
 export function useStats(active) {
@@ -23,7 +26,10 @@ export function useStats(active) {
         setStats({
           unwatchedPinned: data?.unwatchedPinned ?? [],
           silentChannels: data?.silentChannels ?? [],
-          frequencyRanking: data?.frequencyRanking ?? []
+          frequencyRanking: data?.frequencyRanking ?? [],
+          viewedRates: data?.viewedRates ?? [],
+          unviewedBacklog: data?.unviewedBacklog ?? [],
+          favoriteChannels: data?.favoriteChannels ?? []
         })
       }
     } catch {
