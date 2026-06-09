@@ -1,7 +1,7 @@
 # YouTom 共同開発ハンドオフ
 
 最終更新: 2026-06-05
-対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
+対象リポジトリ: `<repo-root>`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、汎用ハーネスは `.claude/rules/cross-agent-harness.md`、YouTom 固有 profile は `.claude/rules/project-collaboration-profile.md` を参照。
@@ -116,7 +116,7 @@ status: active
 
 ## 2026-06-09 17:45 実装完了（v1.24 インサイト強化 — 推し別視聴済み率 — Codex 作成）
 
-- 対象: `codex/insight-viewed-rate` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `codex/insight-viewed-rate` / `<repo-root>`
 - 作成者: Codex
 - 主題: 現在推しに設定されているチャンネルについて、直近30日に終了した配信の視聴済みマーク率をインサイトへ追加
 - 完成条件:
@@ -261,7 +261,7 @@ status: active
 ## 2026-06-04 22:56 実装完了（Phase A Slice 6 — AppHeader 抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice6-app-header.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `App.jsx` のヘッダー行 1（ロゴ、アプリ名、バージョン、モード表示、更新、設定）を `AppHeader.jsx` に抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -331,7 +331,7 @@ status: active
 ## 2026-06-04 22:02 実装完了（Phase A Slice 5 — AppTabMissed / AppTabFavorites 抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice5-missed-favorites-tabs.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `App.jsx` 内の missed / favorites タブ本文 JSX を独立コンポーネントへ抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -380,7 +380,7 @@ status: active
 ## 2026-06-04 21:49 実装完了（Phase A Slice 4 — useTabState 純粋ヘルパー抽出 — Codex 作成）
 
 - 対象計画: `docs/plans/2026-06-04-phase-a-slice4-tabstate-helpers.md`
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `useTabState.js` 内の副作用なし計算ロジック 5 点を `tabStateHelpers.js` へ抽出し、focused unit test を追加。
 - 変更したファイル:
@@ -558,7 +558,7 @@ status: active
 
 ## 2026-06-03 20:56 実装完了（Phase A Slice 2 — SettingsModal タブ UI 分割 — Codex 作成）
 
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: `SettingsModal.jsx` の5タブ描画関数を独立コンポーネントへ分割し、IPC 呼び出しは親コンポーネントに維持。
 - 触ったファイル:
@@ -1536,7 +1536,7 @@ npm run build
 ### Verify 結果
 
 - ✅ `npm run lint`
-- ⚠️ `npm run test` は未完了。pretest の `better-sqlite3` rebuild で `better_sqlite3.node` がロックされ、`EPERM: operation not permitted, unlink ...better_sqlite3.node` で停止。`H:\ClaudeCode\Youtube\youtube-schedule\node_modules\electron\dist\electron.exe` のプロセスが起動中のため、ユーザー側で dev サーバ / Electron を停止してから再実行が必要。
+- ⚠️ `npm run test` は未完了。pretest の `better-sqlite3` rebuild で `better_sqlite3.node` がロックされ、`EPERM: operation not permitted, unlink ...better_sqlite3.node` で停止。`<repo-root>\node_modules\electron\dist\electron.exe` のプロセスが起動中のため、ユーザー側で dev サーバ / Electron を停止してから再実行が必要。
 - ✅ `npx vitest run tests/renderer/hooks/usePlaylist.test.js tests/renderer/PlaylistTab.test.jsx`（2 files / 15 passed）
 - ✅ `npm run build`
 
@@ -3448,7 +3448,7 @@ npm run build
 
 ## 2026-05-20 18:59 完了（統計タブ実装 — Codex 作成）
 
-- 対象: `develop` / `H:/ClaudeCode/Youtube/youtube-schedule`
+- 対象: `develop` / `<repo-root>`
 - 作成者: Codex
 - 主題: チャンネル整理支援ダッシュボード「📊 統計」タブの限定実装
 - 触ったファイル:
@@ -3504,7 +3504,7 @@ npm run build
 
 - 作成者: Claude Code（設計）／実装担当: Codex
 - ブランチ: `develop`（または `feature/stats-tab` を切ってもよい）
-- worktree: `H:/ClaudeCode/Youtube/youtube-schedule`
+- worktree: `<repo-root>`
 
 ### 目的
 

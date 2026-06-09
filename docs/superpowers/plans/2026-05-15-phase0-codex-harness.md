@@ -4,7 +4,7 @@
 
 **Goal:** YouTom リポジトリに Codex × Claude Code 共同開発ハーネスを構築し、Phase 1 以降のタスクを安全に Codex に振れる状態にする。
 
-**Architecture:** 技術記事プロジェクト（`H:/ClaudeCode/技術記事`）の cross-agent-review パターンをコード開発向けに翻案。役割分担表・merge ゲート4条件・handoff 運用・3 つのスキル（codex-handoff / cross-review / implement-task）を整備する。
+**Architecture:** 技術記事プロジェクト（`<technical-articles-repo>`）の cross-agent-review パターンをコード開発向けに翻案。役割分担表・merge ゲート4条件・handoff 運用・3 つのスキル（codex-handoff / cross-review / implement-task）を整備する。
 
 **Tech Stack:** Markdown ルールファイル + Claude Code skills（SKILL.md 形式）+ Codex 互換 skill（`.agents/skills/`）。コード変更なし。
 
@@ -217,7 +217,7 @@ git commit -m "docs(rules): add handoff-protocol for Codex/Claude co-development
 # YouTom 共同開発ハンドオフ
 
 最終更新: 2026-05-15
-対象リポジトリ: `H:/ClaudeCode/Youtube/youtube-schedule`
+対象リポジトリ: `<repo-root>`
 status: active
 
 このファイルは Codex と Claude Code の相互ハンドオフ log。書式・更新タイミングは `.claude/rules/handoff-protocol.md`、役割分担と merge ゲートは `.claude/rules/cross-agent-review.md` を参照。
