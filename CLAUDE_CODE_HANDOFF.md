@@ -10,6 +10,33 @@ status: active
 
 ---
 
+## 2026-06-09 22:44 リリース完了（v1.24.0 — Codex 作成）
+
+- 公開URL: `https://github.com/harness17/youtube-schedule/releases/tag/v1.24.0`
+- merge:
+  - ✅ `codex/insight-viewed-rate` → `develop`
+  - ✅ `develop` → `master`（`Release v1.24.0`）
+  - ✅ `master` → `develop` 同期
+- verify:
+  - ✅ `npm run lint`
+  - ✅ `npm run test`（70 files / 586 passed）
+  - ✅ `npm run test:coverage`
+  - ✅ `npm run build`
+  - ✅ master / develop CI
+  - ✅ GitHub Release workflow（Windows installer / `latest.yml`）
+- security:
+  - `npm audit fix` で `fast-uri` のhigh脆弱性を解消。
+  - moderate 3件は残存。`fast-xml-parser` は未使用の `XMLBuilder` 経路、`uuid` はGoogle認証ライブラリ配下の未使用APIで、現行実行経路に該当しないため受容。
+- signing:
+  - SignPath APIが503を返したため、workflowの既存フォールバックで未署名installerを公開。
+- ローカルpackaging:
+  - アプリpackagingまでは成功。electron-builder cache展開時にWindowsのsymlink権限不足で停止したが、GitHub Release workflowではinstaller生成に成功。
+- 次アクション:
+  - 実データで4小タブの分類結果と閾値（4件 / 50%）を確認し、利用感に応じて次版候補を決める。
+  - `fast-xml-parser` major upgradeはRSS parser回帰テストを伴う別タスクとして検討する。
+
+---
+
 ## 2026-06-09 22:22 クロスレビュー完了（v1.24 視聴傾向4指標 — Claude Code レビュー）
 
 - レビュアー: Claude Code 2.1.165 / Haiku
