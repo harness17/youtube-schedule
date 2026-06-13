@@ -40,6 +40,15 @@ export function useStats(active) {
     }
   }, [])
 
+  // 推し見落とし（unwatchedPinned）のカードを楽観的に更新する。
+  // ⭐/🔔 トグルは DB を即時更新するが stats は別管理のため、ここでパッチして表示を同期する。
+  const patchVideo = useCallback((id, patch) => {
+    setStats((prev) => ({
+      ...prev,
+      unwatchedPinned: prev.unwatchedPinned.map((v) => (v.id === id ? { ...v, ...patch } : v))
+    }))
+  }, [])
+
   useEffect(() => {
     if (active) loadStats()
   }, [active, loadStats])
@@ -51,5 +60,5 @@ export function useStats(active) {
     })
   }, [active, loadStats])
 
-  return { stats, loading, error, reload: loadStats }
+  return { stats, loading, error, reload: loadStats, patchVideo }
 }

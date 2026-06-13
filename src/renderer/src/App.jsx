@@ -166,8 +166,32 @@ export default function App() {
     stats,
     loading: statsLoading,
     error: statsError,
-    reload: reloadStats
+    reload: reloadStats,
+    patchVideo: patchStatsVideo
   } = useStats(activeTab === 'stats')
+
+  // StatsTab（推し見落とし）の ⭐/🔔 は useStats が別管理のため、
+  // 既存ハンドラで DB 更新したあと戻り値で stats を楽観パッチして表示を同期する。
+  const handleStatsToggleFavorite = useCallback(
+    async (id) => {
+      const newVal = await handleToggleFavorite(id)
+      if (newVal !== null && newVal !== undefined) {
+        patchStatsVideo(id, { isFavorite: newVal })
+      }
+      return newVal
+    },
+    [handleToggleFavorite, patchStatsVideo]
+  )
+  const handleStatsToggleNotify = useCallback(
+    async (id) => {
+      const newVal = await handleToggleNotify(id)
+      if (newVal !== null && newVal !== undefined) {
+        patchStatsVideo(id, { isNotify: newVal })
+      }
+      return newVal
+    },
+    [handleToggleNotify, patchStatsVideo]
+  )
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -653,8 +677,8 @@ export default function App() {
           loading={statsLoading}
           error={statsError}
           darkMode={darkMode}
-          onToggleNotify={handleToggleNotify}
-          onToggleFavorite={handleToggleFavorite}
+          onToggleNotify={handleStatsToggleNotify}
+          onToggleFavorite={handleStatsToggleFavorite}
           onTogglePin={handleStatsTogglePin}
           onDeleteChannel={handleStatsDeleteChannel}
           onSyncNow={() => handleSyncChannelsNow({ reloadStatsAfter: true })}
